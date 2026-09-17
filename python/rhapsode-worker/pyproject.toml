@@ -52,3 +52,6 @@ testpaths = ["tests"]
 # misbehaving engines under tests/engines/ and for conftest's helpers.
 pythonpath = ["tests", "."]
 asyncio_mode = "auto"
+# A deadlock in a suite that spawns processes and streams over sockets otherwise wedges CI instead
+# of failing it. Generous, because a cold start on a loaded runner is legitimately slow.
+timeout = 60

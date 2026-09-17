@@ -18,7 +18,7 @@ const venvBin = process.platform === 'win32' ? join(venv, 'Scripts') : join(venv
 const venvPython = join(venvBin, process.platform === 'win32' ? 'python.exe' : 'python');
 
 const PACKAGES = ['rhapsode-worker', 'rhapsode-engine-tone', 'conformance'];
-const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11'];
+const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'pytest-timeout>=2.3', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11'];
 
 // A sandbox or a corporate proxy that intercepts TLS makes pip's certificate check fail against a
 // certificate pip has no way to trust. RHAPSODE_PIP_TRUSTED_HOSTS is the escape hatch for that

@@ -8,13 +8,17 @@ from typing import Any
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
-from . import encoding
+from . import encoding, streaming
 from .engine import CreateVoiceRequest
 from .errors import BadRequest, WorkerError, classify
 from .worker import Worker
+
+#: Above this ASGI spec version Starlette stops racing its own disconnect listener and relies on
+#: `send()` raising, which uvicorn does not do. See `_check_disconnect_assumption`.
+DISCONNECT_RACE_CEILING = (2, 4)
 
 
 def create_app(worker: Worker) -> Starlette:
@@ -69,21 +73,69 @@ def create_app(worker: Worker) -> Starlette:
 
     async def speak(request: Request) -> Response:
         worker.reject_if_draining()
+        _check_disconnect_assumption(request, worker)
         spoken = worker.validate(await _json_body(request))
         await worker.ensure_loaded(spoken.variant)
 
-        async with worker.slots():
-            chunks = await asyncio.to_thread(lambda: b"".join(worker.pcm(spoken)))
-
         native = worker.engine.native_format
-        if spoken.format == "wav":
-            body = encoding.wav_header(native.sample_rate, native.channels, len(chunks)) + chunks
-        else:
-            body = chunks
-        return Response(
-            body,
-            media_type=encoding.content_type_for(spoken.format, native.sample_rate, native.channels),
-        )
+        content_type = encoding.content_type_for(spoken.format, native.sample_rate, native.channels)
+
+        # Serialised by default: one model, one utterance at a time is the right answer for a GPU.
+        # The slot is held until the audio has finished, not until this handler returns, because a
+        # streaming handler returns long before the audio does.
+        await worker.slots().acquire()
+        released = False
+
+        def release() -> None:
+            nonlocal released
+            if not released:
+                released = True
+                worker.slots().release()
+
+        try:
+            if not spoken.stream:
+                # Buffered: the audio is finished by the time this returns, so the slot goes back
+                # here. The streaming branch cannot do the same, which is the whole reason release()
+                # exists rather than a `with` statement around the handler.
+                try:
+                    return await _buffered(worker, spoken, content_type, native)
+                finally:
+                    release()
+
+            source = encoding.encode(
+                spoken.format,
+                streaming.from_blocking(lambda: worker.pcm(spoken)),
+                sample_rate=native.sample_rate,
+                channels=native.channels,
+            )
+
+            # Pull the first chunk before a status exists. Starlette sends http.response.start
+            # before it pulls anything, so without this an unknown voice or an OOM during the
+            # on-demand load would already have committed a 200, and the only move left would be to
+            # abort a connection that could have carried a perfectly good 404.
+            first, rest = await streaming.prime(source)
+            if first is None:
+                raise WorkerError("the engine produced no audio")
+        except BaseException:
+            release()
+            raise
+
+        async def body() -> Any:
+            try:
+                async for chunk in rest:
+                    yield chunk
+            except BaseException as error:
+                # Once a 200 and a Content-Type are on the wire the status cannot be taken back, so
+                # the only honest ending is an aborted connection. Raising here is what produces it:
+                # uvicorn closes the transport without the terminating chunk, and the core sees a
+                # truncated body rather than a short successful one.
+                failure = classify(error)
+                worker.log.error("speak failed after the headers went out", code=failure.code, error=error)
+                raise
+            finally:
+                release()
+
+        return StreamingResponse(body(), media_type=content_type)
 
     async def on_worker_error(_: Request, error: Exception) -> Response:
         failure = classify(error)
@@ -119,3 +171,61 @@ async def _json_body(request: Request) -> dict[str, Any]:
     if not isinstance(body, dict):
         raise BadRequest("the body must be a JSON object")
     return body
+
+
+async def _buffered(worker: Worker, spoken: Any, content_type: str, native: Any) -> Response:
+    """`stream: false`, which reports failures strictly better than streaming does.
+
+    Every failure is still a pre-headers failure, so a problem that would have been an aborted
+    connection becomes an ordinary error envelope with a code and a retryable flag. It is also the
+    only case where a WAV header can carry the real sizes.
+    """
+    pcm = bytearray()
+    async for chunk in streaming.from_blocking(lambda: worker.pcm(spoken)):
+        pcm.extend(chunk)
+
+    async def once() -> Any:
+        yield bytes(pcm)
+
+    body = bytearray()
+    async for chunk in encoding.encode(
+        spoken.format,
+        once(),
+        sample_rate=native.sample_rate,
+        channels=native.channels,
+        length=len(pcm),
+    ):
+        body.extend(chunk)
+
+    return Response(bytes(body), media_type=content_type)
+
+
+_warned_about_disconnect = False
+
+
+def _check_disconnect_assumption(request: Request, worker: Worker) -> None:
+    """Say so, loudly and once, if the thing that stops a cancelled synthesis has gone away.
+
+    uvicorn silently drops writes after the peer is gone, so an app that never learns about a
+    disconnect runs to the end of a line nobody is listening to, holding the card the whole time.
+    Starlette saves us, but only because it races its own disconnect listener while the ASGI spec
+    version is below 2.4. That is a load-bearing coincidence of two version numbers, and a silent
+    regression would look like nothing at all.
+    """
+    global _warned_about_disconnect
+    if _warned_about_disconnect:
+        return
+
+    version = str(request.scope.get("asgi", {}).get("spec_version", "2.0"))
+    try:
+        parsed = tuple(int(part) for part in version.split("."))
+    except ValueError:  # pragma: no cover - a server with a version we cannot read
+        parsed = (0,)
+
+    if parsed >= DISCONNECT_RACE_CEILING:
+        _warned_about_disconnect = True
+        worker.log.warn(
+            "this ASGI server reports a spec version at or above 2.4, where a cancelled request may "
+            "no longer stop the engine; a synthesis nobody is listening to will hold the device",
+            spec_version=version,
+        )
