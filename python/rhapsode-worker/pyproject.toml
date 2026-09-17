@@ -22,6 +22,8 @@ Homepage = "https://github.com/MaroonedSoftware/rhapsode"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rhapsode_worker"]
+# Ships the py.typed marker, so an adapter author type-checks against the SDK rather than Any.
+artifacts = ["src/rhapsode_worker/py.typed"]
 
 [tool.ruff]
 # Generated from contracts/. Linting a generator's output is a diff that comes back.
@@ -38,6 +40,15 @@ exclude = ["_contract"]
 python_version = "3.11"
 files = ["src"]
 
+# torch is imported inside a try/except for device detection and must never become a dependency, so
+# that an adapter with onnxruntime and no torch can still install this SDK. Its absence is normal.
+[[tool.mypy.overrides]]
+module = ["torch.*", "uvicorn.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The suite spawns real worker processes, so tests/ has to be importable as a module root for the
+# misbehaving engines under tests/engines/ and for conftest's helpers.
+pythonpath = ["tests", "."]
 asyncio_mode = "auto"

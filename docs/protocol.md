@@ -381,6 +381,7 @@ player should ask for `stream: false` and will get a better error the day someth
 | Code | HTTP | Retryable | Meaning |
 | --- | --- | --- | --- |
 | `bad_request` | 400 | no | Malformed, or a `params` key the variant does not have |
+| `unknown_engine` | 404 | no | Not in `GET /engines`. Core only; a worker is one engine |
 | `unknown_voice` | 404 | no | Not in `GET /voices` |
 | `unsupported` | 422 | no | A format, language or feature this variant does not do |
 | `model_unavailable` | 503 | **yes** | Loading, evicted, or a load that ran out of time |
