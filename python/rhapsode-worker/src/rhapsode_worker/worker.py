@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from . import encoding
@@ -30,6 +30,8 @@ class Worker:
         self.draining = False
         self._transition = asyncio.Lock()
         self._slots = asyncio.Semaphore(max(1, engine.concurrency))
+        #: Set by serve(), so that /terminate can ask the server to stop without importing it.
+        self.stop: Callable[[], None] = lambda: None
 
     # ---------------------------------------------------------------- documents
 
@@ -108,6 +110,31 @@ class Worker:
             await self._load_locked(wanted)
 
     async def _load_locked(self, variant: str) -> None:
+        """Load, and if that fails clear the wreckage and try exactly once more.
+
+        A load that dies on CUDA OOM strands its own partial allocations: 3.5 GiB was measured
+        stranded on a 16 GiB card. An immediate retry therefore throws itself at a card it has just
+        filled. Unload-then-load-once covers the common case of a card that was briefly full and has
+        since freed up, and it lives here so that every adapter gets it without knowing about it.
+
+        Exactly once, because a second failure is a fact about the card rather than about timing,
+        and a loop would hold the transition lock while the core waits to try something else.
+        """
+        try:
+            await self._attempt_load(variant)
+            return
+        except WorkerError as first:
+            self.log.warn(
+                "model load failed; clearing stranded memory and trying once more",
+                variant=variant,
+                code=first.code,
+                error=first,
+            )
+
+        await self._unload_locked(quiet=True)
+        await self._attempt_load(variant)
+
+    async def _attempt_load(self, variant: str) -> None:
         self.model = "loading"
         self.log.info("loading", variant=variant)
         try:
@@ -120,17 +147,27 @@ class Worker:
         self.model = "loaded"
         self.log.info("loaded", variant=variant)
 
-    async def _unload_locked(self) -> None:
+    async def _unload_locked(self, *, quiet: bool = False) -> None:
         self.model = "unloading"
         try:
             await asyncio.to_thread(self.engine.unload)
+        except Exception as error:
+            # An adapter whose unload throws has still lost the model as far as anybody here is
+            # concerned, and refusing to move on would strand the worker in `unloading` forever.
+            self.log.warn("unload raised; treating the model as gone anyway", error=error)
         finally:
             self.engine.variant = None
             self.model = "unloaded"
-        self.log.info("unloaded")
+        if not quiet:
+            self.log.info("unloaded")
 
     async def unload(self) -> None:
-        """Idempotent, and never fatal. Unloading nothing is a success."""
+        """Idempotent, and never fatal. Unloading nothing is a success.
+
+        An unload reclaims roughly 70% of what the model held, because the graphics runtime keeps
+        the rest until the process exits. That is why the core has `terminate` as well, and why a
+        residency manager with only this verb will slowly lose a card to nothing.
+        """
         async with self._transition:
             if self.model == "unloaded":
                 return
@@ -215,6 +252,10 @@ class Worker:
     def reject_if_draining(self) -> None:
         if self.draining:
             raise Overloaded("this worker is draining")
+
+    def request_stop(self) -> None:
+        """Finish what is in flight, then exit. The caller has already been answered."""
+        self.stop()
 
 
 def _license_document(declared: dict[str, Any]) -> dict[str, Any]:

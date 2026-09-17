@@ -84,9 +84,14 @@ to the log stream after the handshake, so the rule cannot be broken by accident.
 
 ### Stop
 
-`SIGTERM` means drain: refuse new requests with `503`, finish what is in flight, exit 0. The core
-sends `SIGKILL` after a grace period it owns. `POST /terminate` (§3) is the same sequence asked for
-over HTTP rather than signalled, and is what reclaims a card from a worker the core cannot signal.
+`SIGTERM` means drain: refuse new requests as `overloaded`, finish what is in flight, exit 0. The
+error table in § 6 is what fixes the status, and it says `429` and retryable, which is the answer
+this case wants: a request refused by a draining worker is one the core should send somewhere else
+or send again, not one it should write off. (This paragraph said `503` and the table said `429`. The
+table wins, because a caller reads the code and the `retryable` flag rather than the prose.) The
+core sends `SIGKILL` after a grace period it owns. `POST /terminate` (§3) is the same sequence asked
+for over HTTP rather than signalled, and is what reclaims a card from a worker the core cannot
+signal.
 
 An exit the core did not ask for is a crash, and the core restarts it with backoff, holding the
 restart count against it. An exit that follows a `SIGTERM` or a `/terminate` is not, however it is

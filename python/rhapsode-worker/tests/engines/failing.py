@@ -28,12 +28,21 @@ class FailingEngine(Engine):
     def variants(self) -> dict[str, Variant]:
         return {"only": Variant()}
 
+    #: Counts load attempts, so a test can tell "tried twice" from "tried once and got lucky".
+    _attempts = 0
+
     def load(self, variant: str) -> None:
+        type(self)._attempts += 1
         if MODE == "load_oom":
+            raise RuntimeError("CUDA error: out of memory")
+        if MODE == "load_oom_once" and type(self)._attempts == 1:
+            # What a card that was briefly full looks like: the first load strands its partial
+            # allocations, and the retry after an unload succeeds.
             raise RuntimeError("CUDA error: out of memory")
 
     def unload(self) -> None:
-        pass
+        if MODE == "unload_throws":
+            raise RuntimeError("the adapter's unload threw")
 
     def voices(self) -> list[Voice]:
         return [Voice(id="one", label="One", spec="one@only")]

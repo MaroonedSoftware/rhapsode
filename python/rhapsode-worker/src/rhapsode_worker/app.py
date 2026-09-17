@@ -71,6 +71,15 @@ def create_app(worker: Worker) -> Starlette:
         await worker.unload()
         return JSONResponse(worker.health())
 
+    async def terminate(_: Request) -> Response:
+        # Drain and exit 0, which is the only way to reclaim what an unload cannot: the graphics
+        # runtime holds the rest until the process goes. 202 rather than 200 because the answer has
+        # to leave before the process does, so the evidence it worked is the socket closing.
+        worker.log.info("terminating on request")
+        worker.draining = True
+        worker.request_stop()
+        return Response(status_code=202)
+
     async def speak(request: Request) -> Response:
         worker.reject_if_draining()
         _check_disconnect_assumption(request, worker)
@@ -154,6 +163,7 @@ def create_app(worker: Worker) -> Starlette:
             Route("/voices/{voice}", delete_voice, methods=["DELETE"]),
             Route("/load", load, methods=["POST"]),
             Route("/unload", unload, methods=["POST"]),
+            Route("/terminate", terminate, methods=["POST"]),
             Route("/speak", speak, methods=["POST"]),
         ],
         exception_handlers={Exception: on_worker_error, WorkerError: on_worker_error},

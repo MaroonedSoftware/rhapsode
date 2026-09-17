@@ -46,6 +46,9 @@ def serve(engine: Engine, *, argv: list[str] | None = None) -> None:
     # the window between "announced" and "able to drain" has to be zero rather than merely short.
     server = _server(create_app(worker))
     _install_signal_handlers(server, worker, log)
+    # POST /terminate is the same drain a signal asks for, reached over HTTP. The worker holds a
+    # callback rather than the server, so nothing below the transport layer knows what uvicorn is.
+    worker.stop = lambda: setattr(server, "should_exit", True)
 
     announce(engine=engine.id, contract=contract, listen=listen)
     seal_stdout(log)
