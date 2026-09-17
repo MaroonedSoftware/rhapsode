@@ -1,0 +1,44 @@
+name: build
+
+on:
+    workflow_call:
+
+permissions:
+    contents: read
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: '3.11'
+
+            # Every format in capabilities.formats has to actually produce bytes in that format, so
+            # the encoder is not something the suite can stub. A runner without ffmpeg would pass a
+            # worker that only ever serves pcm and wav.
+            - name: Install ffmpeg
+              run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm run python:sync
+
+            - run: pnpm run format:check
+            - run: pnpm run codegen:check
+            - run: pnpm run build
+            - run: pnpm run typecheck
+            - run: node scripts/python.mjs typecheck
+            - run: pnpm run lint
+            - run: node scripts/python.mjs lint
+            - run: pnpm run test

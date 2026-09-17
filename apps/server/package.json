@@ -1,0 +1,35 @@
+{
+    "name": "rhapsode",
+    "version": "0.0.0",
+    "description": "A multi-engine speech server: one contract, many TTS models.",
+    "type": "module",
+    "license": "MIT",
+    "bin": {
+        "rhapsode": "./dist/main.js"
+    },
+    "files": [
+        "dist/**",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsup src/main.ts --format esm --sourcemap && tsc --emitDeclarationOnly --declaration",
+        "build:ci": "eslint --max-warnings=0 && pnpm run build",
+        "lint": "eslint --fix",
+        "format": "prettier --write . --ignore-path ../../.prettierignore",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit",
+        "dev": "node --watch dist/main.js"
+    },
+    "dependencies": {
+        "@rhapsode/contract": "workspace:*",
+        "@rhapsode/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@repo/config-eslint": "workspace:*",
+        "@repo/config-typescript": "workspace:*",
+        "vitest": "^4.1.11"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

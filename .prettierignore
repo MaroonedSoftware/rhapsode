@@ -1,0 +1,29 @@
+# Every package's `format` script loads this file explicitly with --ignore-path, because Prettier
+# only auto-discovers a .prettierignore in its own CWD and never walks up to the workspace root.
+# Keep patterns `**/`-anchored so they match the same way whether Prettier runs from here or from a
+# package directory.
+
+**/pnpm-lock.yaml
+**/node_modules/
+**/dist/
+**/.venv/
+**/.pnpm-store/
+
+# Generated from contracts/. Rewriting a generator's output is a diff that comes back on the next
+# `pnpm codegen`, and `codegen:check` would then fail on a tree nobody edited.
+**/generated/
+**/_contract/
+docs/openapi.yaml
+
+# Prose, wrapped by hand at 100 columns. `docs/protocol.md` is the specification and it is argued
+# over line by line; Prettier reflows it to 150 and rewrites its tables, so a one-sentence amendment
+# arrives as several hundred lines of churn over text nobody touched. The same habit produced every
+# README and this repo's CLAUDE.md.
+**/*.md
+
+# The contracts. The ContractKit plugin will happily rewrite these, and the house style here is long
+# trailing `#` documentation on a field, which printWidth counts: the formatter then breaks the only
+# breakable thing left and a documented enum becomes three lines. These files are the source of the
+# types, the schemas and the SDK, so they are read far more often than they are edited, and the prose
+# is the part worth keeping.
+**/*.ck

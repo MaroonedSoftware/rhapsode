@@ -1,0 +1,30 @@
+{
+    "$schema": "https://turborepo.com/schema.json",
+    "globalEnv": ["NODE_ENV"],
+    "globalPassThroughEnv": ["TMPDIR", "RHAPSODE_FFMPEG"],
+    "tasks": {
+        "build": {
+            "dependsOn": ["^build"],
+            "outputs": ["dist/**"]
+        },
+        "codegen": {
+            "cache": false
+        },
+        "format": {
+            "dependsOn": ["^format"]
+        },
+        "lint": {
+            "dependsOn": ["^lint"]
+        },
+        "test": {
+            "dependsOn": ["^build"]
+        },
+        "typecheck": {
+            "dependsOn": ["^build"]
+        },
+        "dev": {
+            "cache": false,
+            "persistent": true
+        }
+    }
+}

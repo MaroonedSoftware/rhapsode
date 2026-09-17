@@ -1,0 +1,26 @@
+name: pr
+
+on:
+    pull_request:
+    push:
+        branches: [main]
+
+concurrency:
+    group: pr-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    build:
+        uses: ./.github/workflows/build.yml
+
+    ci-ok:
+        # One required check, so adding a job later does not mean editing branch protection.
+        if: always()
+        needs: [build]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Fail if anything upstream did
+              run: '[ "${{ needs.build.result }}" = "success" ]'

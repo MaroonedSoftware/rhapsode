@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-worker"
+version = "0.0.0"
+description = "The SDK an engine author subclasses: one class, and the worker protocol is handled."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "uvicorn>=0.30,<1.0",
+    "starlette>=0.37,<2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MaroonedSoftware/rhapsode"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_worker"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

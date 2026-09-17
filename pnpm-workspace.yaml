@@ -1,0 +1,14 @@
+packages:
+    - apps/*
+    - packages/*
+
+allowBuilds:
+    esbuild: true
+
+minimumReleaseAgeExclude:
+    - '@maroonedsoftware/*'
+    - '@contractkit/*'
+
+# pnpm's pre-run dependency check misfires in sandboxed sessions, where the store path drifts.
+# Warn rather than trying to reinstall underneath a running command.
+verifyDepsBeforeRun: warn
