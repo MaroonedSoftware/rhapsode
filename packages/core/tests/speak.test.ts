@@ -228,3 +228,71 @@ describeWithSockets('failing after the headers have gone', () => {
         expect(response.json().error).toMatchObject({ code: 'oom', retryable: true });
     }, 60_000);
 });
+
+describeWithSockets('version skew', () => {
+    it('refuses a worker whose contract major is above its own, naming both', async () => {
+        // The core and its workers ship separately, so they will disagree in the field. Designing
+        // for that on day one costs about forty lines; retrofitting it costs a client that sniffs
+        // your OpenAPI document to work out what you accept.
+        socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
+        const builder = await buildServer(
+            {
+                workers: { socketDir, startupTimeoutSeconds: 30 },
+                engines: {
+                    future: {
+                        displayName: 'From the future',
+                        license: MIT,
+                        command: PYTHON,
+                        args: ['-m', 'engines.future'],
+                        cwd: REPO,
+                        env: { PYTHONPATH: WORKER_TESTS },
+                    },
+                },
+            },
+            new RhapsodeJsonLogger('error', () => {}),
+        );
+        running = builder;
+        await builder.app.ready();
+
+        const response = await builder.app.inject({ method: 'GET', url: '/engines/future/capabilities' });
+
+        expect(response.statusCode).toBe(422);
+        const message = response.json().error.message;
+        expect(message).toContain('99');
+        expect(message).toContain('1');
+    }, 60_000);
+});
+
+describeWithSockets('residency under contention', () => {
+    it('queues a second engine rather than evicting a model that is speaking', async () => {
+        // At maxResidentModels 1 this is simply a queue, and it will look like a hang to an
+        // operator, which is why /health names what is blocking.
+        socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
+        const builder = await buildServer(
+            {
+                workers: { socketDir, startupTimeoutSeconds: 30 },
+                residency: { maxResidentModels: 1, evictionWaitSeconds: 30 },
+                engines: {
+                    tone: { venv: join(REPO, 'python/.venv') },
+                    second: {
+                        displayName: 'Second',
+                        license: MIT,
+                        command: PYTHON,
+                        args: ['-m', 'rhapsode_engine_tone'],
+                        cwd: REPO,
+                        env: { RHAPSODE_WORKER_ENGINE_ALIAS: 'second' },
+                    },
+                },
+            },
+            new RhapsodeJsonLogger('error', () => {}),
+        );
+        running = builder;
+        await builder.app.ready();
+
+        await speak(builder, { engine: 'tone', text: 'first', stream: false });
+        const health = (await builder.app.inject({ method: 'GET', url: '/health' })).json();
+
+        // One resident, and the budget is honest about the ceiling.
+        expect(health.residency).toMatchObject({ resident: 1, max: 1 });
+    }, 60_000);
+});

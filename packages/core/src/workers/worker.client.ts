@@ -102,6 +102,27 @@ export class WorkerClient {
         };
     }
 
+    /** A fixed line in one voice, which every engine gets for free from the SDK. § 7. */
+    async preview(voice: string, signal: AbortSignal): Promise<SpokenResponse> {
+        const response = await this.pool.request({
+            path: `/voices/${encodeURIComponent(voice)}/preview`,
+            method: 'GET',
+            signal,
+            headersTimeout: HEADERS_TIMEOUT_MS,
+            bodyTimeout: 0,
+        });
+
+        if (response.statusCode >= 400) {
+            throw fromWorkerEnvelope(await response.body.json().catch(() => undefined), response.statusCode);
+        }
+
+        return {
+            contentType: String(response.headers['content-type'] ?? 'application/octet-stream'),
+            body: response.body as unknown as Readable,
+            trailers: () => response.trailers,
+        };
+    }
+
     async close(): Promise<void> {
         await this.pool.destroy();
     }

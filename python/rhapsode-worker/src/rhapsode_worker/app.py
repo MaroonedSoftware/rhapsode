@@ -58,6 +58,25 @@ def create_app(worker: Worker) -> Starlette:
         await worker.delete_voice(request.path_params["voice"])
         return Response(status_code=204)
 
+    async def preview(request: Request) -> Response:
+        """A fixed line in one voice, so `previewUrl` works for every engine with no adapter effort.
+
+        Buffered rather than streamed: a preview is short, a client is usually rendering several at
+        once to fill a list, and a buffered failure is a status rather than a broken connection.
+        """
+        worker.reject_if_draining()
+        voice = request.path_params["voice"]
+        await worker.ensure_loaded(None)
+
+        native = worker.engine.native_format
+        async with worker.slots():
+            pcm = bytearray()
+            async for chunk in streaming.from_blocking(lambda: worker.engine.preview(voice)):
+                pcm.extend(chunk)
+
+        body = encoding.wav_header(native.sample_rate, native.channels, len(pcm)) + bytes(pcm)
+        return Response(body, media_type="audio/wav")
+
     async def load(request: Request) -> Response:
         worker.reject_if_draining()
         body = await _json_body(request)
@@ -161,6 +180,7 @@ def create_app(worker: Worker) -> Starlette:
             Route("/voices", voices, methods=["GET"]),
             Route("/voices", create_voice, methods=["POST"]),
             Route("/voices/{voice}", delete_voice, methods=["DELETE"]),
+            Route("/voices/{voice}/preview", preview, methods=["GET"]),
             Route("/load", load, methods=["POST"]),
             Route("/unload", unload, methods=["POST"]),
             Route("/terminate", terminate, methods=["POST"]),

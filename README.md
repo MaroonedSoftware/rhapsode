@@ -5,9 +5,11 @@
 Point it at a box with a GPU, install the engines you want, and every client talks to one HTTP API
 that describes honestly what each engine can actually do.
 
-> **Status: design.** The contract is written and the code is not.
-> [`docs/protocol.md`](docs/protocol.md) is the specification, and it is the thing to read, argue
-> with and open issues against. Nothing here is implemented yet.
+> **Status: early.** The worker protocol is implemented and conformance-tested, and a core that
+> spawns a worker and streams `/speak` through it works end to end. What is not here yet: a real
+> engine (the only one that ships is a tone generator with no weights), voice cloning through the
+> core, and the OpenAI and Wyoming shims.
+> [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
 
@@ -107,13 +109,52 @@ clients:
 - **OpenAI** `/v1/audio/speech`, where `model` selects the engine.
 - **Wyoming**, for Home Assistant voice pipelines.
 
+## Trying it
+
+```bash
+pnpm install && pnpm python:sync
+pnpm build
+
+cat > rhapsode.config.json <<'JSON'
+{
+    "server": { "port": 8080 },
+    "engines": { "tone": { "venv": "./python/.venv" } }
+}
+JSON
+
+node apps/server/dist/main.js
+```
+
+```bash
+curl localhost:8080/engines
+curl localhost:8080/engines/tone/capabilities
+curl -N -X POST localhost:8080/speak \
+  -H 'content-type: application/json' \
+  -d '{"engine":"tone","text":"Right, that was The Verve Pipe.","format":"wav"}' \
+  --output line.wav
+```
+
+The `tone` engine has no weights and makes a sine wave. It exists to prove the protocol rather than
+to make speech, which is exactly what makes it useful: it loads in microseconds, needs no GPU, and
+runs in CI on every commit. It is also the conformance fixture, and will stay one.
+
 ## Contributing an engine
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write
 Python and never open a TypeScript file. The SDK handles the socket, the handshake, the error
 taxonomy, format encoding from your native PCM, and the load-retry rules.
 
-See [`docs/protocol.md`](docs/protocol.md) § 8.
+```bash
+rhapsode-conform unix:/run/rhapsode/workers/your-engine.sock
+```
+
+Point it at your worker and it says whether that worker is one: 23 checks, each naming the section
+of the protocol it comes from, and an exit code you can wire into your own CI. Two of them compare
+audio with and without a cue, which is the closest a machine can get to the one thing an adapter has
+to get right by hand.
+
+See [`docs/protocol.md`](docs/protocol.md) § 8, and
+[`python/rhapsode-worker/`](python/rhapsode-worker/) for the SDK.
 
 ## Licence
 
