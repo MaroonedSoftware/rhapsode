@@ -2,7 +2,12 @@
  * The rhapsode core: routing, worker supervision and model residency.
  *
  * It never imports torch and holds no engine knowledge, which is the rule the whole design rests
- * on. Everything model-shaped lives behind a worker.
+ * on. Everything model-shaped lives behind a worker, and the core reaches it over HTTP.
  */
 
-export { CONTRACT_MAJOR } from '@rhapsode/contract';
+export { buildServer } from './server.js';
+export { DEFAULTS, type RhapsodeConfig } from './config.js';
+export { RhapsodeError, TAXONOMY, type ErrorCode } from './errors/rhapsode.error.js';
+export { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
+export { EngineRegistry, type EngineEntry, type EngineState } from './registry/engine.registry.js';
+export { CATALOG } from './registry/engines.catalog.js';

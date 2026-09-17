@@ -26,7 +26,15 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@maroonedsoftware/appconfig": "^2.6.1",
+        "@maroonedsoftware/errors": "^1.9.1",
+        "@maroonedsoftware/fastify": "^0.3.7",
+        "@maroonedsoftware/logger": "^1.1.9",
+        "@maroonedsoftware/servercore": "^0.3.0",
+        "@maroonedsoftware/zod": "^0.8.0",
         "@rhapsode/contract": "workspace:*",
+        "fastify": "^5.12.5",
+        "injectkit": "^1.7.1",
         "luxon": "^3.7.2",
         "undici": "^8.9.0",
         "zod": "^4.5.4"

@@ -3,6 +3,8 @@ packages:
     - packages/*
 
 allowBuilds:
+    # Pulled in by ServerKit's authentication package. Builds a native addon.
+    cbor-extract: true
     esbuild: true
 
 minimumReleaseAgeExclude:
