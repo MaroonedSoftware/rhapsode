@@ -42,3 +42,9 @@ jobs:
             - run: pnpm run lint
             - run: node scripts/python.mjs lint
             - run: pnpm run test
+
+            # The suite an engine author runs before opening a pull request, against the engine that
+            # exists to prove the protocol. If this passes and their engine fails it, the difference
+            # is theirs; if it fails here, the difference is ours.
+            - name: Conformance, against the reference engine
+              run: node scripts/conform.mjs

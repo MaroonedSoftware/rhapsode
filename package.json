@@ -13,7 +13,8 @@
         "test:python": "node scripts/python.mjs test",
         "typecheck": "turbo run typecheck",
         "python:sync": "node scripts/python.mjs sync",
-        "changeset": "changeset"
+        "changeset": "changeset",
+        "conform": "node scripts/conform.mjs"
     },
     "devDependencies": {
         "@changesets/cli": "^3.0.2",
