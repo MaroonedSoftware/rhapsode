@@ -1,0 +1,26 @@
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+
+# Models and generated audio, which are never committed
+models/
+weights/
+voices/*.wav
+outputs/
+
+# Local
+.env
+.env.*
+!.env.example
+*.sock
+.DS_Store
