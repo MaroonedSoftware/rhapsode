@@ -1,0 +1,9 @@
+{
+    "rootDir": ".",
+    "patterns": ["contracts/rhapsode.types.ck", "contracts/rhapsode.worker.ck", "contracts/rhapsode.public.ck"],
+    "plugins": {
+        "@contractkit/plugin-python": {
+            "baseDir": "python/conformance/src/rhapsode_conform/_generated/"
+        }
+    }
+}

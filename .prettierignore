@@ -8,6 +8,7 @@
 **/dist/
 **/.venv/
 **/.pnpm-store/
+**/.contractkit/
 
 # Generated from contracts/. Rewriting a generator's output is a diff that comes back on the next
 # `pnpm codegen`, and `codegen:check` would then fail on a tree nobody edited.

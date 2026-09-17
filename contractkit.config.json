@@ -1,0 +1,20 @@
+{
+    "rootDir": ".",
+    "prettier": true,
+    "patterns": ["contracts/**/*.ck"],
+    "plugins": {
+        "@contractkit/plugin-typescript": {
+            "zod": {
+                "baseDir": "packages/contract/",
+                "output": "src/generated/{filename}.schema.ts"
+            }
+        },
+        "@contractkit/plugin-docs": {
+            "openapi": {
+                "baseDir": "docs/",
+                "output": "openapi.yaml",
+                "info": { "title": "Rhapsode", "version": "1.0.0" }
+            }
+        }
+    }
+}

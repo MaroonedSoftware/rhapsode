@@ -17,9 +17,12 @@ rhapsode-conform = "rhapsode_conform.__main__:main"
 packages = ["src/rhapsode_conform"]
 
 [tool.ruff]
+# Generated from contracts/. Linting a generator's output is a diff that comes back.
+extend-exclude = ["src/**/_generated"]
 line-length = 110
 target-version = "py311"
 
 [tool.mypy]
 strict = true
+exclude = ["_generated"]
 files = ["src"]

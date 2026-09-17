@@ -36,3 +36,6 @@ python/.venv/
 
 # pnpm writes a project-local store when the configured store path is unreachable.
 .pnpm-store/
+
+# ContractKit's build cache.
+.contractkit/

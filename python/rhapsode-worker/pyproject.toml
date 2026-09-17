@@ -10,6 +10,9 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
+    # The response shapes are generated from contracts/rhapsode.types.ck as Pydantic models, so the
+    # worker validates what it sends against the same declaration the core parses it with.
+    "pydantic>=2.0",
     "uvicorn>=0.30,<1.0",
     "starlette>=0.37,<2.0",
 ]
@@ -21,6 +24,8 @@ Homepage = "https://github.com/MaroonedSoftware/rhapsode"
 packages = ["src/rhapsode_worker"]
 
 [tool.ruff]
+# Generated from contracts/. Linting a generator's output is a diff that comes back.
+extend-exclude = ["src/**/_contract"]
 line-length = 110
 target-version = "py311"
 
@@ -29,6 +34,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.mypy]
 strict = true
+exclude = ["_contract"]
 python_version = "3.11"
 files = ["src"]
 

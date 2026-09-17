@@ -1,9 +1,10 @@
 /**
- * The rhapsode contract: the vocabulary, the protocol constants, and the generated schemas.
+ * The rhapsode contract: the generated schemas, the standard vocabulary, and the pure functions
+ * that apply it.
  *
- * This package depends on zod and nothing else, so a client SDK or a shim can adopt it alone
- * without dragging in a server.
+ * This package depends on zod and nothing else. Keep it that way: it is what a client SDK or a
+ * shim adopts on its own, and a server dependency in here would defeat that.
  */
 
-/** The contract major this build of the core and its SDK speak. See `docs/protocol.md` § 9. */
-export const CONTRACT_MAJOR = 1;
+export * from './generated/rhapsode.types.schema.js';
+export * from './vocabulary.js';

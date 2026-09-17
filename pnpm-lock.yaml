@@ -14,6 +14,9 @@ importers:
       '@contractkit/cli':
         specifier: ^0.11.5
         version: 0.11.5(prettier@3.9.7)
+      '@contractkit/plugin-docs':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@contractkit/plugin-python':
         specifier: ^0.15.3
         version: 0.15.3
@@ -228,6 +231,9 @@ packages:
 
   '@contractkit/openapi-to-ck@0.12.7':
     resolution: {integrity: sha512-NPit0nOSXptji+0Na6aHsXE1MbxK4S2U2n6xwv80e0nafgkHIYYxiMx9gN8PX/teY4s1XwsYX+GCbaUlDqLENw==}
+
+  '@contractkit/plugin-docs@0.4.1':
+    resolution: {integrity: sha512-xu12r7EEEV0K0fUg7pP13GB0lOWfAGAJ+b6zaX2Ljyj1A2a2X9FkWbZlX5quAfLXo8BdDYIQh4pdlEB7VrMVMw==}
 
   '@contractkit/plugin-python@0.15.3':
     resolution: {integrity: sha512-Hs8Gzc+6inFSwJ28n602BA4bD7q2yrDmjF8JJZhyvTe2KmeRDBKP0zs7SkzvMVqSW2W9HMIZT1JtZ9O+4mOt4g==}
@@ -1801,6 +1807,10 @@ snapshots:
     dependencies:
       '@contractkit/core': 0.31.0
       yaml: 2.9.1
+
+  '@contractkit/plugin-docs@0.4.1':
+    dependencies:
+      '@contractkit/core': 0.31.0
 
   '@contractkit/plugin-python@0.15.3':
     dependencies:
