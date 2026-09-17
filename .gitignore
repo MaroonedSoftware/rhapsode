@@ -39,3 +39,4 @@ python/.venv/
 
 # ContractKit's build cache.
 .contractkit/
+.scratch/
