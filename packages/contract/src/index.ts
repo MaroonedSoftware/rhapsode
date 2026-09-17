@@ -6,5 +6,6 @@
  * shim adopts on its own, and a server dependency in here would defeat that.
  */
 
+export * from './dispatch.js';
 export * from './generated/rhapsode.types.schema.js';
 export * from './vocabulary.js';
