@@ -14,3 +14,6 @@ export { CATALOG } from './registry/engines.catalog.js';
 export { WorkerClient, type SpokenResponse } from './workers/worker.client.js';
 export { WorkerRegistry } from './workers/worker.registry.js';
 export { LocalWorkerHandle, RemoteWorkerHandle, resolveCommand, type WorkerHandle } from './workers/worker.handle.js';
+export { ResidencyManager, type ResidencyLease, type ResidencyPolicy } from './residency/residency.manager.js';
+export { Mutex } from './residency/mutex.js';
+export { audioFloor, ShortAudioError } from './speak/audio.floor.js';

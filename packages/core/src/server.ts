@@ -14,6 +14,8 @@ import { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js'
 import { engineModule } from './registry/engine.module.js';
 import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
+import { residencyModule } from './residency/residency.module.js';
+import { speakRoutes } from './speak/speak.routes.js';
 import { workerModule } from './workers/worker.module.js';
 import type { RhapsodeConfig } from './config.js';
 
@@ -34,7 +36,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger): Pr
     // Registration order is the shutdown contract: ServerKit runs `shutdown` hooks in reverse, so
     // this order means shutdown unwinds speak, then residency, then the workers. Registering the
     // worker module last would kill the children out from under streams still reading them.
-    const modules: ServerKitModule[] = [engineModule(settings), workerModule(settings)];
+    const modules: ServerKitModule[] = [engineModule(settings), workerModule(settings), residencyModule(settings)];
 
     const container = await builder.setup(config, log, modules);
 
@@ -45,7 +47,12 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger): Pr
         bodyParserPlugin(),
     ]);
 
-    const routes: ServerKitRouteMount[] = [{ plugin: healthRoutes }, { plugin: enginesRoutes }, { plugin: engineDetailRoutes }];
+    const routes: ServerKitRouteMount[] = [
+        { plugin: healthRoutes },
+        { plugin: enginesRoutes },
+        { plugin: engineDetailRoutes },
+        { plugin: speakRoutes },
+    ];
     builder.setupRoutes(routes);
 
     return builder;
