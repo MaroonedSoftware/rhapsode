@@ -3,13 +3,14 @@ import { pipeline } from 'node:stream/promises';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Logger } from '@maroonedsoftware/logger';
 
-import { assertWithinCeiling, effectiveVariant, performable, type Claims } from '@rhapsode/contract';
+import { assertWithinCeiling, effectiveVariant, MIN_PLAUSIBLE_AUDIO_BYTES, performable, type Claims } from '@rhapsode/contract';
 
 import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
 import { ResidencyManager } from '../residency/residency.manager.js';
+import { DURATION_HEADER, type SpokenResponse } from '../workers/worker.client.js';
 import { WorkerRegistry } from '../workers/worker.registry.js';
-import { audioFloor } from './audio.floor.js';
+import { audioFloor, ShortAudioError } from './audio.floor.js';
 
 const DEFAULT_MAX_CHARACTERS = 4096;
 
@@ -36,16 +37,18 @@ export interface SpeakOptions {
 }
 
 /**
- * Speak a native request through its engine and stream the answer onto `reply`.
+ * Speak a native request through its engine and put the answer on `reply`, streamed or buffered as
+ * the request asked.
  *
  * Both `/speak` and the OpenAI shim end here, which is what keeps § 11's promise that the shim is a
  * translation and not a second implementation: there is one ceiling, one cue stripper, one lease and
  * one way of failing after the headers, and a rule added to any of them reaches both routes.
  *
  * The order below is load-bearing. Everything that can fail before the hijack fails as an ordinary
- * error envelope; everything after it is an aborted connection, because once a 200 and a
- * Content-Type are on the wire the status cannot be taken back. That is the whole of § 6's "failing
- * after the headers have gone", expressed as one line in a handler.
+ * error envelope, and a buffered answer never reaches the hijack; everything after it is an aborted
+ * connection, because once a 200 and a Content-Type are on the wire the status cannot be taken back.
+ * That is the whole of § 6's "failing after the headers have gone", expressed as one line in a
+ * handler.
  */
 export async function speakThrough(
     request: FastifyRequest,
@@ -120,6 +123,15 @@ export async function speakThrough(
         throw error;
     }
 
+    if (!native.stream) {
+        try {
+            return await sendBuffered(reply, upstream);
+        } finally {
+            settled = true;
+            lease.release();
+        }
+    }
+
     // Only now. Everything above could still answer with a status.
     reply.hijack();
 
@@ -152,4 +164,37 @@ export async function speakThrough(
     }
 
     return reply;
+}
+
+/**
+ * `stream: false`: the whole body, counted, before any status is written.
+ *
+ * § 6 promises that a buffered request reports failures strictly better than a streamed one, because
+ * every failure is still a pre-headers failure. That holds only if the core has the body before it
+ * commits a status. It used to write the 200 first and count through the same floor a stream uses,
+ * so a worker that answered a buffered request with a click still produced an aborted connection,
+ * and the Content-Length and duration the worker had sent were dropped on the way through.
+ *
+ * The buffer is one response, bounded by the variant's `maxCharacters`, and § 13.2 is the decision
+ * that the core holds audio here and nowhere else.
+ */
+async function sendBuffered(reply: FastifyReply, upstream: SpokenResponse): Promise<FastifyReply> {
+    const chunks: Buffer[] = [];
+    try {
+        for await (const chunk of upstream.body) chunks.push(chunk as Buffer);
+    } catch (error) {
+        throw new RhapsodeError('internal', `the worker's answer ended early: ${error instanceof Error ? error.message : String(error)}`, {
+            cause: error,
+        });
+    }
+
+    const body = Buffer.concat(chunks);
+    if (body.length < MIN_PLAUSIBLE_AUDIO_BYTES) {
+        const short = new ShortAudioError(body.length);
+        throw new RhapsodeError('internal', short.message, { cause: short });
+    }
+
+    reply.header('content-type', upstream.contentType).header('cache-control', 'no-store').header('content-length', body.length);
+    if (upstream.durationMs !== undefined) reply.header(DURATION_HEADER, upstream.durationMs);
+    return reply.send(body);
 }

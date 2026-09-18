@@ -127,6 +127,19 @@ describeWithSockets('speaking', () => {
         expect(body.readUInt32LE(40)).toBe(body.length - 44);
     }, 60_000);
 
+    it('says how long a buffered take is, in bytes and in time', async () => {
+        // § 6: with `stream: false` both are known before the headers go out, so both are headers.
+        // The worker sent them and the core dropped them, forwarding only the Content-Type.
+        const builder = await start();
+        const response = await speak(builder, { engine: 'tone', text: 'buffered', format: 'pcm', stream: false });
+
+        expect(response.statusCode).toBe(200);
+        expect(Number(response.headers['content-length'])).toBe(response.rawPayload.length);
+        expect(response.headers['transfer-encoding']).toBeUndefined();
+        // Tone's pcm is s16le at 24 kHz mono, so the body is the samples and nothing else.
+        expect(Number(response.headers['x-rhapsode-duration-ms'])).toBe(Math.round((response.rawPayload.length / 2 / 24_000) * 1000));
+    }, 60_000);
+
     it('strips a cue the variant does not claim, before the worker ever sees it', async () => {
         // An engine that performs no cues never receives one, so the failure where an engine reads
         // the word "laugh" out loud cannot happen. Shorter text is shorter audio, which is how the
@@ -234,6 +247,18 @@ describeWithSockets('failing after the headers have gone', () => {
         expect(result.status).toBe(200);
         expect(result.bytes).toBeLessThan(256);
         expect(result.failure).toBeInstanceOf(TypeError);
+    }, 60_000);
+
+    it('reports a body too small to be audio as an envelope when it was buffered', async () => {
+        // § 6: "stream: false reports failures strictly better than stream: true does". The core
+        // used to write its 200 before counting, so a buffered request that was sent a click got an
+        // aborted connection exactly as a streamed one did, and no reason.
+        const builder = await start('tiny');
+        const response = await speak(builder, { engine: 'failing', text: 'x', format: 'pcm', stream: false });
+
+        expect(response.statusCode).toBe(500);
+        expect(response.json().error).toMatchObject({ code: 'internal', retryable: false });
+        expect(response.json().error.message).toContain('16 bytes');
     }, 60_000);
 
     it('reports a pre-headers failure as a clean envelope instead', async () => {
