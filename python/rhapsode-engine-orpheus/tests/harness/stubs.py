@@ -63,7 +63,12 @@ class FakeLlama:
         self.seed: int | None = None
         self.generations: list[Generation] = []
         self.closed = False
+        #: The prompt whose KV cache is still held, which llama.cpp reuses across calls to generate.
+        self.cached: list[int] = []
         recorder.llamas.append(self)
+
+    def reset(self) -> None:
+        self.cached = []
 
     def tokenize(self, text: bytes, add_bos: bool = True, special: bool = False) -> list[int]:
         return ([128000] if add_bos else []) + list(text)
@@ -77,7 +82,13 @@ class FakeLlama:
         return self._generate(generation)
 
     def _generate(self, generation: Generation) -> Iterator[int]:
-        rng = random.Random(repr((generation.tokens, generation.seed, sorted(generation.sampling.items()))))
+        # As llama.cpp does: a prompt that shares a prefix with the cached one is evaluated only from
+        # where they differ, and the logits that produces are not bit-identical to a whole evaluation,
+        # so what is sampled from them is not either.
+        replayed = bool(self.cached) and self.cached[:8] == generation.tokens[:8]
+        self.cached = list(generation.tokens)
+        options = sorted(generation.sampling.items())
+        rng = random.Random(repr((generation.tokens, generation.seed, options, replayed)))
         frames = self.recorder.frames if self.recorder.frames is not None else 6 + len(generation.tokens) // 2
         position = 0
         try:
@@ -171,9 +182,14 @@ class _Audio(np.ndarray):
 
 
 class FakeSnac:
-    def __init__(self) -> None:
+    """SNAC 24 kHz, including the part that matters here: its decoder adds noise from torch's global
+    generator on every decode, so the same codes decode differently unless torch was seeded."""
+
+    def __init__(self, torch: types.ModuleType) -> None:
+        self.torch = torch
         self.device: str | None = None
         self.decoded: list[list[list[int]]] = []
+        self.seeds: list[int | None] = []
 
     def eval(self) -> FakeSnac:
         return self
@@ -185,7 +201,9 @@ class FakeSnac:
     def decode(self, codes: list[np.ndarray]) -> _Audio:
         layers = [np.asarray(layer).reshape(-1).tolist() for layer in codes]
         self.decoded.append(layers)
-        digest = int.from_bytes(hashlib.sha256(repr(layers).encode()).digest()[:8], "little")
+        self.seeds.append(self.torch.seeded)  # type: ignore[attr-defined]
+        noise = self.torch.generator.getrandbits(32)  # type: ignore[attr-defined]
+        digest = int.from_bytes(hashlib.sha256(repr((layers, noise)).encode()).digest()[:8], "little")
         samples = np.random.default_rng(digest).uniform(-0.5, 0.5, len(layers[0]) * SAMPLES_PER_FRAME)
         return samples.astype(np.float32).reshape(1, 1, -1).view(_Audio)
 
@@ -198,9 +216,18 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
     torch.inference_mode = contextlib.nullcontext  # type: ignore[attr-defined]
     torch.cuda = types.SimpleNamespace(is_available=lambda: False, empty_cache=lambda: None)  # type: ignore[attr-defined]
     torch.backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: False))  # type: ignore[attr-defined]
+    # The global generator, unseeded until somebody seeds it, as torch's is.
+    torch.generator = random.Random()  # type: ignore[attr-defined]
+    torch.seeded = None  # type: ignore[attr-defined]
+
+    def manual_seed(seed: int) -> None:
+        torch.generator = random.Random(seed)  # type: ignore[attr-defined]
+        torch.seeded = seed  # type: ignore[attr-defined]
+
+    torch.manual_seed = manual_seed  # type: ignore[attr-defined]
 
     snac = types.ModuleType("snac")
-    codec = FakeSnac()
+    codec = FakeSnac(torch)
 
     def from_pretrained(repo_id: str, **options: Any) -> FakeSnac:
         recorder.downloads.append({"repo_id": repo_id, **options})

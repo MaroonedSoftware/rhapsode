@@ -76,6 +76,16 @@ def test_a_seed_zero_is_zero_and_a_large_one_wraps(orpheus: Recorder) -> None:
     assert [generation.seed for generation in orpheus.llamas[0].generations] == [0, 5]
 
 
+def test_the_same_seed_and_prompt_twice_is_the_same_tokens(orpheus: Recorder) -> None:
+    # Without a reset, llama.cpp reuses the cached prompt and samples from logits that differ in the
+    # last bits: on the real q8 weights the two runs agreed for 160 tokens and then diverged.
+    built = source()
+    first = list(built.tokens("tara: hi", SAMPLING))
+    list(built.tokens("tara: something else", SAMPLING))
+    assert list(built.tokens("tara: hi", SAMPLING)) == first
+    assert list(built.tokens("tara: hi", SAMPLING)) == first
+
+
 def test_every_layer_goes_to_the_gpu_when_there_is_one(orpheus: Recorder) -> None:
     source(gpu=True)
     source(gpu=False)

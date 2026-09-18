@@ -67,6 +67,13 @@ class LlamaCppSource:
         seed = sampling.seed if sampling.seed is not None else random.SystemRandom().getrandbits(32)
         self._llama.set_seed(seed % 2**32)
 
+        # Forget the last prompt. `reset=True` below does not: llama-cpp-python keeps whatever prefix
+        # of the KV cache matches and evaluates only the rest, so a repeated prompt is evaluated in a
+        # different batch shape than it was the first time, its logits differ in the last bits, and
+        # sampling goes its own way. Measured on q8 with Metal: the same seed and prompt twice agreed
+        # for 160 tokens and then diverged, which made a seed reproduce nothing.
+        self._llama.reset()
+
         generated = self._llama.generate(
             prompt,
             # Upstream's vLLM defaults: no top-k and no min-p. llama.cpp's own are 40 and 0.05, which

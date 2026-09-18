@@ -185,19 +185,30 @@ class OrpheusEngine(Engine):
             )
             framer = Framer()
             generated = 0
+            windows = 0
             for token in source.tokens(prompt(voice, segment), sampling):
                 generated += 1
                 window = framer.push(token)
                 if window is not None:
-                    yield decoder.decode(window)
+                    yield decoder.decode(window, _window_seed(sampling.seed, windows))
+                    windows += 1
             tail = framer.finish()
             if tail is not None:
-                yield decoder.decode(tail)
+                yield decoder.decode(tail, _window_seed(sampling.seed, windows))
 
             if generated >= MAX_TOKENS:
                 # The model was still speaking when it ran out, so this segment ends mid-word. It is
                 # what SEGMENT_CHARACTERS exists to prevent, and the evidence for tuning it.
                 self.log.warn("a segment ran out of tokens", characters=len(segment), tokens=generated)
+
+
+def _window_seed(seed: int | None, window: int) -> int | None:
+    """A codec seed per window of a seeded segment, and none for an unseeded one.
+
+    Different for every window, because the codec's noise is drawn fresh each decode: one seed for all
+    of them would lay the same noise down every 85 ms, a pattern at 11.7 Hz.
+    """
+    return None if seed is None else (seed * 1_000_003 + window) % 2**63
 
 
 def _gguf(variant: str) -> str:

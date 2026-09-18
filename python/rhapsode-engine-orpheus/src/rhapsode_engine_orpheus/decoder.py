@@ -27,8 +27,16 @@ class SnacDecoder:
         self._device = device
         self._model: Any = SNAC.from_pretrained(SNAC_REPOSITORY, revision=SNAC_REVISION).eval().to(device)
 
-    def decode(self, window: Window) -> bytes:
+    def decode(self, window: Window, seed: int | None = None) -> bytes:
+        """PCM for the samples `window` keeps.
+
+        SNAC's decoder adds noise on every decode (`NoiseBlock`, with `"noise": true` in this model's
+        config), drawn from torch's global generator, so the same codes decode differently every time
+        unless it is seeded. Measured on both the CPU and MPS. A seed pins it; None leaves it be.
+        """
         torch = self._torch
+        if seed is not None:
+            torch.manual_seed(seed)
         codes = [
             torch.tensor([layer], dtype=torch.int32, device=self._device) for layer in layers(window.codes)
         ]

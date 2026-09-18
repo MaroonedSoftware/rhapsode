@@ -171,9 +171,31 @@ class TestSpeaking:
         assert seeds == list(range(100, 100 + len(seeds)))
 
     def test_a_seed_reproduces_the_audio(self, orpheus: Recorder, tmp_path: Path) -> None:
+        # Two things had to be pinned for this, and on the real weights neither was: llama.cpp's
+        # prompt cache (see the backend) and SNAC's decoder, which adds noise from torch's generator.
         built = loaded(tmp_path)
         assert spoken(built, seed=5) == spoken(built, seed=5)
         assert spoken(built, seed=5) != spoken(built, seed=6)
+
+    def test_each_window_of_a_seeded_request_seeds_the_codec_differently(
+        self, orpheus: Recorder, tmp_path: Path
+    ) -> None:
+        # One seed for every window would lay the same noise down every 85 ms, a buzz at 11.7 Hz.
+        import snac
+
+        orpheus.frames = 9
+        spoken(loaded(tmp_path), seed=5)
+        seeds = snac.codec.seeds  # type: ignore[attr-defined]
+        assert None not in seeds
+        assert len(set(seeds)) == len(seeds) > 1
+
+    def test_an_unseeded_request_leaves_the_codec_its_own_noise(
+        self, orpheus: Recorder, tmp_path: Path
+    ) -> None:
+        import snac
+
+        spoken(loaded(tmp_path))
+        assert set(snac.codec.seeds) == {None}  # type: ignore[attr-defined]
 
     def test_a_segment_that_runs_out_of_tokens_is_logged(self, orpheus: Recorder, tmp_path: Path) -> None:
         orpheus.endless = True
