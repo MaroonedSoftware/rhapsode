@@ -1,0 +1,99 @@
+name: release
+
+# A pushed `v*` tag publishes. `pnpm release version <x.y.z>` is what makes the commit to tag: it
+# moves every published package to one version and folds the changesets into CHANGELOG.md.
+on:
+    push:
+        tags: ['v*']
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    versions:
+        # First and cheapest. A tag that disagrees with any package would publish something under a
+        # number nobody asked for, and § 9's one-version rule would be false from the first release.
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+            - run: node scripts/release.mjs check "$GITHUB_REF_NAME"
+
+    build:
+        # The whole of CI, again, on exactly the commit being published.
+        needs: [versions]
+        uses: ./.github/workflows/build.yml
+
+    npm:
+        needs: [build]
+        runs-on: ubuntu-latest
+        environment: npm
+        permissions:
+            contents: read
+            # Provenance: npm records that this workflow, on this commit, built what it publishes.
+            id-token: write
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  registry-url: https://registry.npmjs.org
+
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm run build
+
+            # Packed by pnpm, because only pnpm rewrites `workspace:*` into the version being
+            # released, and published by npm, because npm is what attaches provenance. Dependencies
+            # before dependents, so no published package ever names one that is not there yet.
+            #
+            # A version already on the registry is skipped rather than failed, so a run that died
+            # halfway is finished by re-running it, not by cutting a new version.
+            - name: Publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  version="${GITHUB_REF_NAME#v}"
+                  out="$RUNNER_TEMP/npm"
+                  mkdir -p "$out"
+                  for dir in packages/contract packages/sdk packages/core apps/server; do
+                      name=$(node -p "require('./$dir/package.json').name")
+                      if npm view "$name@$version" version >/dev/null 2>&1; then
+                          echo "$name@$version is already published"
+                          continue
+                      fi
+                      tarball=$(cd "$dir" && pnpm pack --pack-destination "$out" | tail -n 1)
+                      npm publish "$tarball" --access public --provenance
+                  done
+
+    github:
+        needs: [npm]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+            - name: Release notes, from CHANGELOG.md
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  node scripts/release.mjs notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+                  gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
