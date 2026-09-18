@@ -451,17 +451,43 @@ to anybody who followed it from the public API. The core rewrites each one to
 proxying, and the only reason it does is that the worker cannot know its own prefix. A client should
 follow the URL it was given and never build one.
 
-Cloning, where the variant supports it:
+**A voice id is a name**: letters, digits, `-` and `_`, starting with a letter or digit, at most 64
+characters. Anything else is `bad_request`, checked before an adapter sees it. An adapter makes a
+file of an id, and before the rule an id of `../../x` wrote a clone outside the voice directory and
+an id of `*` matched whichever voice sorted first.
+
+**A voice the engine does not have is `unknown_voice`, never a substitute.** An engine that falls
+back to its default voice for an id it does not know hands the caller audio in a voice they did not
+ask for, with a `200`, which is the silent discard this document exists to prevent.
+
+Cloning, where the engine supports it:
 
 ```http
-POST /voices
+POST /engines/{engine}/voices          (worker: POST /voices)
 Content-Type: multipart/form-data
   id=narrator_03  label="Narrator 03"  reference=@clip.wav
-DELETE /voices/{id}
+DELETE /engines/{engine}/voices/{id}   (worker: DELETE /voices/{id})
 ```
 
-The worker owns its voice store. The core does not proxy files around or keep a shadow registry,
-because two registries is one more than the number that can be right.
+The answer to a create is the new voice, as `GET /voices` would list it. Creating an id that exists
+replaces it, which is how a voice is re-recorded; its `spec` changes, so a cached preview does too.
+
+**The worker owns its voice store.** The core keeps no shadow registry, because two registries is one
+more than the number that can be right. It streams the upload to the worker as it arrives and keeps
+no copy, so a clip costs the core no memory and no disk. It refuses a body over **25 MB** as
+`bad_request`: a usable reference is 5 to 20 seconds, which is under 1 MB of 24 kHz mono WAV and
+under 6 MB of 48 kHz stereo at 24 bits, so the cap is generous for any clip and small enough that a
+single request cannot fill a disk.
+
+**Creating and deleting a voice are management routes** (§ 10): they write files on the box, so the
+same guard applies and a page from another machine is refused. Listing voices and hearing a preview
+stay open, like speaking.
+
+**Creating a voice loads no model and takes no residency slot.** An adapter's `create_voice` stores
+the reference and returns. Work that needs the model, such as computing a speaker embedding, happens
+at the first `speak` in that voice, under the lease `speak` already holds. The alternative is a clone
+that evicts whatever another caller is using, from a route nobody would expect to touch the GPU, and
+Chatterbox, which clones from the reference on every call anyway, has nothing to do early.
 
 ---
 
