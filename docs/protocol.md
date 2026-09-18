@@ -29,6 +29,10 @@ Every rule below that looks arbitrary is one somebody already paid for, and says
 | `POST /speak` (with `engine`) | `POST /speak` |
 | `GET /health` | `GET /health` |
 | (core policy) | `POST /load`, `POST /unload`, `POST /terminate` |
+| `POST /engines/{id}/pull` (§ 10) | `POST /fetch` |
+
+The core also answers routes no worker has, for installing and removing engines. They are about the
+box rather than about speech, and § 10 describes them.
 
 This is the single decision everything else falls out of, and it buys four things:
 
@@ -405,6 +409,8 @@ player should ask for `stream: false` and will get a better error the day someth
 | `oom` | 503 | **yes** | Out of device memory |
 | `overloaded` | 429 | **yes** | Draining, or at the concurrency limit |
 | `internal` | 500 | no | The adapter threw |
+| `forbidden` | 403 | no | A management route (§ 10) called from somewhere it does not answer |
+| `conflict` | 409 | no | A management route (§ 10) asked for something the current state rules out |
 
 **`retryable` is a field and not something the client infers from the status.** The distinction that
 matters is between "this request was wrong" and "this request was fine and the server was not", and
@@ -512,7 +518,8 @@ serve(ChatterboxEngine())
 
 - Binds the socket, prints the handshake line, captures stray `stdout`, frames logs as JSON on
   stderr.
-- Serves `/health`, `/capabilities`, `/voices`, `/load`, `/unload`, `/terminate` and `/speak`.
+- Serves `/health`, `/capabilities`, `/voices`, `/load`, `/unload`, `/terminate`, `/fetch` and
+  `/speak`.
   `capabilities()` is assembled from `variants()`, `native_format`, `license` and the detected
   device, and `current` is omitted entirely while nothing is loaded.
 - **Encodes.** The engine yields its native PCM; the SDK produces wav, mp3, opus, flac or raw
@@ -525,6 +532,15 @@ serve(ChatterboxEngine())
   called, so an adapter never receives a request it did not declare support for.
 - Serialises requests by default. One model, one utterance at a time is the correct default for a
   GPU; an engine that can genuinely batch sets `concurrency > 1` and takes responsibility.
+
+### `fetch`, the one optional verb
+
+`fetch(variant)` downloads a variant's weights to wherever the engine keeps them, without putting
+them on the device. The SDK serves it as `POST /fetch` with `{ "variant": "turbo" }`, and an adapter
+that does not override it answers `unsupported`. It exists because the alternative is the first
+`/speak` doing the download: Chatterbox's `turbo` is 3.8 GB and took about 75 seconds on a first
+load, and a caller waiting on one utterance cannot tell that from a hang. An engine whose weights
+ship inside its package, or that has none, leaves it alone.
 
 ### What an adapter must do honestly, and it is only one thing
 
@@ -560,20 +576,154 @@ is the specific future this section exists to prevent.
 
 ---
 
-## 10. Deliberately not in v1
+## 10. Managing engines
+
+Installing an engine is part of the API rather than a set of instructions, so that a terminal
+client and a web page can both drive it and neither holds logic the other lacks. By hand it was five
+steps: a virtualenv, a pip install, an edit to the config, a restart, and a first `/speak` that
+silently downloaded 3.8 GB. The core still ships no interface of its own (§ 11). These routes are
+what one is built on.
+
+| Route | Does |
+| --- | --- |
+| `GET /catalog` | Every engine that exists, installed or not, with both licences |
+| `POST /engines/{id}/install` | Starts an install job; `202` with the job |
+| `DELETE /engines/{id}` | Stops and removes an engine this API installed |
+| `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
+| `GET /installs` | Every job this process knows about, newest first |
+| `GET /installs/{job}` | One job |
+| `GET /installs/{job}/events` | The job's progress as server-sent events |
+
+### Who may call them
+
+**Management routes answer loopback callers, and nobody else unless a token is configured.** With
+`management.token` set, a caller presenting `Authorization: Bearer <token>` is admitted from
+anywhere. Everything else gets `forbidden`. `GET /catalog` is the exception and answers everybody,
+because it only reads and the licences in it are the thing § 4 promises before install.
+
+The reason is that the server has no other authentication and binds every interface by default,
+and an install runs pip. A management route open to the LAN is remote code execution for anyone on
+it. The speech routes stay open because the worst a stranger can do with them is make it talk.
+
+The guard runs before the request body is read and before any stream opens, so a refused caller is
+refused cheaply and cannot hold a connection.
+
+### The catalog
+
+```json
+[
+  {
+    "id": "chatterbox",
+    "displayName": "Chatterbox",
+    "license": { "code": "MIT", "weights": "MIT", "weightsCommercialUse": true },
+    "package": "rhapsode-engine-chatterbox",
+    "defaultVariant": "turbo",
+    "installed": "yes",
+    "managed": true
+  }
+]
+```
+
+`installed` is `no`, `installing` or `yes`. `managed` says whether this API installed it and can
+therefore remove it; an engine the operator configured by hand is `installed: yes, managed: false`.
+`GET /engines` is unchanged and still lists only what is configured: the catalog is what exists,
+and `/engines` is what this box has.
+
+### Installing
+
+An install is four steps, and a job reports which one it is on:
+
+1. **`venv`**: create `<install.venvDir>/<id>`, with `uv venv` when uv is on the path and the
+   interpreter's own `venv` module otherwise. A directory already there that no registered engine
+   points at is the remains of an install that did not finish, and is removed first.
+2. **`packages`**: pip install the adapter. If `<install.sourceDir>/<package>` exists it is
+   installed from there; otherwise it is installed by name from the package index. The first is how
+   a checkout works today, and the second is how it works once adapters are published, with nothing
+   to change in between.
+3. **`verify`**: import the engine's module with the new interpreter. That is the command the core
+   will spawn, minus serving, and it is the check that a virtualenv pip abandoned halfway fails,
+   although its `bin/python` runs perfectly well.
+4. **`register`**: record the engine in the managed file and add it to the running registry. No
+   restart: the next `/speak` for it spawns a worker.
+
+`RHAPSODE_PIP_TRUSTED_HOSTS` is honoured from the server's own environment and cannot be set
+through the API. Weakening certificate verification stays a decision made on the box.
+
+Installing an engine that is already installed or already installing is `conflict`. An id that is
+not in the catalog is `unknown_engine`.
+
+### The managed file
+
+The core records what it installed in `rhapsode.engines.json`, beside the config file, and reads it
+at boot underneath the config: **where both name the same engine, the operator's config wins.** The
+core never writes the operator's file. That file may carry comments that a rewrite would lose, may
+sit on a read-only path, and is somebody's hand-kept record of the box. One writer per file is the
+rule that keeps both honest.
+
+### Uninstalling
+
+`DELETE /engines/{id}` terminates the worker, removes the engine from the registry and from the
+managed file, and deletes its virtualenv, but only a virtualenv inside `install.venvDir`. An engine
+the operator configured is `conflict`: it is theirs to remove, by editing their file.
+
+Weights are left alone. They live in the engine's own cache (for Chatterbox, the Hugging Face cache
+in the user's home), which other tools on the box share, and 9.7 GB is not something to delete as a
+side effect.
+
+### Pulling weights
+
+`POST /engines/{id}/pull` asks the engine's worker to `fetch` a variant (§ 8): download the weights
+without loading them. The worker process is started if it is not running, which costs tens of
+megabytes, and no model is loaded, so it takes no residency slot and evicts nothing. An engine that
+does not implement `fetch` answers `unsupported`, and its weights arrive on first load as before.
+
+### Jobs
+
+```json
+{
+  "id": "01J8Z6Q4B7",
+  "engine": "chatterbox",
+  "kind": "install",
+  "state": "running",
+  "step": "packages",
+  "createdAt": "2026-09-18T14:02:11.000Z",
+  "startedAt": "2026-09-18T14:02:11.004Z"
+}
+```
+
+`kind` is `install` or `pull`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
+carries `error`, an ordinary error envelope body. **One job runs at a time and the rest queue**,
+because two pip installs racing for one disk and one network connection finish later than the same
+two in a line, and a failure in one is easier to read without the other interleaved.
+
+Jobs live in memory. A restart forgets them, and a job running at shutdown is stopped and marked
+`failed`. That loses nothing that matters: a half-built virtualenv is caught by step 1 of the next
+install.
+
+`GET /installs/{job}/events` streams the job's events: step changes as `progress`, each line pip
+and the interpreter print as `log`, and the outcome as `status` or `error`. A client that
+reconnects with `Last-Event-ID` resumes where it left off, and one whose resume point has already
+fallen out of the replay buffer is sent a `resync` event and should re-read the job. The frame
+format is ServerKit's server feed, so the same client code reads it wherever ServerKit is used.
+
+---
+
+## 11. Deliberately not in v1
 
 Named so that nobody has to guess whether they were forgotten.
 
 - **STT.** A different problem wearing a similar hat. Say no once, in the README.
 - **Multi-speaker dialogue.** Dia wants `[S1]`/`[S2]` alternation and produces a two-hander in one
   pass, with overlaps that stitching separate takes cannot make. It does not fit a `voice` field and
-  half-designing it now would put a bad shape in the contract. Open question, section 11.
+  half-designing it now would put a bad shape in the contract. Open question, section 12.
 - **Word timestamps.** Wanted, cheap enough as an optional sidecar response, and not worth blocking
   v1. Leave room: a `X-Rhapsode-Timings-Url` header or a `timings` field in a multipart response.
 - **Batching.** Adapters declare `concurrency` and that is the whole of it for now.
-- **A UI.** The gap this project fills is that everything else has one.
+- **A UI in the core.** The gap this project fills is that everything else has one, and has put
+  its API behind it. A web page for installing engines is a client of § 10 like any other, and gets
+  no route the terminal client does not.
 
-## 11. Open questions
+## 12. Open questions
 
 1. **Dialogue.** Does `text` grow a structured form (`[{voice, text}, ...]`), or does a dialogue
    engine expose a second endpoint? The first pollutes every engine's request shape; the second

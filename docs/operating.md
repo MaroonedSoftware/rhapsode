@@ -40,6 +40,23 @@ rather than about the contract.
         "restartDecaySeconds": 300
     },
 
+    "management": {
+        // Without this, the install routes answer loopback callers only. With it, a caller
+        // presenting it as a bearer token is admitted from anywhere. Those routes run pip, so treat
+        // this as a root password for the box.
+        "token": null
+    },
+
+    "install": {
+        // Where installed engines get their virtualenvs. Default ~/.rhapsode/venvs.
+        "venvDir": "/opt/rhapsode/venvs",
+        // Where adapter sources are looked for before the package index. Defaults to the python/
+        // directory of the checkout the server is running from, when there is one.
+        "sourceDir": null,
+        // The interpreter that creates each virtualenv. Default python3.
+        "python": "python3"
+    },
+
     "engines": {
         "tone": { "venv": "/opt/rhapsode/venvs/tone" },
         "chatterbox": {
@@ -59,6 +76,25 @@ Each engine gets its own virtualenv. That is the point: one engine's dependency 
 another's, and a crash takes down a worker rather than the server. The environment a worker is
 spawned with is constructed rather than inherited, so it never sees the core's `PYTHONPATH` or
 `VIRTUAL_ENV`.
+
+## Installing engines
+
+`pnpm wizard install chatterbox` does it from a terminal, and anything else can do it through the
+routes in `docs/protocol.md` § 10. Either way the server does the work, so it has to be running.
+
+What it installs is recorded in `rhapsode.engines.json` beside the config file (or beside wherever
+`RHAPSODE_CONFIG` points). The server writes that file and never touches yours. Both are read at
+boot and **yours wins** where they name the same engine, so to override something about an
+installed engine, such as its `env`, add an entry for it to your config rather than editing the
+managed file. An engine you configured by hand cannot be uninstalled through the API: remove it from
+your file.
+
+If pip cannot verify a certificate because something on your network intercepts TLS, start the
+server with `RHAPSODE_PIP_TRUSTED_HOSTS=pypi.org,files.pythonhosted.org`. It is deliberately not
+something a client can ask for.
+
+Uninstalling removes the virtualenv and leaves downloaded weights where the engine put them.
+Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants.
 
 ## What to watch
 
