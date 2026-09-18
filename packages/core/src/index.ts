@@ -11,6 +11,7 @@ export { RhapsodeError, TAXONOMY, type ErrorCode } from './errors/rhapsode.error
 export { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 export { EngineRegistry, type EngineEntry, type EngineState } from './registry/engine.registry.js';
 export { CATALOG } from './registry/engines.catalog.js';
+export { loadSettings, ManagedEngines, MANAGED_FILE, type ConfiguredEngine } from './registry/managed.engines.js';
 export { WorkerClient, type SpokenResponse } from './workers/worker.client.js';
 export { WorkerRegistry } from './workers/worker.registry.js';
 export { LocalWorkerHandle, RemoteWorkerHandle, resolveCommand, type WorkerHandle } from './workers/worker.handle.js';

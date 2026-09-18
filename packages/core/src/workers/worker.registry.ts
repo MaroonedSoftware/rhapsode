@@ -43,6 +43,19 @@ export class WorkerRegistry {
         return this.handle(id).ensureUp();
     }
 
+    /**
+     * Stop an engine's worker and drop its handle.
+     *
+     * A handle captures the entry it was built from, so without this an engine reinstalled at
+     * runtime would go on spawning the old command from the old virtualenv.
+     */
+    async forget(id: string): Promise<void> {
+        const handle = this.handles.get(id);
+        if (handle === undefined) return;
+        this.handles.delete(id);
+        await handle.stop('uninstall');
+    }
+
     async stopAll(): Promise<void> {
         await Promise.allSettled([...this.handles.values()].map(handle => handle.stop('shutdown')));
         this.handles.clear();

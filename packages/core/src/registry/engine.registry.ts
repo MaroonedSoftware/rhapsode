@@ -40,6 +40,12 @@ export class EngineRegistry {
         }
     }
 
+    /** An engine uninstalled at runtime. Its worker is the worker registry's to stop, first. */
+    remove(id: string): void {
+        this.entries.delete(id);
+        this.states.delete(id);
+    }
+
     has(id: string): boolean {
         return this.entries.has(id);
     }

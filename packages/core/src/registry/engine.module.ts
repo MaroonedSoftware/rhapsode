@@ -1,7 +1,8 @@
 import type { ServerKitModule } from '@maroonedsoftware/fastify';
 
 import { CATALOG } from './engines.catalog.js';
-import { EngineRegistry } from './engine.registry.js';
+import { EngineRegistry, type EngineEntry } from './engine.registry.js';
+import { ManagedEngines, type ConfiguredEngine } from './managed.engines.js';
 import type { RhapsodeConfig } from '../config.js';
 import { DEFAULTS } from '../config.js';
 
@@ -15,7 +16,7 @@ import { DEFAULTS } from '../config.js';
  * Nothing here spawns anything. A registry that started a process in order to answer `GET /engines`
  * would make listing what is installed cost a cold start each time.
  */
-export const engineModule = (settings: RhapsodeConfig): ServerKitModule => {
+export const engineModule = (settings: RhapsodeConfig, managed: ManagedEngines = ManagedEngines.none(settings)): ServerKitModule => {
     // Built here rather than inside the factory, so a configuration mistake is thrown while the
     // server is being assembled rather than lazily on the first request that happens to need it.
     const engines = buildRegistry(settings);
@@ -28,6 +29,10 @@ export const engineModule = (settings: RhapsodeConfig): ServerKitModule => {
                 .register(EngineRegistry)
                 .useFactory(() => engines)
                 .asSingleton();
+            registry
+                .register(ManagedEngines)
+                .useFactory(() => managed)
+                .asSingleton();
         },
     };
 };
@@ -38,31 +43,40 @@ export function buildRegistry(settings: RhapsodeConfig): EngineRegistry {
 
     for (const [id, configured] of Object.entries(settings.engines ?? {})) {
         if (configured.enabled === false) continue;
-
-        const catalogued = CATALOG[id];
-        const license = configured.license ?? catalogued?.license;
-        if (license === undefined) {
-            throw new Error(
-                `engine "${id}" is configured but is not in the catalog, so nothing knows its licence. ` +
-                    'Declare `license` on the config entry, with the weights licence named separately.',
-            );
-        }
-
-        engines.declare({
-            id,
-            displayName: configured.displayName ?? catalogued?.displayName ?? id,
-            license,
-            module: configured.module ?? catalogued?.module,
-            defaultVariant: configured.defaultVariant ?? catalogued?.defaultVariant,
-            venv: configured.venv,
-            command: configured.command,
-            args: configured.args,
-            cwd: configured.cwd,
-            env: configured.env,
-            url: configured.url,
-            autostart: configured.autostart ?? false,
-        });
+        engines.declare(entryFrom(id, configured));
     }
 
     return engines;
+}
+
+/**
+ * One configured engine joined to the catalog.
+ *
+ * Boot and install both go through here, so an engine added at runtime passes the same licence
+ * gate as one read at startup rather than a second copy of it that drifts.
+ */
+export function entryFrom(id: string, configured: ConfiguredEngine): EngineEntry {
+    const catalogued = CATALOG[id];
+    const license = configured.license ?? catalogued?.license;
+    if (license === undefined) {
+        throw new Error(
+            `engine "${id}" is configured but is not in the catalog, so nothing knows its licence. ` +
+                'Declare `license` on the config entry, with the weights licence named separately.',
+        );
+    }
+
+    return {
+        id,
+        displayName: configured.displayName ?? catalogued?.displayName ?? id,
+        license,
+        module: configured.module ?? catalogued?.module,
+        defaultVariant: configured.defaultVariant ?? catalogued?.defaultVariant,
+        venv: configured.venv,
+        command: configured.command,
+        args: configured.args,
+        cwd: configured.cwd,
+        env: configured.env,
+        url: configured.url,
+        autostart: configured.autostart ?? false,
+    };
 }

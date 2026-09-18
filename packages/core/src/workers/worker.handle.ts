@@ -32,7 +32,7 @@ export interface WorkerHandle {
     readonly id: string;
     readonly client: WorkerClient | undefined;
     ensureUp(): Promise<WorkerClient>;
-    stop(reason: 'shutdown' | 'evict'): Promise<void>;
+    stop(reason: 'shutdown' | 'evict' | 'uninstall'): Promise<void>;
     readonly restarts: number;
     readonly lastError: string | undefined;
 }
@@ -289,7 +289,7 @@ export class LocalWorkerHandle implements WorkerHandle {
         this.logger.warn('worker exited', { engine: this.id, code, signal, restarts: this.restarts });
     }
 
-    async stop(reason: 'shutdown' | 'evict'): Promise<void> {
+    async stop(reason: 'shutdown' | 'evict' | 'uninstall'): Promise<void> {
         this.wanted = false;
         const child = this.child;
         await this.client?.close();

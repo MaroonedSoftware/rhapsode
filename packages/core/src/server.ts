@@ -12,6 +12,7 @@ import { rhapsodeErrorPlugin } from './errors/error.plugin.js';
 import { healthRoutes } from './health/health.routes.js';
 import { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 import { engineModule } from './registry/engine.module.js';
+import type { ManagedEngines } from './registry/managed.engines.js';
 import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
 import { residencyModule } from './residency/residency.module.js';
@@ -25,7 +26,7 @@ import type { RhapsodeConfig } from './config.js';
  * `apps/server` is a composition root and nothing else; this is where the order lives, because the
  * order is a decision rather than a detail.
  */
-export async function buildServer(settings: RhapsodeConfig, logger?: Logger): Promise<ServerKitServerBuilder> {
+export async function buildServer(settings: RhapsodeConfig, logger?: Logger, managed?: ManagedEngines): Promise<ServerKitServerBuilder> {
     // AppConfig is keyed by string at its edges, and RhapsodeConfig is the typed view of the same
     // object. Services take their own section rather than this, which is ServerKit's rule.
     const config = new AppConfig(settings as unknown as Record<string, unknown>);
@@ -36,7 +37,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger): Pr
     // Registration order is the shutdown contract: ServerKit runs `shutdown` hooks in reverse, so
     // this order means shutdown unwinds speak, then residency, then the workers. Registering the
     // worker module last would kill the children out from under streams still reading them.
-    const modules: ServerKitModule[] = [engineModule(settings), workerModule(settings), residencyModule(settings)];
+    const modules: ServerKitModule[] = [engineModule(settings, managed), workerModule(settings), residencyModule(settings)];
 
     const container = await builder.setup(config, log, modules);
 

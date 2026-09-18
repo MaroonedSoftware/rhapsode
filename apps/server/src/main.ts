@@ -5,20 +5,16 @@
  * shims can be built on it later without going through a process.
  */
 
-import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
-import { buildServer, DEFAULTS, type RhapsodeConfig } from '@rhapsode/core';
+import { buildServer, DEFAULTS, loadSettings } from '@rhapsode/core';
 
-const configPath = process.env.RHAPSODE_CONFIG ?? './rhapsode.config.json';
+const configPath = resolve(process.env.RHAPSODE_CONFIG ?? './rhapsode.config.json');
 
-const settings: RhapsodeConfig = await readFile(configPath, 'utf8')
-    .then(text => JSON.parse(text) as RhapsodeConfig)
-    .catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return {};
-        throw new Error(`could not read ${configPath}: ${error.message}`, { cause: error });
-    });
+// The operator's file with the engines this server installed underneath it. protocol.md § 10.
+const { settings, managed } = await loadSettings(configPath);
 
-const builder = await buildServer(settings);
+const builder = await buildServer(settings, undefined, managed);
 
 await builder.start(settings.server?.port ?? DEFAULTS.port, {
     // Comfortably longer than a worker's own drain grace, because every module's shutdown hook is
