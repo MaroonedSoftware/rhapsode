@@ -5,6 +5,13 @@
 export const queryKeys = {
     /** Every engine that exists, and what this box has of it. One key: the core answers all at once. */
     catalog: () => ['catalog'] as const,
+    /** What this box has. */
+    engines: () => ['engines'] as const,
+    /** Per engine. Capabilities change with the loaded variant, voices with every clone. */
+    engine: {
+        capabilities: (engine: string) => ['engine', engine, 'capabilities'] as const,
+        voices: (engine: string) => ['engine', engine, 'voices'] as const,
+    },
     installs: {
         all: () => ['installs'] as const,
         list: () => ['installs', 'list'] as const,
