@@ -788,7 +788,10 @@ does not implement `fetch` answers `unsupported`, and its weights arrive on firs
 ```
 
 `kind` is `install` or `pull`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
-carries `error`, an ordinary error envelope body. **One job runs at a time and the rest queue**,
+carries `error`, an ordinary error envelope body. Its message names the command and the line of
+its output that says why it failed, not the line it printed last: pip ends a failed build with a
+footer naming the package, and an Orpheus install whose error was `╰─> llama-cpp-python` had its
+reason, a missing C compiler, only in the event feed. **One job runs at a time and the rest queue**,
 because two pip installs racing for one disk and one network connection finish later than the same
 two in a line, and a failure in one is easier to read without the other interleaved.
 
