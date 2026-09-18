@@ -92,6 +92,17 @@ describe('refusals that happen before anything is committed', () => {
         const builder = await start();
         expect((await speak(builder, { text: 'x' })).statusCode).toBe(400);
     });
+
+    it('refuses a misspelled field and names it, rather than ignoring what the client meant', async () => {
+        // `streaming` is not `stream`. Ignored, the caller gets a stream it believes it turned off,
+        // which is the silent discard § 6 spends a section arguing against.
+        const builder = await start();
+        const response = await speak(builder, { engine: 'tone', text: 'x', streaming: false });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error).toMatchObject({ code: 'bad_request', retryable: false });
+        expect(response.json().error.message).toContain('"streaming"');
+    });
 });
 
 describeWithSockets('speaking', () => {
