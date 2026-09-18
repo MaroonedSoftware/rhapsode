@@ -36,12 +36,30 @@ describe('the 256-byte floor', () => {
     });
 
     it('buffers nothing, which is what lets it coexist with streaming', async () => {
-        // The only state is an integer. If it buffered, a five-minute synthesis would be held in
-        // memory before a byte reached the client.
-        const seen: number[] = [];
-        await pipeline(Readable.from([Buffer.alloc(200, 1), Buffer.alloc(200, 2)]), audioFloor(), async source => {
-            for await (const chunk of source) seen.push((chunk as Buffer).length);
+        // If it buffered, a five-minute synthesis would be held in memory before a byte reached the
+        // client. The property is that a chunk comes out before the source has finished, which is
+        // asserted directly: the source holds its second chunk back until the first has arrived on
+        // the far side. Asserting chunk boundaries instead does not work, because a byte stream is
+        // free to coalesce two writes into one read, and on some runners it does.
+        let firstArrived!: () => void;
+        const arrived = new Promise<void>(fulfil => {
+            firstArrived = fulfil;
         });
-        expect(seen).toEqual([200, 200]);
+
+        async function* source() {
+            yield Buffer.alloc(300, 1);
+            await arrived;
+            yield Buffer.alloc(300, 2);
+        }
+
+        let total = 0;
+        await pipeline(Readable.from(source()), audioFloor(), async stream => {
+            for await (const chunk of stream) {
+                total += (chunk as Buffer).length;
+                firstArrived();
+            }
+        });
+
+        expect(total).toBe(600);
     });
 });
