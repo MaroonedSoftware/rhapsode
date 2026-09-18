@@ -113,18 +113,16 @@ clients:
 ## Trying it
 
 ```bash
-pnpm install && pnpm python:sync
-pnpm build
-
-cat > rhapsode.config.json <<'JSON'
-{
-    "server": { "port": 8080 },
-    "engines": { "tone": { "venv": "./python/.venv" } }
-}
-JSON
-
+pnpm install
+pnpm wizard setup
 node apps/server/dist/main.js
 ```
+
+`pnpm wizard setup` builds the Python venv, builds the TypeScript packages, writes a
+`rhapsode.config.json` pointing the `tone` engine at that venv, and runs the conformance suite
+against it. `pnpm wizard doctor` checks the same things without changing anything, and
+`pnpm wizard doctor --fix` repairs what it can. The config is gitignored, because it describes this
+machine.
 
 ```bash
 curl localhost:8080/engines

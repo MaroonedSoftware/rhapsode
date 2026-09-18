@@ -27,10 +27,15 @@ Dependency direction is one-way: `apps/server` → `packages/core` → `packages
 of its implementations move in one commit" if one command tests both.
 
 ```bash
-pnpm install && pnpm python:sync    # first time
+pnpm install && pnpm wizard setup   # first time
 pnpm build && pnpm test
 node scripts/python.mjs test        # the Python half alone
+pnpm wizard doctor                  # what is wrong with this checkout, and --fix for what it can mend
 ```
+
+`pnpm wizard` is `packages/cli`, a johnny5 CLI like the ones in signet and kanban. It runs from
+TypeScript source under swc and is never built. `setup` is interactive and drives the same scripts
+listed here rather than duplicating them, so it cannot drift from what CI runs.
 
 `pnpm python:sync` builds `python/.venv` with the three Python packages installed editable. It
 prefers `uv` and falls back to the stdlib `venv` module.
