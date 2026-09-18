@@ -32,6 +32,9 @@ ENV RHAPSODE_UPSTREAM=server:8080 \
 COPY --from=web-build /src/apps/web/dist /usr/share/nginx/html
 COPY docker/web/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=0755 docker/web/15-rhapsode-token.envsh /docker-entrypoint.d/15-rhapsode-token.envsh
+# Through the proxy, so healthy means the core is reachable from here and not only that nginx is up.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s \
+    CMD ["wget", "--quiet", "--spider", "http://127.0.0.1/api/health"]
 
 # Debian rather than Alpine: cbor-extract, under ServerKit's authentication package, has no musl
 # prebuild, and would need a compiler in the image to build one.
