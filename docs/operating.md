@@ -133,6 +133,8 @@ location ^~ /api/ {
     # An install's events stream stays open while it runs.
     proxy_buffering off;
     proxy_read_timeout 1h;
+    # A voice's reference clip may be 25 MB. nginx's default of 1 MB refuses about ten seconds.
+    client_max_body_size 26m;
 }
 location / {
     root /srv/rhapsode-web;
@@ -145,6 +147,100 @@ the catalog and says installing is only for this one. That is deliberate: the pa
 and those routes run pip. If you serve the page under a name of your own, such as
 `https://rhapsode.home.arpa`, add that origin to `management.origins`, or the core will refuse the
 page's requests as coming from a site it does not know.
+
+## Docker
+
+```bash
+docker compose up -d --build     # the server on 127.0.0.1:8080, the page on http://localhost:8081
+```
+
+`docker/Dockerfile` builds two images from one build: `server`, the core, and `web`, the page behind
+nginx proxying `/api` as above. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
+
+### Two volumes
+
+| Mount     | What                                                        | Where in it                            |
+| --------- | ----------------------------------------------------------- | -------------------------------------- |
+| `/config` | the config, and `rhapsode.engines.json` beside it           | `rhapsode.config.json`                 |
+|           | the management token the page presents                      | `management.token`                     |
+|           | cloned voices                                               | `voices/<engine>`                      |
+| `/data`   | each engine's virtualenv                                    | `.rhapsode/venvs/<engine>`             |
+|           | the Python interpreters those virtualenvs run on            | `.local/share/uv/python`               |
+|           | weights: Chatterbox's Hugging Face cache, Kokoro's own      | `.cache/huggingface`, `.cache/rhapsode` |
+|           | pip's and uv's download caches                              | `.cache/pip`, `.cache/uv`              |
+
+`/config` is small and is the one to back up: a cloned voice cannot be downloaded again. `/data` is
+tens of GB with Chatterbox and all of it can be. `/data` is the container's `HOME`, which is the
+whole mechanism: everything an engine downloads already lands under `HOME`, so none of it needs to
+know it is in a container.
+
+The two are joined in one place: `rhapsode.engines.json` names virtualenvs in `/data`. Lose `/data`
+and those engines stay listed but fail to start until they are installed again, from the page or
+the wizard. Lose `/config` and the downloads survive, but the engines and voices are forgotten.
+
+On first boot, with an empty `/config`, the server writes a config there and never touches it
+again. It differs from an empty one in four things: `install.sourceDir` names the Python sources in
+the image, `install.python` is `3.12`, `workers.voiceDir` is `/config/voices`, and there is a
+generated `management.token`. Leave `server.port` at 8080: the healthcheck and the page both expect
+it inside the container.
+
+### No Python in the image
+
+A virtualenv is a directory of links to the interpreter that made it. Were that `/usr/bin/python3`
+in the image, every engine in `/data` would break on the first base image that ships a different
+minor version, and reinstalling Chatterbox is several GB of torch. So the image has `uv` and no
+Python, and uv fetches an interpreter into `/data` beside the virtualenvs that use it: 3.12 by
+default, or whatever an engine's range asks for, such as Kokoro's 3.13.
+
+The cost is that the first install fetches about 30 MB from GitHub as well as packages from PyPI,
+so a network that allows one and not the other fails there. `install.python` can name an
+interpreter you mount in instead.
+
+### Installing from the page
+
+A published port is never loopback to the core: a request through one arrives from Docker's bridge.
+So the install routes answer only the management token, and the `web` container presents it on the
+page's behalf, reading it from `/config`. It follows an edit to the token once both containers have
+restarted.
+
+That makes the page's port the key to the install routes, which run pip, and it is why compose
+publishes both ports on `127.0.0.1` only. Publishing the page to your LAN gives everyone on it that
+key. The API port without the page is safe to widen: installs there still need the token.
+
+The wizard installs through the page's proxy, with no token on the host:
+
+```bash
+pnpm wizard install kokoro --server http://127.0.0.1:8081/api
+```
+
+`HF_TOKEN`, `CUDA_VISIBLE_DEVICES` and anything else an engine should see go in that engine's `env`
+block in `/config/rhapsode.config.json`, not in the container's environment, because a worker's
+environment is constructed rather than inherited.
+
+Docker's default ten-second stop kills a worker before the core has drained it. Compose waits 30
+seconds; with `docker run`, pass `--stop-timeout 30`.
+
+### unraid
+
+No image is published yet, so build both on the box from a checkout:
+
+```bash
+docker build -f docker/Dockerfile --target server -t rhapsode-server .
+docker build -f docker/Dockerfile --target web -t rhapsode-web .
+docker network create rhapsode
+```
+
+Then two containers on that network, so that the page can find the server by name:
+
+- `rhapsode-server`: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
+  `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own `nobody:users`, port
+  8080, and `--stop-timeout 30` in Extra Parameters.
+- `rhapsode-web`: the same `/config` mapping, read-only, `RHAPSODE_UPSTREAM=rhapsode-server:8080`,
+  port 8081 to 80.
+
+Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
+so add it to `management.origins`. That is also the moment the page reaches the install routes from
+the LAN, which the section above describes the cost of.
 
 ## Voices
 

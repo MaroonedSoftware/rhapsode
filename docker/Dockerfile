@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# One build, two images. `--target server` is the core; docs/operating.md § Docker has the rest.
+# One build, two images: `--target server` is the core and `--target web` is the page in front of
+# it. compose.yaml builds both, and docs/operating.md § Docker says why each choice here is made.
 
 ARG NODE_VERSION=22
 ARG PNPM_VERSION=11.23.0
@@ -20,6 +21,17 @@ RUN pnpm exec turbo run build --filter=./apps/server...
 # copied in as real directories rather than links into a tree this stage leaves behind.
 RUN --mount=type=cache,id=rhapsode-pnpm,target=/root/.local/share/pnpm/store \
     pnpm --filter ./apps/server deploy --prod --legacy /out
+
+FROM build AS web-build
+RUN pnpm exec turbo run build --filter=./apps/web...
+
+# The page is static, and nginx serves it and proxies /api to the core with the management token.
+FROM nginx:stable-alpine AS web
+ENV RHAPSODE_UPSTREAM=server:8080 \
+    RHAPSODE_RESOLVER=127.0.0.11
+COPY --from=web-build /src/apps/web/dist /usr/share/nginx/html
+COPY docker/web/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=0755 docker/web/15-rhapsode-token.envsh /docker-entrypoint.d/15-rhapsode-token.envsh
 
 # Debian rather than Alpine: cbor-extract, under ServerKit's authentication package, has no musl
 # prebuild, and would need a compiler in the image to build one.

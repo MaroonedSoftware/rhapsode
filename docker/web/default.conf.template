@@ -1,0 +1,36 @@
+# Rendered by the nginx image's entrypoint into conf.d/default.conf, substituting only the variables
+# that are set, so nginx's own $uri and the like survive. docs/operating.md § Docker.
+
+# Docker's own DNS, re-asked every ten seconds. Resolving the core once at startup, as a literal
+# proxy_pass does, sends every request to a dead address after the core's container is recreated.
+resolver ${RHAPSODE_RESOLVER} valid=10s ipv6=off;
+
+server {
+    listen 80;
+
+    # A cloned voice's reference clip may be 25 MB, docs/protocol.md § 7. nginx's default is 1 MB,
+    # which refuses a clip longer than about ten seconds with a 413 the page cannot explain.
+    client_max_body_size 26m;
+
+    location ^~ /api/ {
+        set $rhapsode ${RHAPSODE_UPSTREAM};
+        rewrite ^/api(/.*)$ $1 break;
+        proxy_pass http://$rhapsode;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # The core sees this container's address, never loopback, so it admits the install routes
+        # on this token or not at all. Empty when there is no token, which removes the header.
+        # Whoever reaches this port reaches the install routes, which is why compose publishes it on
+        # 127.0.0.1.
+        proxy_set_header Authorization "${RHAPSODE_AUTHORIZATION}";
+        # An install's events stream stays open while it runs.
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+    }
+
+    location / {
+        root /usr/share/nginx/html;
+        try_files $uri /index.html;
+    }
+}
