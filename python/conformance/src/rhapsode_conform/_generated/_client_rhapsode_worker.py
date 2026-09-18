@@ -5,7 +5,7 @@ from urllib.parse import quote
 from typing import Any, Literal, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
-from ._models_rhapsode_types import Capabilities, CreateVoiceForm, ErrorBody, LoadRequest, SpeakRequest, Voice, WorkerHealth
+from ._models_rhapsode_types import Capabilities, CreateVoiceForm, ErrorBody, FetchRequest, LoadRequest, SpeakRequest, Voice, WorkerHealth
 
 
 class WorkerCreateVoice201Response(TypedDict):
@@ -50,6 +50,34 @@ class WorkerLoad200Response(TypedDict):
 
 class WorkerLoad503Response(TypedDict):
     status: Literal[503]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerFetch204Response(TypedDict):
+    status: Literal[204]
+
+
+class WorkerFetch400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerFetch422Response(TypedDict):
+    status: Literal[422]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerFetch429Response(TypedDict):
+    status: Literal[429]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerFetch500Response(TypedDict):
+    status: Literal[500]
     content_type: Literal["application/json"]
     data: ErrorBody
 
@@ -150,6 +178,21 @@ class RhapsodeWorkerClient(BaseClient):
         """
         result = await self._fetch("/terminate", method="POST")
         return None
+
+    async def worker_fetch(self, body: FetchRequest) -> WorkerFetch204Response | WorkerFetch400Response | WorkerFetch422Response | WorkerFetch429Response | WorkerFetch500Response:
+        """
+        Download a variant's weights without loading them, so a first /speak does not sit through
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full("/fetch", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 422, 429, 500))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 422:
+            return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 429:
+            return { "status": 429, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 500:
+            return { "status": 500, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 204 }
 
     async def worker_speak(self, body: SpeakRequest) -> WorkerSpeak200Response | WorkerSpeak400Response | WorkerSpeak404Response | WorkerSpeak422Response | WorkerSpeak429Response | WorkerSpeak503Response:
         """

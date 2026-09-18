@@ -192,6 +192,16 @@ class Engine:
     def delete_voice(self, voice_id: str) -> None:
         raise Unsupported("this engine does not clone voices")
 
+    def fetch(self, variant: str) -> None:
+        """Download a variant's weights to wherever this engine keeps them, without loading them.
+
+        Optional. The alternative is the first `/speak` doing the download: Chatterbox's `turbo` is
+        3.8 GB and took about 75 seconds, which a caller waiting on one utterance cannot tell from a
+        hang. An engine whose weights ship in its package, or that has none, leaves this alone.
+        protocol.md § 8.
+        """
+        raise Unsupported("this engine does not fetch weights ahead of loading them")
+
     def preview(self, voice_id: str) -> Iterator[bytes]:
         """A fixed line in the named voice, so `previewUrl` works for every engine for free."""
         return self.speak(SpeakRequest(text=PREVIEW_TEXT, voice=voice_id, format="wav", stream=False))

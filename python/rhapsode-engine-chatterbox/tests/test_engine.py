@@ -242,3 +242,57 @@ class TestPcm:
         built.variant = "turbo"
         total = sum(len(chunk) for chunk in spoken(built, variant="turbo"))
         assert total == SAMPLE_RATE * 2  # 24000 samples, two bytes each
+
+
+class TestFetching:
+    def test_every_build_knows_where_its_weights_are(self) -> None:
+        # A variant without an entry here would fail its fetch with a KeyError, which the SDK
+        # reports as internal. Better to fail here, where the missing name is obvious.
+        from rhapsode_engine_chatterbox.builds import WEIGHTS, variants
+
+        assert set(WEIGHTS) == set(variants())
+
+    def test_asks_for_the_files_the_build_loads_and_no_more(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # original and multilingual share a repository. Downloading it whole for either would
+        # fetch both, which is most of the 9.7 GB all three came to.
+        import sys
+        import types
+
+        asked: list[dict[str, Any]] = []
+        hub = types.ModuleType("huggingface_hub")
+        hub.snapshot_download = lambda **arguments: asked.append(arguments) or str(tmp_path)  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+
+        engine(tmp_path).fetch("original")
+
+        assert asked == [
+            {
+                "repo_id": "ResembleAI/chatterbox",
+                "allow_patterns": [
+                    "ve.safetensors",
+                    "t3_cfg.safetensors",
+                    "s3gen.safetensors",
+                    "tokenizer.json",
+                    "conds.pt",
+                ],
+                "token": None,
+            }
+        ]
+
+    def test_does_not_load_anything(
+        self, chatterbox, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        import sys
+        import types
+
+        hub = types.ModuleType("huggingface_hub")
+        hub.snapshot_download = lambda **arguments: str(tmp_path)  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+
+        built = engine(tmp_path)
+        built.fetch("turbo")
+        assert built._model is None
+        assert "turbo" not in chatterbox

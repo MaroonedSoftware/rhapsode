@@ -86,6 +86,15 @@ def create_app(worker: Worker) -> Starlette:
         await worker.ensure_loaded(variant)
         return JSONResponse(worker.health())
 
+    async def fetch(request: Request) -> Response:
+        worker.reject_if_draining()
+        body = await _json_body(request)
+        variant = body.get("variant")
+        if not isinstance(variant, str) or variant == "":
+            raise BadRequest("`variant` is required, and must be a string")
+        await worker.fetch(variant)
+        return Response(status_code=204)
+
     async def unload(_: Request) -> Response:
         await worker.unload()
         return JSONResponse(worker.health())
@@ -184,6 +193,7 @@ def create_app(worker: Worker) -> Starlette:
             Route("/load", load, methods=["POST"]),
             Route("/unload", unload, methods=["POST"]),
             Route("/terminate", terminate, methods=["POST"]),
+            Route("/fetch", fetch, methods=["POST"]),
             Route("/speak", speak, methods=["POST"]),
         ],
         exception_handlers={Exception: on_worker_error, WorkerError: on_worker_error},

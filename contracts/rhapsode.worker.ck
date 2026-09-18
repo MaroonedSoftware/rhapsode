@@ -114,6 +114,24 @@ operation /terminate: {
     }
 }
 
+operation /fetch: {
+    post: {
+        # Download a variant's weights without loading them, so a first /speak does not sit through
+        # the download. Optional: an adapter that does not override fetch answers 422. protocol.md § 8.
+        sdk: workerFetch
+        request: {
+            application/json: FetchRequest
+        }
+        response: {
+            204:
+            400: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
+            429: { application/json: ErrorBody }
+            500: { application/json: ErrorBody }
+        }
+    }
+}
+
 operation /speak: {
     post: {
         # Loads on demand. It does not fail with "no model loaded" and does not require /load first.

@@ -17,7 +17,7 @@ from rhapsode_worker import (
     Voice,
 )
 
-from .builds import CFG_WEIGHT_RANGE, DELIVERY_OFFSETS, EXAGGERATION_RANGE, clamp, variants
+from .builds import CFG_WEIGHT_RANGE, DELIVERY_OFFSETS, EXAGGERATION_RANGE, WEIGHTS, clamp, variants
 
 #: Upstream's S3GEN_SR. Every build synthesises at this rate.
 SAMPLE_RATE = 24_000
@@ -103,6 +103,21 @@ class ChatterboxEngine(Engine):
         # onto the CPU with `device in ["cpu", "mps"]`, which a torch.device never satisfies, so on
         # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
         self._model = build.from_pretrained(device=self._torch_device())
+
+    def fetch(self, variant: str) -> None:
+        """Download a build's weights into the Hugging Face cache, where its load will find them.
+
+        The same repository and files upstream's `from_pretrained` asks for, so the load that follows
+        is a cache hit. `turbo` alone is 3.8 GB and took about 75 seconds on a first load, which a
+        `/speak` caller cannot tell from a hang. The import is here for the same reason `load`'s are.
+        """
+        import os
+
+        from huggingface_hub import snapshot_download
+
+        repository, patterns = WEIGHTS[variant]
+        token = os.getenv("HF_TOKEN") or None
+        snapshot_download(repo_id=repository, allow_patterns=list(patterns), token=token)
 
     def unload(self) -> None:
         """Drop the model, then ask the runtime for the memory back.

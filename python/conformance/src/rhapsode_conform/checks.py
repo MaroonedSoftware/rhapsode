@@ -461,6 +461,37 @@ def unloading_nothing_is_a_success(worker: Worker, report: Report) -> None:
     report.record("unload is idempotent", "§ 3", set(statuses) == {200}, str(statuses))
 
 
+@check
+def fetch_downloads_or_says_it_does_not(worker: Worker, report: Report) -> None:
+    """§ 8. Optional, so either answer is conforming, but only those two, and never a load.
+
+    Runs after the unload check, so the model is known to be unloaded and a fetch that quietly
+    loaded it instead is visible here.
+    """
+    variants = sorted(_variants(worker))
+    if not variants:
+        report.record("fetch answers or says unsupported", "§ 8", False, "no variants to fetch")
+        return
+    status, body = worker.post("/fetch", {"variant": variants[0]})
+    code = body.get("error", {}).get("code") if isinstance(body, dict) else None
+    answered = status == 204 or (status == 422 and code == "unsupported")
+    report.record(
+        "fetch answers or says unsupported",
+        "§ 8",
+        answered,
+        f'variant "{variants[0]}": status {status}' + (f", {code}" if code else ""),
+    )
+
+    if status == 204:
+        _, health = worker.get("/health")
+        report.record(
+            "fetch does not load the model",
+            "§ 8",
+            health.get("model") == "unloaded",
+            f"model {health.get('model')}",
+        )
+
+
 def _variants(worker: Worker) -> dict[str, Any]:
     _, capabilities = worker.get("/capabilities")
     variants = capabilities.get("variants")

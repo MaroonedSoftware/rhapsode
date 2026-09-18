@@ -93,6 +93,10 @@ If pip cannot verify a certificate because something on your network intercepts 
 server with `RHAPSODE_PIP_TRUSTED_HOSTS=pypi.org,files.pythonhosted.org`. It is deliberately not
 something a client can ask for.
 
+An engine's weights normally arrive on its first load, which for Chatterbox's `turbo` means a first
+`/speak` that waits about 75 seconds on a 3.8 GB download. `POST /engines/{id}/pull` (or the wizard's
+offer to pull) downloads them ahead of time, without loading anything.
+
 Uninstalling removes the virtualenv and leaves downloaded weights where the engine put them.
 Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants.
 

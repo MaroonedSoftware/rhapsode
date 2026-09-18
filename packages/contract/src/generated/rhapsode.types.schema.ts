@@ -139,11 +139,21 @@ export const LoadRequest = z.strictObject({
 export type LoadRequest = z.infer<typeof LoadRequest>;
 
 /**
+ * Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
+ * not loaded yet. protocol.md § 8.
+ * generated from [FetchRequest](../../../../contracts/rhapsode.types.ck#L137)
+ */
+export const FetchRequest = z.strictObject({
+    variant: z.string(),
+});
+export type FetchRequest = z.infer<typeof FetchRequest>;
+
+/**
  * `retryable` is a field rather than something the client infers from the status, because the
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L143)
+ * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L149)
  */
 export const ErrorDetail = z.looseObject({
     code: z
@@ -168,7 +178,7 @@ export const ErrorDetail = z.looseObject({
 export type ErrorDetail = z.infer<typeof ErrorDetail>;
 
 /**
- * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L161)
+ * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L167)
  */
 export const WorkerHealth = z.looseObject({
     process: z.enum(['up', 'draining']),
@@ -180,7 +190,7 @@ export const WorkerHealth = z.looseObject({
 export type WorkerHealth = z.infer<typeof WorkerHealth>;
 
 /**
- * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L180)
+ * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L186)
  */
 export const ResidencySummary = z.looseObject({
     resident: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -191,7 +201,7 @@ export const ResidencySummary = z.looseObject({
 export type ResidencySummary = z.infer<typeof ResidencySummary>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L223)
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L229)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -201,7 +211,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L229)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L235)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -230,7 +240,7 @@ export const Variant = z.looseObject({
 export type Variant = z.infer<typeof Variant>;
 
 /**
- * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L169)
+ * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L175)
  */
 export const EngineSummary = z.looseObject({
     id: z.string(),
@@ -247,7 +257,7 @@ export type EngineSummary = z.infer<typeof EngineSummary>;
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L200)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L206)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -271,7 +281,7 @@ export const EngineSpeakRequest = SpeakRequest.extend({
 export type EngineSpeakRequest = z.infer<typeof EngineSpeakRequest>;
 
 /**
- * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L153)
+ * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L159)
  */
 export const ErrorBody = z.looseObject({
     error: ErrorDetail,
@@ -279,7 +289,7 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L210)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L216)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
@@ -296,7 +306,7 @@ export const InstallJob = z.looseObject({
 export type InstallJob = z.infer<typeof InstallJob>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L236)
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L242)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -326,7 +336,7 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L187)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L193)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),

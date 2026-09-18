@@ -43,6 +43,14 @@ class FailingEngine(Engine):
             # allocations, and the retry after an unload succeeds.
             raise RuntimeError("CUDA error: out of memory")
 
+    def fetch(self, variant: str) -> None:
+        if MODE == "fetch_type_error":
+            # What a download library looks like when an optional import it swallowed was None.
+            raise TypeError("'NoneType' object is not callable")
+        if PROGRESS_FILE:
+            with open(PROGRESS_FILE, "a") as progress:
+                progress.write(f"fetched {variant}\n")
+
     def unload(self) -> None:
         if MODE == "unload_throws":
             raise RuntimeError("the adapter's unload threw")

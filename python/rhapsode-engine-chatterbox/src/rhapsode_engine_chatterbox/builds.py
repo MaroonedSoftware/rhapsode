@@ -112,3 +112,28 @@ def variants() -> dict[str, Variant]:
 def clamp(value: float, low: float, high: float) -> float:
     """Clamped and rounded, so that 0.8 + 0.4 goes out as 1.2 rather than a float's idea of it."""
     return round(max(low, min(high, value)), 4)
+
+
+#: Where each build's weights live, and which files its `from_pretrained` actually reads. Copied from
+#: upstream 0.1.7 (`tts_turbo.py`, `tts.py`, `mtl_tts.py`) rather than imported, because importing any
+#: of those modules imports torch, and fetching has no use for it. A repository downloaded whole would
+#: be every build at once: `original` and `multilingual` share one, and together they are most of the
+#: 9.7 GB that all three came to. Keep in step with upstream when it moves.
+WEIGHTS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "turbo": ("ResembleAI/chatterbox-turbo", ("*.safetensors", "*.json", "*.txt", "*.pt", "*.model")),
+    "original": (
+        "ResembleAI/chatterbox",
+        ("ve.safetensors", "t3_cfg.safetensors", "s3gen.safetensors", "tokenizer.json", "conds.pt"),
+    ),
+    "multilingual": (
+        "ResembleAI/chatterbox",
+        (
+            "ve.pt",
+            "t3_mtl23ls_v2.safetensors",
+            "s3gen.pt",
+            "grapheme_mtl_merged_expanded_v1.json",
+            "conds.pt",
+            "Cangjie5_TC.json",
+        ),
+    ),
+}

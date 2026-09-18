@@ -93,6 +93,11 @@ class SpeakRequest(BaseModel):
 class LoadRequest(BaseModel):
     variant: str | None = None
 
+# Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
+# not loaded yet. protocol.md § 8.
+class FetchRequest(BaseModel):
+    variant: str
+
 # `retryable` is a field rather than something the client infers from the status, because the
 # distinction that matters is between "this request was wrong" and "this request was fine and the
 # server was not". A caller that conflates them either retries a permanent failure forever or

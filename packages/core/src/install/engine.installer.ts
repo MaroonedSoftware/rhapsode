@@ -43,6 +43,27 @@ export class EngineInstaller {
     }
 
     /**
+     * Queue a download of a variant's weights, so a first `/speak` does not sit through it.
+     *
+     * The worker is started if it is not running, which costs tens of megabytes, and nothing is
+     * loaded, so this takes no residency slot and evicts nobody. An engine whose adapter does not
+     * fetch fails the job with `unsupported`, and its weights arrive on first load as before.
+     */
+    pull(id: string, variant: string | undefined): InstallJob {
+        if (!this.engines.has(id)) throw RhapsodeError.unknownEngine(id, this.engines.ids());
+        this.refuseIfBusy(id);
+        const chosen = variant ?? this.engines.entry(id)?.defaultVariant;
+        if (chosen === undefined) throw new RhapsodeError('bad_request', `"${id}" has no default variant, so name the one to pull`);
+
+        return this.jobs.submit('pull', id, chosen, async context => {
+            context.step('weights');
+            context.line(`fetching ${id} ${chosen}`);
+            const client = await this.workers.client(id);
+            await client.fetch(chosen, context.signal);
+        });
+    }
+
+    /**
      * Stop an engine, forget it, and delete its virtualenv if this API made it.
      *
      * Synchronous rather than a job, because none of it waits on the network. Weights are left where

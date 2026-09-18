@@ -132,6 +132,12 @@ contract LoadRequest: {
     variant?: string
 }
 
+# Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
+# not loaded yet. protocol.md § 8.
+contract FetchRequest: {
+    variant: string
+}
+
 ############################################################################################
 # Failure. protocol.md § 6.
 ############################################################################################

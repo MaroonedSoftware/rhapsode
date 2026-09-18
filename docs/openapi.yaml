@@ -545,6 +545,43 @@ paths:
             responses:
                 '202':
                     description: 'Response 202'
+    '/fetch':
+        post:
+            operationId: workerFetch
+            description: "Download a variant's weights without loading them, so a first /speak does not sit through"
+            requestBody:
+                required: true
+                content:
+                    'application/json':
+                        schema:
+                            '$ref': '#/components/schemas/FetchRequest'
+            responses:
+                '204':
+                    description: 'No content'
+                '400':
+                    description: 'Bad request'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '422':
+                    description: 'Unprocessable entity'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '429':
+                    description: 'Response 429'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '500':
+                    description: 'Internal server error'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
 components:
     schemas:
         Dial:
@@ -771,6 +808,13 @@ components:
             properties:
                 variant:
                     type: string
+        FetchRequest:
+            type: object
+            properties:
+                variant:
+                    type: string
+            required: [variant]
+            description: "Required, unlike a load's: there is no \"whatever is loaded\" to fall back on for weights that are\nnot loaded yet. protocol.md § 8."
         ErrorDetail:
             type: object
             properties:

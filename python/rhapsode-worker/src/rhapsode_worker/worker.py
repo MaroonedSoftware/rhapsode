@@ -180,6 +180,28 @@ class Worker:
                 return
             await self._unload_locked()
 
+    async def fetch(self, variant: str) -> None:
+        """Download a variant's weights, outside the transition lock.
+
+        A download touches the disk and the network and never the device, so it has no reason to
+        wait for a load to finish or to hold one up. The variant is checked first so that a typo is
+        refused in a millisecond rather than after a download attempt names the wrong repository.
+        """
+        declared = self.engine.variants()
+        if variant not in declared:
+            raise Unsupported(f'no variant "{variant}"; this engine has {sorted(declared)}')
+        try:
+            await asyncio.to_thread(self.engine.fetch, variant)
+        except WorkerError:
+            raise
+        except BaseException as error:
+            failure = classify(error)
+            # The same reasoning as a load: the caller named a variant and nothing else, so a
+            # TypeError from inside a download library is the adapter's to explain, not the caller's.
+            if isinstance(failure, BadRequest):
+                failure = Internal(f"{type(error).__name__}: {error}")
+            raise failure from error
+
     # ---------------------------------------------------------------- voices
 
     async def create_voice(self, request: CreateVoiceRequest) -> dict[str, Any]:

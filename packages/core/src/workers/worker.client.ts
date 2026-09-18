@@ -67,6 +67,35 @@ export class WorkerClient {
         return this.json<WorkerHealth>('POST', '/unload', {});
     }
 
+    /**
+     * Download a variant's weights without loading them. § 8.
+     *
+     * On no clock at all: the worker answers once the download is done, and Chatterbox's three
+     * builds came to 9.7 GB. A timeout short enough to catch a wedged worker would also cut off a
+     * slow connection halfway through, and the job this runs in already has a cancel, which is
+     * shutdown.
+     */
+    async fetch(variant: string, signal: AbortSignal): Promise<void> {
+        let response;
+        try {
+            response = await this.pool.request({
+                path: '/fetch',
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ variant }),
+                signal,
+                headersTimeout: 0,
+                bodyTimeout: 0,
+            });
+        } catch (error) {
+            throw new RhapsodeError('model_unavailable', 'the worker did not answer POST /fetch', { cause: error });
+        }
+        if (response.statusCode >= 400) {
+            throw fromWorkerEnvelope(await response.body.json().catch(() => undefined), response.statusCode);
+        }
+        await response.body.dump();
+    }
+
     /** Drain and exit. The 202 arrives before the process goes, so the socket closing is the proof. */
     async terminate(): Promise<void> {
         await this.request('POST', '/terminate', {});
