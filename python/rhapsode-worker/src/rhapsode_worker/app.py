@@ -20,6 +20,9 @@ from .worker import Worker
 #: `send()` raising, which uvicorn does not do. See `_check_disconnect_assumption`.
 DISCONNECT_RACE_CEILING = (2, 4)
 
+#: § 6. A header on a buffered answer, because only there is the duration known before the headers.
+DURATION_HEADER = "X-Rhapsode-Duration-Ms"
+
 
 def create_app(worker: Worker) -> Starlette:
     async def health(_: Request) -> Response:
@@ -245,7 +248,12 @@ async def _buffered(worker: Worker, spoken: Any, content_type: str, native: Any)
     ):
         body.extend(chunk)
 
-    return Response(bytes(body), media_type=content_type)
+    # From the PCM rather than the encoded body, because an mp3 or opus body's length says nothing
+    # about how long it plays. The native format is s16le, two bytes a sample.
+    frames = len(pcm) // (2 * native.channels)
+    duration_ms = round(frames * 1000 / native.sample_rate)
+
+    return Response(bytes(body), media_type=content_type, headers={DURATION_HEADER: str(duration_ms)})
 
 
 _warned_about_disconnect = False

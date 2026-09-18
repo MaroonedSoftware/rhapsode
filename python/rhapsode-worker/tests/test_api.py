@@ -132,6 +132,24 @@ class TestSpeak:
         assert content_type == "audio/L16; rate=24000; channels=1"
         assert len(body) % 2 == 0
 
+    def test_a_buffered_answer_says_how_long_it_is_in_bytes_and_in_time(self, worker: RunningWorker) -> None:
+        # § 6: with `stream: false` the duration is known before the headers go out, so it is a
+        # header. Nothing sent it until the core was checked against the spec, and a client that
+        # needed the length of a take had to decode the take to find it.
+        request = urllib.request.Request(
+            f"{worker.base_url}/speak",
+            data=json.dumps({"text": "one two three", "format": "pcm", "stream": False}).encode(),
+            headers={"content-type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = response.read()
+            headers = response.headers
+
+        assert int(headers["content-length"]) == len(body)
+        # pcm is the native s16le at 24 kHz mono, so the body is the samples and nothing else.
+        assert int(headers["x-rhapsode-duration-ms"]) == round(len(body) / 2 / 24_000 * 1000)
+
     def test_longer_text_makes_more_audio(self, worker: RunningWorker) -> None:
         _, short, _ = post(worker, "/speak", {"text": "one", "format": "pcm", "stream": False})
         _, long, _ = post(worker, "/speak", {"text": "one " * 40, "format": "pcm", "stream": False})
