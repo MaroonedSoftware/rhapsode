@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -41,6 +42,36 @@ describe('planInstall', () => {
     it('seeds pip into a uv venv, because every later step is pip', () => {
         const { commands } = planInstall({ ...base, uv: true });
         expect(commands[0]).toEqual({ step: 'venv', command: 'uv', args: ['venv', '--seed', '--python', 'python3', '/v/chatterbox'] });
+    });
+
+    it('hands uv an engine’s Python range, so it finds or fetches an interpreter inside it', () => {
+        const record = { ...CATALOG.chatterbox!, python: { from: '3.10', below: '3.14' } };
+        const { commands } = planInstall({ ...base, record, uv: true });
+
+        expect(commands[0]).toEqual({ step: 'venv', command: 'uv', args: ['venv', '--seed', '--python', '>=3.10,<3.14', '/v/chatterbox'] });
+    });
+
+    it('asks the interpreter whether it is in range before creating anything, when there is no uv', () => {
+        const record = { ...CATALOG.chatterbox!, python: { from: '3.10', below: '3.14' } };
+        const { commands } = planInstall({ ...base, record });
+
+        expect(commands.map(command => command.step)).toEqual(['venv', 'venv', 'packages', 'packages', 'verify']);
+        expect(commands[0]!.command).toBe('python3');
+        expect(commands[0]!.args[0]).toBe('-c');
+    });
+
+    it('refuses an interpreter outside the range, in a sentence the job can show', () => {
+        // Run for real: the check is a program, and a program is only right if it runs. 3.0 to 3.1
+        // excludes whatever runs this test, and 3.0 to 99.0 includes it.
+        const check = (below: string) => planInstall({ ...base, record: { ...CATALOG.chatterbox!, python: { from: '3.0', below } } }).commands[0]!;
+        const run = (command: PlannedCommand) => spawnSync(command.command, command.args, { encoding: 'utf8' });
+
+        const refused = run(check('3.1'));
+        expect(refused.status).toBe(1);
+        expect(refused.stderr).toContain('Chatterbox needs Python >=3.0,<3.1 and python3 is 3.');
+        expect(refused.stderr).toContain('Install uv');
+
+        expect(run(check('99.0')).status).toBe(0);
     });
 
     it('passes trusted hosts to every pip command and nothing else', () => {

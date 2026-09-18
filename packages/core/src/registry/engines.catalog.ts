@@ -8,7 +8,20 @@ import type { EngineEntry } from './engine.registry.js';
 export type CatalogRecord = Pick<EngineEntry, 'displayName' | 'license' | 'module' | 'defaultVariant'> & {
     module: string;
     package: string;
+    /**
+     * The Python versions the engine's own dependencies install on, when that is narrower than the
+     * SDK's. Without it pip quietly resolves whatever old release still claims to support the
+     * interpreter it was given, which is a different engine from the one the adapter was written
+     * against. protocol.md § 10.
+     */
+    python?: PythonRange;
 };
+
+/** At least `from`, and below `below`. Both `major.minor`. */
+export interface PythonRange {
+    from: string;
+    below: string;
+}
 
 /**
  * What exists, as distinct from what this box has.

@@ -705,7 +705,12 @@ An install is four steps, and a job reports which one it is on:
 
 1. **`venv`**: create `<install.venvDir>/<id>`, with `uv venv` when uv is on the path and the
    interpreter's own `venv` module otherwise. A directory already there that no registered engine
-   points at is the remains of an install that did not finish, and is removed first.
+   points at is the remains of an install that did not finish, and is removed first. An engine
+   whose dependencies install on a narrower range of Python than the SDK's says so in its catalog
+   record. uv is handed the range and finds or fetches an interpreter inside it; without uv, the
+   configured interpreter is asked first and the job fails naming both, because pip given an
+   interpreter outside the range does not fail. It resolves the newest release that still claims to
+   support it: `kokoro-onnx` 0.6.1 declares `<3.14`, and on 3.14 pip quietly installed 0.4.7.
 2. **`packages`**: pip install the adapter. If `<install.sourceDir>/<package>` exists it is
    installed from there; otherwise it is installed by name from the package index. The first is how
    a checkout works today, and the second is how it works once adapters are published, with nothing

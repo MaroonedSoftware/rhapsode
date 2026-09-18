@@ -1,6 +1,6 @@
 import type { InstallJob } from '@rhapsode/contract';
 
-import type { CatalogRecord } from '../registry/engines.catalog.js';
+import type { CatalogRecord, PythonRange } from '../registry/engines.catalog.js';
 import { resolveCommand } from '../workers/worker.handle.js';
 
 export type InstallStep = NonNullable<InstallJob['step']>;
@@ -60,13 +60,24 @@ export function planInstall(inputs: PlanInputs): InstallPlan {
         args: ['-m', 'pip', 'install', '--progress-bar', 'off', ...trusted, ...args],
     });
 
+    const range = record.python;
+    const venvCommands: PlannedCommand[] = uv
+        ? // --seed, because a uv virtualenv has no pip otherwise and every later step is pip. A range
+          // goes to uv as a specifier, and uv finds or fetches an interpreter inside it.
+          [{ step: 'venv', command: 'uv', args: ['venv', '--seed', '--python', range === undefined ? python : specifier(range), venv] }]
+        : [
+              // Asked of the interpreter itself, before anything is created, so the job fails with
+              // a sentence rather than with pip picking an older release the adapter never met.
+              ...(range === undefined
+                  ? []
+                  : [{ step: 'venv' as const, command: python, args: ['-c', interpreterCheck(record.displayName, python, range)] }]),
+              { step: 'venv', command: python, args: ['-m', 'venv', venv] },
+          ];
+
     return {
         venv,
         commands: [
-            uv
-                ? // --seed, because a uv virtualenv has no pip otherwise and every later step is pip.
-                  { step: 'venv', command: 'uv', args: ['venv', '--seed', '--python', python, venv] }
-                : { step: 'venv', command: python, args: ['-m', 'venv', venv] },
+            ...venvCommands,
             pip('--upgrade', 'pip'),
             // Both in one resolve. The adapter depends on rhapsode-worker by name, and naming a
             // directory that provides it in the same command is what lets pip satisfy that without
@@ -75,4 +86,16 @@ export function planInstall(inputs: PlanInputs): InstallPlan {
             { step: 'verify', command: interpreter, args: ['-c', `import ${record.module}`] },
         ],
     };
+}
+
+/** A range as a PEP 440 specifier, which is what `uv venv --python` takes. */
+export function specifier(range: PythonRange): string {
+    return `>=${range.from},<${range.below}`;
+}
+
+/** A one-line Python program that exits non-zero, saying why, when it is outside the range. */
+function interpreterCheck(engine: string, python: string, range: PythonRange): string {
+    const tuple = (version: string) => `(${version.split('.').map(Number).join(', ')})`;
+    const why = `${engine} needs Python ${specifier(range)} and ${python} is %d.%d. Install uv, which fetches one, or set install.python to an interpreter in range.`;
+    return `import sys; v = sys.version_info[:2]; sys.exit(0 if ${tuple(range.from)} <= v < ${tuple(range.below)} else ${JSON.stringify(why)} % v)`;
 }
