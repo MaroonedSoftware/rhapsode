@@ -6,10 +6,10 @@ Point it at a box with a GPU, install the engines you want, and every client tal
 that describes honestly what each engine can actually do.
 
 > **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
-> a worker and streams `/speak` through it works end to end, and there is a Chatterbox adapter whose
-> protocol surface passes the conformance suite against a stubbed model. What is not here yet:
-> Chatterbox verified against real weights on a GPU, voice cloning through the core, and the OpenAI
-> and Wyoming shims.
+> a worker and streams `/speak` through it works end to end, engines install through the API, and
+> the Chatterbox adapter passes the conformance suite against real weights on Apple Silicon. What is
+> not here yet: Chatterbox measured on a CUDA card, voice cloning through the core, a web page over
+> the install API, and the OpenAI and Wyoming shims.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -137,12 +137,22 @@ The `tone` engine has no weights and makes a sine wave. It exists to prove the p
 to make speech, which is exactly what makes it useful: it loads in microseconds, needs no GPU, and
 runs in CI on every commit. It is also the conformance fixture, and will stay one.
 
-For something that makes speech, install
-[`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) into its own virtualenv and point
-an engine entry at it. It is the engine the capability document was designed around, and the reason
-that document has two levels: `turbo` performs the cues and has no dials, `original` and
-`multilingual` have the dials and perform no cues, and which you get is a fact about the weights
-resident right now.
+For something that makes speech, install Chatterbox with the server running:
+
+```bash
+pnpm wizard install chatterbox
+```
+
+It shows both licences and asks, has the server build the engine its own virtualenv, and offers to
+download the `turbo` weights (3.8 GB) so the first request does not wait on them. The wizard is only
+a client: the same thing is `POST /engines/chatterbox/install` and `POST /engines/chatterbox/pull`,
+which answer the machine the server runs on and nobody else unless `management.token` is set. See
+[`docs/protocol.md`](docs/protocol.md) § 10 and [`docs/operating.md`](docs/operating.md).
+
+[`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) is the engine the capability
+document was designed around, and the reason that document has two levels: `turbo` performs the cues
+and has no dials, `original` and `multilingual` have the dials and perform no cues, and which you get
+is a fact about the weights resident right now.
 
 ## Contributing an engine
 
