@@ -45,8 +45,9 @@ pnpm release version 0.2.0          # every published package to one version, ch
 
 Every published package, npm and PyPI, carries one version (`docs/protocol.md` § 9). `pnpm release`
 sets it rather than `changeset version`, because a changeset cannot name a Python package. Write a
-changeset as before; pushing a `v*` tag is what publishes, through `.github/workflows/release.yml`,
-which needs an `NPM_TOKEN` secret on the repository's `npm` environment.
+changeset as before; pushing a `v*` tag is what publishes, through `.github/workflows/release.yml`:
+PyPI first, by trusted publishing from the `pypi` environment, then npm, with an `NPM_TOKEN` secret
+on the `npm` environment. PyPI goes first because a published core installs its engines from there.
 
 `pnpm wizard` is `packages/cli`, a johnny5 CLI like the ones in signet and kanban. It runs from
 TypeScript source under swc and is never built. `setup` is interactive and drives the same scripts

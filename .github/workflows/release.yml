@@ -32,8 +32,48 @@ jobs:
         needs: [versions]
         uses: ./.github/workflows/build.yml
 
-    npm:
+    pypi:
+        # Before npm, because a published core installs its engines from PyPI at its own version
+        # (§ 9), and a core on npm whose engines are not on PyPI yet fails every install.
         needs: [build]
+        runs-on: ubuntu-latest
+        environment: pypi
+        permissions:
+            contents: read
+            # Trusted publishing: PyPI accepts this workflow's identity in place of a token, and
+            # attestations are made from the same one.
+            id-token: write
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: '3.11'
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+
+            # The generated contract code is committed, so a plain build of each directory is the
+            # whole package. --strict because PyPI renders what twine would only warn about.
+            - name: Build
+              run: |
+                  python -m pip install build twine
+                  for dir in $(node scripts/release.mjs list python); do
+                      python -m build --outdir dist "$dir"
+                  done
+                  python -m twine check --strict dist/*
+
+            # skip-existing, so a run that died halfway is finished by re-running it.
+            - uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist/
+                  skip-existing: true
+
+    npm:
+        needs: [pypi]
         runs-on: ubuntu-latest
         environment: npm
         permissions:
@@ -57,8 +97,8 @@ jobs:
             - run: pnpm run build
 
             # Packed by pnpm, because only pnpm rewrites `workspace:*` into the version being
-            # released, and published by npm, because npm is what attaches provenance. Dependencies
-            # before dependents, so no published package ever names one that is not there yet.
+            # released, and published by npm, because npm is what attaches provenance. In the order
+            # `release.mjs list` gives, which is dependencies before dependents.
             #
             # A version already on the registry is skipped rather than failed, so a run that died
             # halfway is finished by re-running it, not by cutting a new version.
@@ -69,7 +109,7 @@ jobs:
                   version="${GITHUB_REF_NAME#v}"
                   out="$RUNNER_TEMP/npm"
                   mkdir -p "$out"
-                  for dir in packages/contract packages/sdk packages/core apps/server; do
+                  for dir in $(node scripts/release.mjs list npm); do
                       name=$(node -p "require('./$dir/package.json').name")
                       if npm view "$name@$version" version >/dev/null 2>&1; then
                           echo "$name@$version is already published"
@@ -80,7 +120,7 @@ jobs:
                   done
 
     github:
-        needs: [npm]
+        needs: [pypi, npm]
         runs-on: ubuntu-latest
         permissions:
             contents: write

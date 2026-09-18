@@ -4,6 +4,7 @@
 //   node scripts/release.mjs version 0.1.0   set it everywhere and fold .changeset/ into CHANGELOG.md
 //   node scripts/release.mjs check v0.1.0    fail unless every published package is at that version
 //   node scripts/release.mjs notes 0.1.0     print that version's CHANGELOG section
+//   node scripts/release.mjs list npm|python  the published package directories, in publishing order
 //
 // This rather than `changeset version`, because changesets knows only the pnpm workspace. Half of
 // what ships is Python, a changeset cannot name a Python package, and 15 of the first 37 had an
@@ -17,10 +18,13 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Published to npm. The private workspace packages (cli, web, eslint and tsconfig) keep 0.0.0. */
-const NPM = ['packages/contract', 'packages/core', 'packages/sdk', 'apps/server'];
+/**
+ * Published to npm, dependencies before dependents, so no published package ever names one that is
+ * not on the registry yet. The private workspace packages (cli, web, eslint and tsconfig) keep 0.0.0.
+ */
+const NPM = ['packages/contract', 'packages/sdk', 'packages/core', 'apps/server'];
 
-/** Published to PyPI: the SDK, the conformance suite, and every engine the catalog installs by name. */
+/** Published to PyPI: the SDK first, the conformance suite, and every engine the catalog installs by name. */
 const PYTHON = [
     'python/rhapsode-worker',
     'python/conformance',
@@ -140,4 +144,5 @@ const [command, argument] = process.argv.slice(2);
 if (command === 'version') commandVersion(argument);
 else if (command === 'check') commandCheck(argument);
 else if (command === 'notes') commandNotes(argument?.replace(/^v/, ''));
-else fail('usage: release.mjs version <x.y.z> | check <vX.Y.Z> | notes <x.y.z>');
+else if (command === 'list' && (argument === 'npm' || argument === 'python')) console.log((argument === 'npm' ? NPM : PYTHON).join('\n'));
+else fail('usage: release.mjs version <x.y.z> | check <vX.Y.Z> | notes <x.y.z> | list npm|python');
