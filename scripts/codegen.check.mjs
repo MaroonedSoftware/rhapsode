@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const GENERATED = [
     'packages/contract/src/generated',
+    'packages/sdk/src/generated',
     'python/rhapsode-worker/src/rhapsode_worker/_contract',
     'python/conformance/src/rhapsode_conform/_generated',
     'docs/openapi.yaml',

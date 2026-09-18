@@ -19,7 +19,11 @@ Two languages, one protocol.
 - `python/rhapsode-worker` is the SDK an engine author subclasses. It must never depend on torch
   either, or an ONNX adapter cannot install it.
 
-Dependency direction is one-way: `apps/server` → `packages/core` → `packages/contract`.
+- `packages/sdk` is a typed client for the public API, generated from the same contracts and
+  committed. It depends on nothing, for the same reason `packages/contract` depends only on zod.
+
+Dependency direction is one-way: `apps/server` → `packages/core` → `packages/contract`. The SDK
+depends on the core only to test against it.
 
 ## Commands
 

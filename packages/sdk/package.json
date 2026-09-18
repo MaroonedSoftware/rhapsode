@@ -1,0 +1,37 @@
+{
+    "name": "@rhapsode/sdk",
+    "version": "0.0.0",
+    "description": "A typed client for the rhapsode public API, generated from contracts/.",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "license": "MIT",
+    "files": [
+        "dist/**",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --sourcemap && tsc --emitDeclarationOnly --declaration",
+        "build:ci": "eslint --max-warnings=0 && pnpm run build",
+        "lint": "eslint --fix",
+        "format": "prettier --write . --ignore-path ../../.prettierignore",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@repo/config-eslint": "workspace:*",
+        "@repo/config-typescript": "workspace:*",
+        "@rhapsode/core": "workspace:*",
+        "vitest": "^4.1.11"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

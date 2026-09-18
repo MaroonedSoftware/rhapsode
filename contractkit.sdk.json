@@ -1,0 +1,18 @@
+{
+    "rootDir": ".",
+    "prettier": true,
+    "patterns": ["contracts/rhapsode.types.ck", "contracts/rhapsode.public.ck"],
+    "plugins": {
+        "@contractkit/plugin-typescript": {
+            "sdk": {
+                "baseDir": "packages/sdk/",
+                "name": "rhapsode",
+                "output": {
+                    "sdk": "src/generated/{name}.sdk.ts",
+                    "types": "src/generated/{area}/types/{filename}.ts",
+                    "clients": "src/generated/{area}/{filename}.client.ts"
+                }
+            }
+        }
+    }
+}
