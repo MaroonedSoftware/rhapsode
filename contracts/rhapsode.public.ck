@@ -61,12 +61,15 @@ operation /engines/{engine}/voices: {
         }
     }
     post: {
+        # Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB.
         sdk: createVoice
         request: {
             multipart/form-data: CreateVoiceForm
         }
         response: {
             201: { application/json: Voice }
+            400: { application/json: ErrorBody }
+            403: { application/json: ErrorBody }
             404: { application/json: ErrorBody }
             422: { application/json: ErrorBody }
         }
@@ -82,7 +85,10 @@ operation /engines/{engine}/voices/{voice}: {
         sdk: deleteVoice
         response: {
             204:
+            400: { application/json: ErrorBody }
+            403: { application/json: ErrorBody }
             404: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
         }
     }
 }

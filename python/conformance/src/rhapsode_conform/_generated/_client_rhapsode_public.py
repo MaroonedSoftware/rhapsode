@@ -44,6 +44,18 @@ class CreateVoice201Response(TypedDict):
     data: Voice
 
 
+class CreateVoice400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class CreateVoice403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class CreateVoice404Response(TypedDict):
     status: Literal[404]
     content_type: Literal["application/json"]
@@ -60,8 +72,26 @@ class DeleteVoice204Response(TypedDict):
     status: Literal[204]
 
 
+class DeleteVoice400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class DeleteVoice403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class DeleteVoice404Response(TypedDict):
     status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class DeleteVoice422Response(TypedDict):
+    status: Literal[422]
     content_type: Literal["application/json"]
     data: ErrorBody
 
@@ -268,18 +298,31 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "application/json", "data": _ENGINE_VOICES_RESPONSE_200.validate_python(result) }
 
-    async def create_voice(self, engine: str, body: dict[str, Any]) -> CreateVoice201Response | CreateVoice404Response | CreateVoice422Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices", method="POST", body=body, content_type="multipart/form-data", body_kind="multipart", response_kind="auto", expect_statuses=(404, 422))
+    async def create_voice(self, engine: str, body: dict[str, Any]) -> CreateVoice201Response | CreateVoice400Response | CreateVoice403Response | CreateVoice404Response | CreateVoice422Response:
+        """
+        Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB.
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices", method="POST", body=body, content_type="multipart/form-data", body_kind="multipart", response_kind="auto", expect_statuses=(400, 403, 404, 422))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 422:
             return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 201, "content_type": "application/json", "data": Voice.model_validate(result) }
 
-    async def delete_voice(self, engine: str, voice: str) -> DeleteVoice204Response | DeleteVoice404Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices/{quote(str(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(404,))
+    async def delete_voice(self, engine: str, voice: str) -> DeleteVoice204Response | DeleteVoice400Response | DeleteVoice403Response | DeleteVoice404Response | DeleteVoice422Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices/{quote(str(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(400, 403, 404, 422))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 422:
+            return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 204 }
 
     async def voice_preview(self, engine: str, voice: str) -> VoicePreview200Response | VoicePreview404Response:

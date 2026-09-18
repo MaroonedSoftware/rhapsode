@@ -14,6 +14,12 @@ class WorkerCreateVoice201Response(TypedDict):
     data: Voice
 
 
+class WorkerCreateVoice400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class WorkerCreateVoice422Response(TypedDict):
     status: Literal[422]
     content_type: Literal["application/json"]
@@ -24,8 +30,20 @@ class WorkerDeleteVoice204Response(TypedDict):
     status: Literal[204]
 
 
+class WorkerDeleteVoice400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class WorkerDeleteVoice404Response(TypedDict):
     status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerDeleteVoice422Response(TypedDict):
+    status: Literal[422]
     content_type: Literal["application/json"]
     data: ErrorBody
 
@@ -138,19 +156,25 @@ class RhapsodeWorkerClient(BaseClient):
         result = await self._fetch("/voices", method="GET")
         return _WORKER_VOICES_RESPONSE.validate_python(result)
 
-    async def worker_create_voice(self, body: dict[str, Any]) -> WorkerCreateVoice201Response | WorkerCreateVoice422Response:
+    async def worker_create_voice(self, body: dict[str, Any]) -> WorkerCreateVoice201Response | WorkerCreateVoice400Response | WorkerCreateVoice422Response:
         """
         Cloning, where the variant supports it.
         """
-        _status, _content_type, result, _response_headers = await self._fetch_full("/voices", method="POST", body=body, content_type="multipart/form-data", body_kind="multipart", response_kind="auto", expect_statuses=(422,))
+        _status, _content_type, result, _response_headers = await self._fetch_full("/voices", method="POST", body=body, content_type="multipart/form-data", body_kind="multipart", response_kind="auto", expect_statuses=(400, 422))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 422:
             return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 201, "content_type": "application/json", "data": Voice.model_validate(result) }
 
-    async def worker_delete_voice(self, voice: str) -> WorkerDeleteVoice204Response | WorkerDeleteVoice404Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/voices/{quote(str(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(404,))
+    async def worker_delete_voice(self, voice: str) -> WorkerDeleteVoice204Response | WorkerDeleteVoice400Response | WorkerDeleteVoice404Response | WorkerDeleteVoice422Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/voices/{quote(str(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(400, 404, 422))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 422:
+            return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 204 }
 
     async def worker_voice_preview(self, voice: str) -> WorkerVoicePreview200Response | WorkerVoicePreview404Response:

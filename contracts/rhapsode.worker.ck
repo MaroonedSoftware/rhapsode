@@ -48,6 +48,7 @@ operation /voices: {
         }
         response: {
             201: { application/json: Voice }
+            400: { application/json: ErrorBody }
             422: { application/json: ErrorBody }
         }
     }
@@ -61,7 +62,9 @@ operation /voices/{voice}: {
         sdk: workerDeleteVoice
         response: {
             204:
+            400: { application/json: ErrorBody }
             404: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
         }
     }
 }

@@ -63,20 +63,27 @@ export class PublicClient {
         }
     }
 
+    /** @description Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB. */
     async createVoice(
         engine: string,
         body: FormData,
     ): Promise<
         | { status: 201; contentType: 'application/json'; data: Voice }
+        | { status: 400; contentType: 'application/json'; data: ErrorBody }
+        | { status: 403; contentType: 'application/json'; data: ErrorBody }
         | { status: 404; contentType: 'application/json'; data: ErrorBody }
         | { status: 422; contentType: 'application/json'; data: ErrorBody }
     > {
         const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/voices`, {
             method: 'POST',
             body: body,
-            expectStatuses: [404, 422],
+            expectStatuses: [400, 403, 404, 422],
         });
         switch (result.status) {
+            case 400:
+                return { status: 400, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             case 404:
                 return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             case 422:
@@ -86,14 +93,29 @@ export class PublicClient {
         }
     }
 
-    async deleteVoice(engine: string, voice: string): Promise<{ status: 204 } | { status: 404; contentType: 'application/json'; data: ErrorBody }> {
+    async deleteVoice(
+        engine: string,
+        voice: string,
+    ): Promise<
+        | { status: 204 }
+        | { status: 400; contentType: 'application/json'; data: ErrorBody }
+        | { status: 403; contentType: 'application/json'; data: ErrorBody }
+        | { status: 404; contentType: 'application/json'; data: ErrorBody }
+        | { status: 422; contentType: 'application/json'; data: ErrorBody }
+    > {
         const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/voices/${encodeURIComponent(voice)}`, {
             method: 'DELETE',
-            expectStatuses: [404],
+            expectStatuses: [400, 403, 404, 422],
         });
         switch (result.status) {
+            case 400:
+                return { status: 400, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             case 404:
                 return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 422:
+                return { status: 422, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             default:
                 return { status: 204 };
         }
