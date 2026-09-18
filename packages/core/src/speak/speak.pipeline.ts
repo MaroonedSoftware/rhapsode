@@ -20,6 +20,7 @@ export interface NativeSpeak {
     voice?: string;
     variant?: string;
     format?: string;
+    language?: string;
     delivery?: string;
     params?: Record<string, number>;
     seed?: number;
@@ -104,6 +105,7 @@ export async function speakThrough(
                 text: ready.text,
                 variant,
                 format: native.format,
+                language: native.language,
                 voice: native.voice,
                 delivery: ready.delivery,
                 params: ready.params,

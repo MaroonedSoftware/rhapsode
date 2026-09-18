@@ -21,6 +21,7 @@ export const speakRoutes: FastifyPluginAsync = async app => {
             voice: typeof body.voice === 'string' ? body.voice : undefined,
             variant: typeof body.variant === 'string' ? body.variant : undefined,
             format: typeof body.format === 'string' ? body.format : undefined,
+            language: typeof body.language === 'string' ? body.language : undefined,
             delivery: typeof body.delivery === 'string' ? body.delivery : undefined,
             params: body.params as Record<string, number> | undefined,
             seed: typeof body.seed === 'number' ? body.seed : undefined,

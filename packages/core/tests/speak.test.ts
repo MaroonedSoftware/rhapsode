@@ -136,6 +136,21 @@ describeWithSockets('speaking', () => {
         expect(response.json().error.message).toContain('pitch');
     }, 60_000);
 
+    it('hands the worker the language, so one the variant does not speak is refused', async () => {
+        // § 6: a multilingual variant reads `language`. Before this reached the worker, every
+        // request spoke the variant's first language whatever it asked for. Tone speaks only "en",
+        // and the refusal is the worker's own, which is the evidence the field arrived.
+        const builder = await start();
+        const refused = await speak(builder, { engine: 'tone', text: 'x', language: 'fr', format: 'pcm', stream: false });
+
+        expect(refused.statusCode).toBe(422);
+        expect(refused.json().error).toMatchObject({ code: 'unsupported' });
+        expect(refused.json().error.message).toContain('"fr"');
+
+        const spoken = await speak(builder, { engine: 'tone', text: 'x', language: 'en', format: 'pcm', stream: false });
+        expect(spoken.statusCode).toBe(200);
+    }, 60_000);
+
     it('refuses a variant the engine does not have rather than swapping one in', async () => {
         const builder = await start();
         expect((await speak(builder, { engine: 'tone', text: 'x', variant: 'nosuch' })).statusCode).toBe(422);
