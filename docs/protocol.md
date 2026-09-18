@@ -249,6 +249,12 @@ whether a commercial user may ship the thing. Apache-2.0 inference code over res
 is a real and common combination; Breeze TTS 2 is exactly that. A licence scanner reads the package
 and reports Apache-2.0, and it is wrong in the way that matters.
 
+**`code` is the licence of what the worker process runs, not of the adapter package.** A scanner
+makes the same mistake one layer down: `kokoro-onnx` is MIT, and turning text into the phonemes its
+model takes goes through `phonemizer` and eSpeak NG, which are GPL-3.0-or-later. An adapter reports
+the most restrictive licence among what it loads, and says in `notes` which dependency is
+responsible, because that is the one a commercial user will ask about.
+
 So the adapter declares both, by hand, and `GET /engines` surfaces them. Nobody else in this space
 does this, and for anyone using the server commercially it is the most useful field in the document.
 The catalog entry for an engine carries the same two fields, so the licence is visible **before**
@@ -567,6 +573,28 @@ that does not override it answers `unsupported`. It exists because the alternati
 `/speak` doing the download: Chatterbox's `turbo` is 3.8 GB and took about 75 seconds on a first
 load, and a caller waiting on one utterance cannot tell that from a hang. An engine whose weights
 ship inside its package, or that has none, leaves it alone.
+
+### An ONNX engine is an adapter like any other
+
+Piper, Kokoro and Supertonic ship ONNX weights, and `onnxruntime-node` could run them inside the
+core with no Python at all. **They run as workers instead**, through `onnxruntime` in their own
+virtualenv, and the core has one kind of engine. This was open until v1 (§ 13) and was decided on
+what running them in-process would actually have cost:
+
+- **The model is the easy half.** These models take phonemes, not text, and every maintained route
+  from one to the other goes through eSpeak NG, which is GPL-3.0-or-later, in Python and in Node
+  alike. In a worker it runs in a process and a virtualenv of its own, behind a catalog entry that
+  shows the licence before install (§ 4). In the core it would be loaded into an MIT server that
+  holds no engine knowledge, which is the rule § 1 rests on.
+- **`onnxruntime-node` is 301 MB unpacked**, and would be a dependency of every core, including the
+  ones that never run an ONNX engine.
+- **The benefit was a first run with no Python**, and the installer (§ 10) already builds each
+  engine its own virtualenv with `uv`. The gain that remains is a first engine that needs no GPU and
+  a download measured in megabytes, and a CPU worker delivers that.
+
+What this asks of the SDK is only what it already promises: it must never depend on torch, or an
+ONNX adapter could not install it. `device` is `cpu` for such an engine and means it; nothing in
+this document treats CPU as a degraded case.
 
 ### What an adapter must do honestly, and it is only one thing
 
@@ -889,6 +917,7 @@ Named so that nobody has to guess whether they were forgotten.
 - **Word timestamps.** Wanted, cheap enough as an optional sidecar response, and not worth blocking
   v1. Leave room: a `X-Rhapsode-Timings-Url` header or a `timings` field in a multipart response.
 - **Batching.** Adapters declare `concurrency` and that is the whole of it for now.
+- **Engines inside the core.** Every engine is a worker, ONNX ones included. § 8 says why.
 - **A UI in the core.** The gap this project fills is that everything else has one, and has put
   its API behind it. A web page for installing engines is a client of § 10 like any other, and gets
   no route the terminal client does not.
@@ -905,10 +934,8 @@ Named so that nobody has to guess whether they were forgotten.
 3. **Voice namespacing across engines.** A station voice that means "the same person" on three
    engines is a client concern, not this server's. Resisting it is probably right, and is worth
    writing down as a decision rather than leaving as an omission.
-4. **In-process ONNX engines.** Piper, Kokoro and Supertonic are ONNX, and `onnxruntime-node` means
-   the core could run them with no Python and no subprocess. That is a much better first five
-   minutes for a new user. It needs a second adapter interface inside the core, which is a real cost
-   against a real benefit. Decide before v1, because it changes what "engine" means in the registry.
+4. **In-process ONNX engines.** Decided: no. ONNX engines are Python workers like every other
+   engine, for the reasons in § 8, and "engine" in the registry keeps meaning one thing.
 5. **Where the core lives.** `MaroonedSoftware` already publishes ServerKit and ContractKit, which
    the core builds on, so the provenance line writes itself. Open only on whether the Python worker
    SDK ships from the same repository or its own: same repo keeps the protocol and both of its
