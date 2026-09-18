@@ -1,0 +1,11 @@
+{
+    "extends": "@repo/config-typescript/base.json",
+    "compilerOptions": {
+        // The CLI is never built; it runs from source under swc, so this is type-checking and
+        // nothing else.
+        "noEmit": true,
+        "rootDir": "./src"
+    },
+    "include": ["./src/**/*"],
+    "exclude": ["node_modules", "dist"]
+}

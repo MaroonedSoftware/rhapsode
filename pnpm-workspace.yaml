@@ -6,6 +6,8 @@ allowBuilds:
     # Pulled in by ServerKit's authentication package. Builds a native addon.
     cbor-extract: true
     esbuild: true
+    # The swc binary behind `pnpm wizard`, which runs the CLI from TypeScript source.
+    '@swc/core': true
 
 minimumReleaseAgeExclude:
     - '@maroonedsoftware/*'

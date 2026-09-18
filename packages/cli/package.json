@@ -1,0 +1,26 @@
+{
+    "name": "@rhapsode/cli",
+    "version": "0.0.0",
+    "description": "The developer CLI: first-run setup and a doctor for this checkout.",
+    "private": true,
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "wizard": "node --no-warnings --import @swc-node/register/esm-register ./src/index.ts",
+        "lint": "eslint --fix",
+        "format": "prettier --write . --ignore-path ../../.prettierignore",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@maroonedsoftware/johnny5": "^8.1.7",
+        "@rhapsode/core": "workspace:*",
+        "@swc-node/register": "^1.12.1",
+        "@swc/core": "^1.16.2"
+    },
+    "devDependencies": {
+        "@repo/config-eslint": "workspace:*",
+        "@repo/config-typescript": "workspace:*",
+        "vitest": "^4.1.11"
+    }
+}

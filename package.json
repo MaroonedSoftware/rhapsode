@@ -14,7 +14,8 @@
         "typecheck": "turbo run typecheck",
         "python:sync": "node scripts/python.mjs sync",
         "changeset": "changeset",
-        "conform": "node scripts/conform.mjs"
+        "conform": "node scripts/conform.mjs",
+        "wizard": "pnpm --silent --filter @rhapsode/cli wizard"
     },
     "devDependencies": {
         "@changesets/cli": "^3.0.2",
