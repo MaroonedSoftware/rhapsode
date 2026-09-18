@@ -14,6 +14,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -59,6 +60,9 @@ def spawn(
         "RHAPSODE_WORKER_LISTEN": listen,
         "RHAPSODE_WORKER_ENGINE": engine,
         "RHAPSODE_WORKER_CONTRACT": contract,
+        # Its own, so a voice a test creates lands nowhere near the repository, where the worker's
+        # default (./voices/<engine> from cwd) would otherwise put it.
+        "RHAPSODE_VOICE_DIR": tempfile.mkdtemp(prefix="rh-voices-"),
         **(env or {}),
     }
     return subprocess.Popen(

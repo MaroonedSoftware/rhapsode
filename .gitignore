@@ -15,7 +15,8 @@ build/
 # Models and generated audio, which are never committed
 models/
 weights/
-voices/*.wav
+# A worker's voice store, which defaults to ./voices/<engine> under wherever it was started.
+**/voices/
 outputs/
 
 # Local

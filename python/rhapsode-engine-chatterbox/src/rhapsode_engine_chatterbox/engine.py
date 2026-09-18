@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, ClassVar
@@ -147,21 +148,8 @@ class ChatterboxEngine(Engine):
         """Whatever reference audio is on disk. A cloned voice is a file, and that is the whole store."""
         if not self.voice_dir.is_dir():
             return []
-
         found = sorted(path for path in self.voice_dir.iterdir() if path.suffix.lower() in VOICE_SUFFIXES)
-        return [
-            Voice(
-                id=path.stem,
-                label=path.stem.replace("_", " ").title(),
-                description=f"Cloned from {path.name}",
-                # Changes when what this voice SOUNDS like would. The resident build is part of that:
-                # the same reference read by turbo and by original are two different renderings, and a
-                # client keying a cached preview on the id alone would serve the wrong one forever.
-                spec=f"{path.stem}@{self.variant or self.default_variant}",
-                tags=("cloned",),
-            )
-            for path in found
-        ]
+        return [self._voice(path) for path in found]
 
     def create_voice(self, request: CreateVoiceRequest) -> Voice:
         """Store the reference audio. Cloning here is zero-shot, so there is nothing to train."""
@@ -172,13 +160,26 @@ class ChatterboxEngine(Engine):
         if not request.reference:
             raise BadRequest("the reference audio is empty")
 
+        # A re-record replaces, whatever the new clip is called. An mp3 over an earlier wav would
+        # otherwise leave both, and which one speaks would depend on how the directory sorted.
+        for stale in self.voice_dir.iterdir():
+            if stale.stem == request.id and stale.suffix.lower() in VOICE_SUFFIXES:
+                stale.unlink()
         target = self.voice_dir / f"{request.id}{suffix}"
         target.write_bytes(request.reference)
+        return self._voice(target, label=request.label)
+
+    def _voice(self, path: Path, label: str | None = None) -> Voice:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:12]
         return Voice(
-            id=request.id,
-            label=request.label or request.id,
-            description=f"Cloned from {target.name}",
-            spec=f"{request.id}@{self.variant or self.default_variant}",
+            id=path.stem,
+            label=label or path.stem.replace("_", " ").title(),
+            description=f"Cloned from {path.name}",
+            # Changes when what this voice SOUNDS like would: the reference, and the resident build,
+            # since turbo and original read the same clip two different ways. It was the id and the
+            # build alone, so re-recording a voice left the spec as it was and a client keying a
+            # cached preview on it served the old recording. protocol.md § 7.
+            spec=f"{path.stem}@{self.variant or self.default_variant}:{digest}",
             tags=("cloned",),
         )
 

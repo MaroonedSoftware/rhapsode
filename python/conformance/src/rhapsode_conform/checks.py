@@ -492,6 +492,134 @@ def fetch_downloads_or_says_it_does_not(worker: Worker, report: Report) -> None:
         )
 
 
+@check
+def an_unknown_voice_is_refused_rather_than_substituted(worker: Worker, report: Report) -> None:
+    """§ 7. A default voice in place of the one asked for is a 200 in a voice nobody chose."""
+    status, body = worker.speak(
+        {"text": "Somebody else.", "voice": "rhapsode_conform_nobody", "stream": False}
+    )
+    code = _error_of(body).get("code")
+    report.record(
+        "an unknown voice is refused, not substituted",
+        "§ 7",
+        (status, code) == (404, "unknown_voice"),
+        f"status {status}, {code}",
+    )
+
+
+@check
+def a_voice_id_that_is_not_a_name_is_refused(worker: Worker, report: Report) -> None:
+    """§ 7. An adapter makes a file of an id, so an id that is a path must never reach one."""
+    status, body = worker.speak({"text": "Somewhere else.", "voice": "../../x", "stream": False})
+    code = _error_of(body).get("code")
+    report.record(
+        "a voice id that is a path is refused",
+        "§ 7",
+        (status, code) == (400, "bad_request"),
+        f"status {status}, {code}",
+    )
+
+
+#: An id the suite owns, so a clone it leaves behind after a crash is recognisable and harmless.
+CLONE_ID = "rhapsode_conform_clone"
+
+
+@check
+def cloning_round_trips(worker: Worker, report: Report) -> None:
+    """§ 7. Create, list, speak, preview, re-record, delete, and gone, on an engine that clones.
+
+    Optional, so an engine that answers the create with `unsupported` conforms and the rest is not
+    asked. One that accepts it is held to all of it.
+    """
+    status, created = worker.create_voice(CLONE_ID, _reference_wav(220.0))
+    if status == 422 and _error_code(created) == "unsupported":
+        report.record("cloning is offered, or refused as unsupported", "§ 7", True, "not offered")
+        return
+    try:
+        _cloning(worker, report, status, created)
+    finally:
+        worker.delete(f"/voices/{CLONE_ID}")
+
+
+def _cloning(worker: Worker, report: Report, status: int, created: Any) -> None:
+    made = status == 201 and isinstance(created, dict) and created.get("id") == CLONE_ID
+    report.record("a clone answers 201 with the new voice", "§ 7", made, f"status {status}")
+    if not made:
+        return
+    Voice.model_validate(created)
+
+    _, voices = worker.get("/voices")
+    listed = next((voice for voice in voices if voice.get("id") == CLONE_ID), None)
+    report.record("a clone is listed", "§ 7", listed is not None)
+
+    status, audio = worker.speak({"text": "In a voice of my own.", "voice": CLONE_ID, "stream": False})
+    report.record(
+        "a clone speaks",
+        "§ 7",
+        status == 200 and len(audio) >= MIN_PLAUSIBLE_AUDIO_BYTES,
+        f"status {status}, {len(audio)} bytes",
+    )
+
+    status, preview = worker.get_bytes(f"/voices/{CLONE_ID}/preview")
+    report.record(
+        "a clone previews",
+        "§ 7",
+        status == 200 and len(preview) >= MIN_PLAUSIBLE_AUDIO_BYTES,
+        f"status {status}",
+    )
+
+    status, again = worker.create_voice(CLONE_ID, _reference_wav(330.0))
+    before = created.get("spec")
+    after = again.get("spec") if isinstance(again, dict) else None
+    report.record(
+        "re-recording a clone changes its spec",
+        "§ 7",
+        status == 201 and after is not None and after != before,
+        f"{before} -> {after}",
+    )
+
+    status, _ = worker.delete(f"/voices/{CLONE_ID}")
+    report.record("a clone deletes", "§ 7", status == 204, f"status {status}")
+    _, voices = worker.get("/voices")
+    report.record(
+        "a deleted clone is gone from the list", "§ 7", all(voice.get("id") != CLONE_ID for voice in voices)
+    )
+    status, body = worker.speak({"text": "Still here?", "voice": CLONE_ID, "stream": False})
+    report.record(
+        "a deleted clone no longer speaks",
+        "§ 7",
+        (status, _error_of(body).get("code")) == (404, "unknown_voice"),
+        f"status {status}, {_error_of(body).get('code')}",
+    )
+
+
+def _reference_wav(hz: float, seconds: float = 6.0, rate: int = 24_000) -> bytes:
+    """Six seconds of a tone, inside every engine's usable reference range and unlike the other one."""
+    import math
+    import struct
+
+    samples = int(seconds * rate)
+    frames = struct.pack(
+        f"<{samples}h", *(int(8000 * math.sin(2 * math.pi * hz * index / rate)) for index in range(samples))
+    )
+    buffer = BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(frames)
+    return buffer.getvalue()
+
+
+def _error_code(body: Any) -> str | None:
+    if isinstance(body, dict):
+        error = body.get("error")
+        if isinstance(error, dict):
+            code = error.get("code")
+            return code if isinstance(code, str) else None
+    return None
+
+
 def _variants(worker: Worker) -> dict[str, Any]:
     _, capabilities = worker.get("/capabilities")
     variants = capabilities.get("variants")

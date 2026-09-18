@@ -11,7 +11,7 @@ import os
 from collections.abc import Iterator
 from typing import Any, ClassVar
 
-from rhapsode_worker import Engine, NativeFormat, SpeakRequest, Variant, Voice, serve
+from rhapsode_worker import Engine, NativeFormat, SpeakRequest, UnknownVoice, Variant, Voice, serve
 
 
 class UnseededEngine(Engine):
@@ -33,6 +33,9 @@ class UnseededEngine(Engine):
         return [Voice(id="one", label="One", spec="one@only")]
 
     def speak(self, request: SpeakRequest) -> Iterator[bytes]:
+        if request.voice not in (None, "one"):
+            # Honest about voices, which is not what this engine exists to fail on. § 7.
+            raise UnknownVoice(f'no voice "{request.voice}"')
         # Length follows the text, as a real model's does, so the only thing wrong with this engine
         # is the thing under test: the content is fresh noise on every call and ignores the cue, the
         # delivery and the seed.

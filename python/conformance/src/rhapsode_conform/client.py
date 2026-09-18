@@ -59,6 +59,24 @@ class Worker:
         response = self._client.post(path, json=body if body is not None else {})
         return response.status_code, _decode(response)
 
+    def create_voice(
+        self, voice_id: str, reference: bytes, filename: str = "reference.wav"
+    ) -> tuple[int, Any]:
+        response = self._client.post(
+            "/voices",
+            data={"id": voice_id},
+            files={"reference": (filename, reference, "audio/wav")},
+        )
+        return response.status_code, _decode(response)
+
+    def delete(self, path: str) -> tuple[int, Any]:
+        response = self._client.delete(path)
+        return response.status_code, _decode(response)
+
+    def get_bytes(self, path: str) -> tuple[int, bytes]:
+        response = self._client.get(path)
+        return response.status_code, response.content
+
     def speak(self, body: dict[str, Any]) -> tuple[int, bytes]:
         response = self._client.post("/speak", json=body)
         return response.status_code, response.content

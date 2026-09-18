@@ -10,7 +10,7 @@ import wave
 from typing import Any
 
 import pytest
-from conftest import RunningWorker
+from conftest import RunningWorker, await_handshake, spawn, stop, url_for
 
 
 def get(worker: RunningWorker, path: str) -> Any:
@@ -72,7 +72,20 @@ class TestCapabilities:
         # An adapter that did not implement create_voice cannot advertise cloning, and one that did
         # cannot forget to. Nothing here is the adapter author's to remember.
         post(worker, "/load", {})
-        assert get(worker, "/capabilities")["current"]["cloning"]["supported"] is False
+        assert get(worker, "/capabilities")["current"]["cloning"]["supported"] is True
+
+        # And the other way: an engine with no create_voice says it does not clone.
+        process = spawn(module="engines.failing", engine="failing", env={"RHAPSODE_TEST_MODE": "ok"})
+        try:
+            other = RunningWorker(
+                process=process,
+                handshake=(handshake := await_handshake(process)),
+                base_url=url_for(handshake),
+            )
+            post(other, "/load", {})
+            assert get(other, "/capabilities")["current"]["cloning"]["supported"] is False
+        finally:
+            stop(process)
 
 
 class TestVoices:

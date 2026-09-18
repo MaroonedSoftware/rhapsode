@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -37,6 +38,8 @@ def _spawn(module: str, engine: str) -> Iterator[str]:
             "RHAPSODE_WORKER_LISTEN": "tcp:127.0.0.1:0",
             "RHAPSODE_WORKER_ENGINE": engine,
             "RHAPSODE_WORKER_CONTRACT": "1",
+            # Its own, so a clone the suite creates lands nowhere near the repository.
+            "RHAPSODE_VOICE_DIR": tempfile.mkdtemp(prefix="rh-voices-"),
         },
     )
     try:
