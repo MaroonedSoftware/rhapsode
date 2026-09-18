@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import OpenAI from 'openai';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildServer } from '../src/server.js';
@@ -213,5 +214,55 @@ describeWithSockets('telling OpenAI’s SDKs what to retry', () => {
         expect(response.statusCode).toBe(503);
         expect(response.headers['x-should-retry']).toBe('true');
         expect(response.json().error).toMatchObject({ type: 'server_error', code: 'oom', retryable: true });
+    }, 60_000);
+});
+
+describeWithSockets('OpenAI’s own SDK, pointed at this server', () => {
+    /**
+     * Over a real socket, because the claim is that an unmodified client works, and the client does
+     * its own fetch. app.listen rather than builder.start, because ServerKit's graceful shutdown
+     * calls process.exit, which in a test runner takes the runner with it.
+     */
+    async function client(mode?: string) {
+        const builder = await start(mode);
+        const address = await builder.app.listen({ port: 0, host: '127.0.0.1' });
+        const requests: string[] = [];
+        const openai = new OpenAI({
+            baseURL: `${address}/v1`,
+            apiKey: 'sk-ignored',
+            fetch: async (input, init) => {
+                requests.push(String(input));
+                return fetch(input, init);
+            },
+        });
+        return { openai, requests };
+    }
+
+    it('speaks, with nothing changed but the base URL', async () => {
+        const { openai } = await client();
+        const response = await openai.audio.speech.create({ model: 'tone', voice: 'sine', input: 'a line to speak', response_format: 'wav' });
+        const body = Buffer.from(await response.arrayBuffer());
+
+        expect(response.headers.get('content-type')).toBe('audio/wav');
+        expect(body.subarray(0, 4).toString()).toBe('RIFF');
+        expect(body.length).toBeGreaterThan(256);
+    }, 60_000);
+
+    it('raises the error class OpenAI’s own API would, carrying the taxonomy code', async () => {
+        const { openai } = await client();
+        const failure = await openai.audio.speech.create({ model: 'tts-1', voice: 'alloy', input: 'x' }).catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(OpenAI.NotFoundError);
+        expect(failure).toMatchObject({ status: 404, code: 'unknown_engine', param: 'model' });
+    }, 60_000);
+
+    it('sends an internal failure once, where the SDK would otherwise send it three times', async () => {
+        const { openai, requests } = await client('raise_before_any_audio');
+        const failure = await openai.audio.speech
+            .create({ model: 'failing', voice: 'x', input: 'x', response_format: 'pcm' })
+            .catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(OpenAI.InternalServerError);
+        expect(requests).toHaveLength(1);
     }, 60_000);
 });
