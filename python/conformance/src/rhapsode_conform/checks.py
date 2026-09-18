@@ -180,17 +180,17 @@ def a_format_that_is_not_declared_is_refused(worker: Worker, report: Report) -> 
     absent = [
         name for name in ("opus", "flac", "mp3", "wav") if name not in (capabilities.get("formats") or [])
     ]
-    if not absent:
-        report.record("an undeclared format is refused", "§ 6", True, "this worker declares them all")
-        return
+    # A worker that produces every format the contract defines still has to refuse one it does not
+    # define. Recording a pass without asking, which is what this did, is a check that cannot fail.
+    asked = absent[0] if absent else "aiff"
 
-    status, body = worker.speak({"text": "x", "format": absent[0], "stream": False})
+    status, body = worker.speak({"text": "x", "format": asked, "stream": False})
     error = _error_of(body)
     report.record(
         "an undeclared format is refused",
         "§ 6",
-        status == 422 and error.get("code") == "unsupported",
-        f"status {status}, {error.get('code')}",
+        status == 422 and error.get("code") == "unsupported" and asked in str(error.get("message")),
+        f'asked for "{asked}": status {status}, {error.get("code")}',
     )
 
 

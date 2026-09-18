@@ -9,6 +9,7 @@ import urllib.request
 import wave
 from typing import Any
 
+import pytest
 from conftest import RunningWorker
 
 
@@ -156,10 +157,25 @@ class TestTheErrorTaxonomy:
         status, error = failure(worker, {"text": "x", "variant": "plain", "delivery": "hushed"})
         assert (status, error["code"]) == (422, "unsupported")
 
-    def test_a_format_this_worker_cannot_produce_says_why(self, worker: RunningWorker) -> None:
-        status, error = failure(worker, {"text": "x", "format": "opus"})
+    def test_a_format_outside_the_contract_is_refused(self, worker: RunningWorker) -> None:
+        # True on every machine, whatever encoders it has, which is what the next test is not.
+        status, error = failure(worker, {"text": "x", "format": "aiff"})
         assert (status, error["code"], error["retryable"]) == (422, "unsupported", False)
-        assert "opus" in error["message"]
+        assert "aiff" in error["message"]
+
+    def test_a_format_this_worker_cannot_produce_says_why(self, worker: RunningWorker) -> None:
+        # Which formats are missing is a fact about the machine, not about the code: this used to
+        # ask for opus and assume it was absent, which held where it was written and failed on the
+        # first CI runner that had ffmpeg. So it asks the worker what it has, and picks from what
+        # the contract defines and the worker does not.
+        produced = set(get(worker, "/capabilities")["formats"])
+        missing = sorted({"mp3", "opus", "flac"} - produced)
+        if not missing:
+            pytest.skip("this machine's ffmpeg produces every format the contract defines")
+
+        status, error = failure(worker, {"text": "x", "format": missing[0]})
+        assert (status, error["code"], error["retryable"]) == (422, "unsupported", False)
+        assert missing[0] in error["message"]
 
     def test_text_past_the_ceiling_is_refused(self, worker: RunningWorker) -> None:
         status, error = failure(worker, {"text": "x" * 99_999})
@@ -169,7 +185,7 @@ class TestTheErrorTaxonomy:
         # It is a field and not something a caller infers from the status, because a caller that
         # conflates "wrong request" with "server was busy" either retries forever or throws work
         # away that would have succeeded next time.
-        for body in ({"text": ""}, {"text": "x", "format": "opus"}, {"text": "x", "variant": "no"}):
+        for body in ({"text": ""}, {"text": "x", "format": "aiff"}, {"text": "x", "variant": "no"}):
             _, error = failure(worker, body)
             assert isinstance(error["retryable"], bool)
             assert set(error) == {"code", "message", "retryable"}
