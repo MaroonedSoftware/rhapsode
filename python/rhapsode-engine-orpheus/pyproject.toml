@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-orpheus"
+version = "0.0.0"
+description = "Orpheus for rhapsode: a Llama that speaks in SNAC codes, and the second engine to perform cues."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = ["rhapsode-worker"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_orpheus"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60
