@@ -3,6 +3,76 @@ info:
     title: Rhapsode
     version: '1.0.0'
 paths:
+    '/v1/audio/speech':
+        post:
+            operationId: openaiSpeech
+            description: 'Hand-written, like /speak. Every error carries `x-should-retry`, set from `retryable`.'
+            requestBody:
+                required: true
+                content:
+                    'application/json':
+                        schema:
+                            '$ref': '#/components/schemas/OpenAISpeechRequest'
+            responses:
+                '200':
+                    description: 'Successful response'
+                    content:
+                        'audio/mpeg':
+                            schema:
+                                type: string
+                                format: binary
+                        'audio/opus':
+                            schema:
+                                type: string
+                                format: binary
+                        'audio/flac':
+                            schema:
+                                type: string
+                                format: binary
+                        'audio/wav':
+                            schema:
+                                type: string
+                                format: binary
+                        'audio/l16':
+                            schema:
+                                type: string
+                                format: binary
+                '400':
+                    description: 'Bad request'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/OpenAIErrorBody'
+                '404':
+                    description: 'Not found'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/OpenAIErrorBody'
+                '422':
+                    description: 'Unprocessable entity'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/OpenAIErrorBody'
+                '429':
+                    description: 'Response 429'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/OpenAIErrorBody'
+                '500':
+                    description: 'Internal server error'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/OpenAIErrorBody'
+                '503':
+                    description: 'Response 503'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/OpenAIErrorBody'
     '/health':
         get:
             operationId: workerHealth
@@ -633,6 +703,58 @@ paths:
                                 '$ref': '#/components/schemas/ErrorBody'
 components:
     schemas:
+        OpenAISpeechRequest:
+            type: object
+            properties:
+                model:
+                    type: string
+                    minLength: 1
+                    description: 'An engine id, or `engine:variant`.'
+                input:
+                    type: string
+                    minLength: 1
+                voice:
+                    type: string
+                    description: "Absent means the engine's default."
+                response_format:
+                    type: string
+                    enum: [mp3, opus, aac, flac, wav, pcm]
+                    description: 'Absent means mp3. aac is always refused.'
+                speed:
+                    type: number
+                    description: 'Carried by a `speed` dial, or refused.'
+                instructions:
+                    type: string
+                    description: 'Refused unless empty.'
+                stream_format:
+                    type: string
+                    enum: [audio, sse]
+                    description: 'sse is always refused.'
+            required: [model, input]
+            description: "Strict, like every request here: OpenAI's own API refuses a field it does not recognise with a 400,\nso a refusal holds a client to nothing it was not already held to."
+        OpenAIErrorDetail:
+            type: object
+            properties:
+                message:
+                    type: string
+                type:
+                    type: string
+                    enum: [invalid_request_error, server_error]
+                param:
+                    type: string
+                    description: 'The request field the failure is about.'
+                code:
+                    type: string
+                    description: "The taxonomy code from protocol.md § 6. A string rather than the enum, so a code from a newer\ncontract does not cost a client the envelope. § 9."
+                retryable:
+                    type: boolean
+            required: [message, type, code, retryable]
+        OpenAIErrorBody:
+            type: object
+            properties:
+                error:
+                    '$ref': '#/components/schemas/OpenAIErrorDetail'
+            required: [error]
         Dial:
             type: object
             properties:

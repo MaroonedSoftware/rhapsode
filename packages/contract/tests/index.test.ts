@@ -9,6 +9,8 @@ import {
     ErrorDetail,
     FeedEvent,
     InstallJob,
+    OpenAIErrorBody,
+    OpenAISpeechRequest,
     SpeakRequest,
     Variant,
 } from '../src/index.js';
@@ -104,5 +106,26 @@ describe('the management shapes', () => {
 
     it('carry the two management error codes at the end of the taxonomy', () => {
         expect(ErrorDetail.shape.code.options.slice(-2)).toEqual(['forbidden', 'conflict']);
+    });
+});
+
+describe('the OpenAI shim shapes', () => {
+    it('parse the request an OpenAI SDK sends', () => {
+        const parsed = OpenAISpeechRequest.parse({ model: 'chatterbox:turbo', input: 'hello', voice: 'alloy', response_format: 'opus', speed: 1 });
+
+        expect(parsed.model).toBe('chatterbox:turbo');
+    });
+
+    it('refuse a field OpenAI does not have, as OpenAI does', () => {
+        // § 11: OpenAI's own API answers an unrecognised field with a 400, so a strict schema holds
+        // a client to nothing it was not already held to.
+        expect(() => OpenAISpeechRequest.parse({ model: 'tone', input: 'hello', seed: 7 })).toThrow();
+    });
+
+    it('keep a taxonomy code from a newer contract in the error envelope', () => {
+        // § 9: losing the envelope over an unfamiliar code is the worst possible trade.
+        const parsed = OpenAIErrorBody.parse({ error: { message: 'x', type: 'server_error', code: 'added_in_contract_2', retryable: true } });
+
+        expect(parsed.error.code).toBe('added_in_contract_2');
     });
 });

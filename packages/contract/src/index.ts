@@ -7,5 +7,6 @@
  */
 
 export * from './dispatch.js';
+export * from './generated/rhapsode.openai.schema.js';
 export * from './generated/rhapsode.types.schema.js';
 export * from './vocabulary.js';
