@@ -15,6 +15,9 @@
 **/generated/
 **/_contract/
 docs/openapi.yaml
+# TanStack Router's route tree, which the Vite plugin rewrites in its own style on every dev and
+# build run. Formatting it is a diff the next build takes back.
+**/routeTree.gen.ts
 
 # Prose, wrapped by hand at 100 columns. `docs/protocol.md` is the specification and it is argued
 # over line by line; Prettier reflows it to 150 and rewrites its tables, so a one-sentence amendment

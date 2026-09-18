@@ -1,0 +1,31 @@
+/*
+ * The page's own surfaces, read by `cssVariablesResolver` in theme.ts. Loaded after every Mantine
+ * stylesheet, so these win. Kept to what Mantine's own variables cannot say.
+ */
+:root {
+    --rh-bg: #f7f7f9;
+    --rh-surface: #ffffff;
+    --rh-border: #e3e3ea;
+}
+
+[data-mantine-color-scheme='dark'] {
+    --rh-bg: #111216;
+    --rh-surface: #17181d;
+    --rh-border: #2a2b33;
+}
+
+/* Tabular figures for anything counted, so a row does not shift as it changes. */
+.rh-num {
+    font-variant-numeric: tabular-nums;
+}
+
+/* The skip link: the first Tab stop on every page, visible only when focused. */
+.rh-skip {
+    position: absolute;
+    left: -9999px;
+    top: 8px;
+    z-index: 1000;
+}
+.rh-skip:focus {
+    left: 8px;
+}

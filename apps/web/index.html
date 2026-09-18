@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <title>Rhapsode</title>
+        <style>
+            /* Painted before the bundle loads, so there is no flash of white on a dark system. The
+               colours are copied from --rh-bg in src/tokens.css, which cannot be read this early. */
+            html,
+            body {
+                margin: 0;
+                background-color: #f7f7f9;
+            }
+            @media (prefers-color-scheme: dark) {
+                html,
+                body {
+                    background-color: #111216;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>
