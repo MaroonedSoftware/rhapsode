@@ -19,6 +19,8 @@ voices/*.wav
 outputs/
 
 # Local
+# What this box has: absolute venv paths and a port, which mean nothing on another machine.
+rhapsode.config.json
 .env
 .env.*
 !.env.example
