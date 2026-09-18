@@ -44,7 +44,10 @@ rather than about the contract.
         // Without this, the install routes answer loopback callers only. With it, a caller
         // presenting it as a bearer token is admitted from anywhere. Those routes run pip, so treat
         // this as a root password for the box.
-        "token": null
+        "token": null,
+        // Browser origins, besides this machine's own, whose pages may call the install routes.
+        // A page from anywhere else is refused, token or not.
+        "origins": []
     },
 
     "install": {

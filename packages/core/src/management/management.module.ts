@@ -37,7 +37,7 @@ export const managementModule = (settings: RhapsodeConfig): ServerKitModule => (
 
         registry
             .register(ManagementAccessPolicy)
-            .useFactory(() => new ManagementAccessPolicy())
+            .useFactory(() => new ManagementAccessPolicy(settings.management?.origins ?? []))
             .asSingleton();
         registry
             .register(PolicyRegistryMap)
@@ -55,5 +55,12 @@ export const managementModule = (settings: RhapsodeConfig): ServerKitModule => (
  * and before any stream is opened, which is the difference between refusing it and serving it.
  */
 export const managementGuard: onRequestAsyncHookHandler = async request => {
-    await request.container.get(PolicyService).assert(MANAGEMENT_ACCESS_POLICY, { ip: request.ip, session: request.authenticationSession });
+    const forwardedFor = request.headers['x-forwarded-for'];
+    const origin = request.headers.origin;
+    await request.container.get(PolicyService).assert(MANAGEMENT_ACCESS_POLICY, {
+        ip: request.ip,
+        ...(forwardedFor === undefined ? {} : { forwardedFor: Array.isArray(forwardedFor) ? forwardedFor.join(',') : forwardedFor }),
+        ...(origin === undefined ? {} : { origin }),
+        session: request.authenticationSession,
+    });
 };

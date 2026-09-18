@@ -605,6 +605,22 @@ The reason is that the server has no other authentication and binds every interf
 and an install runs pip. A management route open to the LAN is remote code execution for anyone on
 it. The speech routes stay open because the worst a stranger can do with them is make it talk.
 
+**A web page counts as where it came from, not where it is running.** Any page the operator visits
+can make their browser send a request to `localhost`, and the browser is a loopback caller: a
+cross-site `POST /engines/tone/install` from `Origin: https://evil.example` was measured answering
+`202` and installing. So a request carrying an `Origin` is refused unless that origin is this
+machine's own (`localhost`, `127.0.0.1`, `[::1]`, any port) or is listed in `management.origins`,
+and that holds with a valid token too. A browser attaches `Origin` to every cross-site request and
+every `POST`, and a page cannot forge it, which is also what defeats DNS rebinding: a rebound page's
+origin is still the attacker's hostname. Clients that are not browsers send no `Origin` and are
+judged on the rest.
+
+**A proxy on this machine does not make its clients local.** The web app's dev server and nginx
+both connect from loopback, and without this rule a web app served to the LAN would hand the LAN
+the install routes. A request from a loopback peer carrying `X-Forwarded-For` is local only if
+every address in that header is. The header is believed only from a loopback peer, and it can only
+make a caller less trusted: leaving it out gains a local caller nothing it did not already have.
+
 The guard runs before the request body is read and before any stream opens, so a refused caller is
 refused cheaply and cannot hold a connection.
 

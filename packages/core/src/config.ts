@@ -35,6 +35,11 @@ export interface RhapsodeConfig {
          * routes answer loopback callers only. They run pip, so this is a root password for the box.
          */
         token?: string;
+        /**
+         * Browser origins, besides this machine's own, whose pages may call management routes. A
+         * page from anywhere else is refused whatever else is true of the request.
+         */
+        origins?: string[];
     };
     /** protocol.md § 10. */
     install?: {

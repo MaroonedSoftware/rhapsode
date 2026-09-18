@@ -4,7 +4,7 @@ import { CatalogEntry } from '@rhapsode/contract';
 
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import { sameToken } from '../src/management/management.auth.js';
-import { isLoopback } from '../src/management/management.access.policy.js';
+import { isLoopback, isLoopbackOrigin } from '../src/management/management.access.policy.js';
 import { managementGuard } from '../src/management/management.module.js';
 import { ManagedEngines } from '../src/registry/managed.engines.js';
 import { buildServer } from '../src/server.js';
@@ -16,7 +16,7 @@ let running: Awaited<ReturnType<typeof buildServer>> | undefined;
 /** A server with one extra route behind the guard, standing in for the § 10 routes to come. */
 async function start(settings: RhapsodeConfig = {}, managed?: ManagedEngines) {
     const builder = await buildServer(settings, silent(), { managed });
-    builder.app.get('/guarded', { onRequest: managementGuard }, async () => ({ ok: true }));
+    builder.app.route({ method: ['GET', 'POST'], url: '/guarded', onRequest: managementGuard, handler: async () => ({ ok: true }) });
     running = builder;
     await builder.app.ready();
     return builder;
@@ -80,6 +80,105 @@ describe('the management guard', () => {
             payload: 'x'.repeat(1024),
         });
         expect(response.statusCode).toBe(403);
+    });
+});
+
+describe('pages in a browser', () => {
+    it('refuses a page from another site, which is what a drive-by POST to localhost looks like', async () => {
+        // Measured before this guard existed: this exact request answered 202 and installed tone.
+        const { app } = await start();
+        const response = await app.inject({ method: 'POST', url: '/guarded', headers: { origin: 'https://evil.example' } });
+
+        expect(response.statusCode).toBe(403);
+        expect(response.json().error.message).toMatch(/evil\.example.*management\.origins/);
+    });
+
+    it('refuses it even with the token, because a token in a stranger’s page is not the operator', async () => {
+        const { app } = await start({ management: { token: 's3cret' } });
+        const response = await app.inject({
+            method: 'GET',
+            url: '/guarded',
+            headers: { origin: 'https://evil.example', authorization: 'Bearer s3cret' },
+        });
+        expect(response.statusCode).toBe(403);
+    });
+
+    it('refuses a rebound hostname, whose origin is the attacker’s name however it resolves', async () => {
+        const { app } = await start();
+        const response = await app.inject({ method: 'POST', url: '/guarded', headers: { origin: 'http://rebind.evil.example:8080' } });
+        expect(response.statusCode).toBe(403);
+    });
+
+    it.each(['http://localhost:8081', 'http://127.0.0.1:3000', 'http://[::1]:8081', 'https://localhost'])(
+        'admits a page served from this machine at %s',
+        async origin => {
+            const { app } = await start();
+            expect((await app.inject({ method: 'POST', url: '/guarded', headers: { origin } })).statusCode).toBe(200);
+        },
+    );
+
+    it('admits an origin the operator named, and only that one', async () => {
+        const { app } = await start({ management: { origins: ['https://rhapsode.home.arpa'] } });
+        const call = (origin: string) => app.inject({ method: 'POST', url: '/guarded', headers: { origin } });
+
+        expect((await call('https://rhapsode.home.arpa')).statusCode).toBe(200);
+        expect((await call('https://rhapsode.home.arpa.evil.example')).statusCode).toBe(403);
+    });
+
+    it('refuses the null origin a sandboxed frame or a file:// page sends', async () => {
+        const { app } = await start();
+        expect((await app.inject({ method: 'POST', url: '/guarded', headers: { origin: 'null' } })).statusCode).toBe(403);
+    });
+
+    it('leaves the catalog open to any page, because it only reads', async () => {
+        const { app } = await start();
+        expect((await app.inject({ method: 'GET', url: '/catalog', headers: { origin: 'https://evil.example' } })).statusCode).toBe(200);
+    });
+});
+
+describe('a proxy on this machine', () => {
+    it('does not make the client it forwarded for local', async () => {
+        // The web app's dev server and nginx both connect from loopback. Without this, serving the
+        // web app to the LAN would hand the LAN the install routes.
+        const { app } = await start();
+        const forwarded = (xff: string) => app.inject({ method: 'GET', url: '/guarded', headers: { 'x-forwarded-for': xff } });
+
+        expect((await forwarded('192.168.1.20')).statusCode).toBe(403);
+        expect((await forwarded('127.0.0.1, 192.168.1.20')).statusCode).toBe(403);
+        expect((await forwarded('127.0.0.1')).statusCode).toBe(200);
+        expect((await forwarded('::1')).statusCode).toBe(200);
+    });
+
+    it('still admits a forwarded remote client that holds the token', async () => {
+        const { app } = await start({ management: { token: 's3cret' } });
+        const response = await app.inject({
+            method: 'GET',
+            url: '/guarded',
+            headers: { 'x-forwarded-for': '192.168.1.20', authorization: 'Bearer s3cret' },
+        });
+        expect(response.statusCode).toBe(200);
+    });
+
+    it('is not believed from a remote peer, where it could only have been written by the caller', async () => {
+        const { app } = await start();
+        const response = await app.inject({ method: 'GET', url: '/guarded', remoteAddress: '10.0.0.5', headers: { 'x-forwarded-for': '127.0.0.1' } });
+        expect(response.statusCode).toBe(403);
+    });
+});
+
+describe('isLoopbackOrigin', () => {
+    it.each([
+        ['http://localhost:8081', true],
+        ['http://127.0.0.1', true],
+        ['http://[::1]:8081', true],
+        ['https://localhost', true],
+        ['http://localhost.evil.example', false],
+        ['http://127.0.0.1.nip.io', false],
+        ['file://', false],
+        ['null', false],
+        ['chrome-extension://abc', false],
+    ])('%s is %s', (origin, expected) => {
+        expect(isLoopbackOrigin(origin)).toBe(expected);
     });
 });
 

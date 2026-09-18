@@ -12,7 +12,7 @@ export { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js'
 export { EngineRegistry, type EngineEntry, type EngineState } from './registry/engine.registry.js';
 export { CATALOG, type CatalogRecord } from './registry/engines.catalog.js';
 export { managementGuard } from './management/management.module.js';
-export { isLoopback, MANAGEMENT_ACCESS_POLICY } from './management/management.access.policy.js';
+export { isLocalCaller, isLoopback, isLoopbackOrigin, MANAGEMENT_ACCESS_POLICY } from './management/management.access.policy.js';
 export { loadSettings, ManagedEngines, MANAGED_FILE, type ConfiguredEngine } from './registry/managed.engines.js';
 export { WorkerClient, type SpokenResponse } from './workers/worker.client.js';
 export { WorkerRegistry } from './workers/worker.registry.js';
