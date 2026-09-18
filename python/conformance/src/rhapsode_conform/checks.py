@@ -31,18 +31,31 @@ class Result:
     section: str
     passed: bool
     detail: str = ""
+    #: A check that could not be decided. Not a pass: the whole reason this state exists is that a
+    #: comparison which cannot fail was being reported as one that had succeeded.
+    skipped: bool = False
 
 
 @dataclass
 class Report:
     results: list[Result] = field(default_factory=list)
+    #: Variants whose audio a seed reproduces, found by `a_seed_reproduces_the_audio` and relied on
+    #: by every check that compares two syntheses.
+    reproducible: dict[str, bool] = field(default_factory=dict)
 
     def record(self, name: str, section: str, passed: bool, detail: str = "") -> None:
         self.results.append(Result(name=name, section=section, passed=passed, detail=detail))
 
+    def skip(self, name: str, section: str, detail: str) -> None:
+        self.results.append(Result(name=name, section=section, passed=False, detail=detail, skipped=True))
+
     @property
     def failures(self) -> list[Result]:
-        return [result for result in self.results if not result.passed]
+        return [result for result in self.results if not result.passed and not result.skipped]
+
+    @property
+    def skipped(self) -> list[Result]:
+        return [result for result in self.results if result.skipped]
 
     @property
     def ok(self) -> bool:
@@ -239,25 +252,87 @@ def longer_text_makes_more_audio(worker: Worker, report: Report) -> None:
 # --------------------------------------------------------------------------- the standard vocabulary
 
 
+#: Fixed, so that two syntheses differ only in the one thing a check changed.
+SEED = 20260917
+
+UNSEEDED = (
+    "cannot be decided: a seed does not reproduce this variant's audio, so two syntheses differ "
+    "whether or not anything was performed. Listen to it."
+)
+
+
+@check
+def a_seed_reproduces_the_audio(worker: Worker, report: Report) -> None:
+    """§ 6, and the precondition for every comparison below.
+
+    The spec makes reproducibility optional ("for engines that can"), so a variant that does not
+    reproduce is not a failure. It does mean the cue and delivery comparisons cannot be decided for
+    it. Without this, those comparisons passed against any non-deterministic engine: a model that
+    samples produces different audio on every call, so "the audio changed" was true whether or not
+    a cue was performed, and a check that cannot fail was being reported as one that had succeeded.
+    """
+    for variant in _variants(worker):
+        body = {"text": "a line", "variant": variant, "seed": SEED, "format": "wav", "stream": False}
+        first_status, first = worker.speak(body)
+        second_status, second = worker.speak(body)
+        same = first_status == second_status == 200 and first == second
+        report.reproducible[variant] = same
+
+        name = f'a seed reproduces the audio on variant "{variant}"'
+        if same:
+            report.record(name, "§ 6", True)
+        else:
+            report.skip(name, "§ 6", "not reproducible, which § 6 allows; the comparisons below cannot run")
+
+
+def _compare(
+    worker: Worker,
+    report: Report,
+    *,
+    name: str,
+    section: str,
+    variant: str,
+    baseline: dict[str, Any],
+    changed: dict[str, Any],
+    claim: str,
+) -> None:
+    """Two syntheses that differ in one thing, with the seed held fixed so nothing else can."""
+    if not report.reproducible.get(variant, False):
+        report.skip(name, section, UNSEEDED)
+        return
+
+    common = {"variant": variant, "seed": SEED, "format": "wav", "stream": False}
+    plain = worker.speak({**common, **baseline})[1]
+    other = worker.speak({**common, **changed})[1]
+    report.record(
+        name,
+        section,
+        plain != other,
+        f"identical audio with the same seed, so the {claim} is claimed but not performed"
+        if plain == other
+        else "",
+    )
+
+
 @check
 def a_claimed_cue_changes_the_audio(worker: Worker, report: Report) -> None:
     """§ 8. The only mechanical check on the one thing an adapter must get right by hand.
 
     Claiming a cue you cannot perform is what breaks the guarantee that an engine never reads the
     word "laugh" out loud. This cannot prove a cue was performed WELL, but a cue wired to nothing
-    produces audio identical to the line without it, and that it can see.
+    produces audio identical to the line without it once the seed is held fixed, and that it can see.
     """
     for variant, claims in _variants(worker).items():
         for cue in claims.get("cues") or []:
-            plain = worker.speak({"text": "a line", "variant": variant, "format": "wav", "stream": False})[1]
-            cued = worker.speak(
-                {"text": f"a [{cue}] line", "variant": variant, "format": "wav", "stream": False}
-            )[1]
-            report.record(
-                f'cue "{cue}" changes the audio on variant "{variant}"',
-                "§ 8",
-                plain != cued,
-                "identical audio, so the cue is claimed but not performed" if plain == cued else "",
+            _compare(
+                worker,
+                report,
+                name=f'cue "{cue}" changes the audio on variant "{variant}"',
+                section="§ 8",
+                variant=variant,
+                baseline={"text": "a line"},
+                changed={"text": f"a [{cue}] line"},
+                claim="cue",
             )
 
 
@@ -266,15 +341,15 @@ def a_claimed_delivery_changes_the_audio(worker: Worker, report: Report) -> None
     """§ 5 and § 8. Same argument, and the one that catches a delivery wired to nothing."""
     for variant, claims in _variants(worker).items():
         for delivery in claims.get("deliveries") or []:
-            plain = worker.speak({"text": "a line", "variant": variant, "format": "wav", "stream": False})[1]
-            spoken = worker.speak(
-                {"text": "a line", "variant": variant, "delivery": delivery, "format": "wav", "stream": False}
-            )[1]
-            report.record(
-                f'delivery "{delivery}" changes the audio on variant "{variant}"',
-                "§ 5",
-                plain != spoken,
-                "identical audio, so the delivery is claimed but not performed" if plain == spoken else "",
+            _compare(
+                worker,
+                report,
+                name=f'delivery "{delivery}" changes the audio on variant "{variant}"',
+                section="§ 5",
+                variant=variant,
+                baseline={"text": "a line"},
+                changed={"text": "a line", "delivery": delivery},
+                claim="delivery",
             )
 
 

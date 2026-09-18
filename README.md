@@ -156,10 +156,11 @@ taxonomy, format encoding from your native PCM, and the load-retry rules.
 rhapsode-conform unix:/run/rhapsode/workers/your-engine.sock
 ```
 
-Point it at your worker and it says whether that worker is one: 23 checks, each naming the section
-of the protocol it comes from, and an exit code you can wire into your own CI. Two of them compare
-audio with and without a cue, which is the closest a machine can get to the one thing an adapter has
-to get right by hand.
+Point it at your worker and it says whether that worker is one: 25 checks against the reference
+engine, each naming the section of the protocol it comes from, and an exit code you can wire into
+your own CI. Some of them compare audio with and without a cue, with the seed held fixed, which is the
+closest a machine can get to the one thing an adapter has to get right by hand. On an engine a seed
+does not reproduce, those are reported as undecided rather than passed.
 
 See [`docs/protocol.md`](docs/protocol.md) § 8, and
 [`python/rhapsode-worker/`](python/rhapsode-worker/) for the SDK.
