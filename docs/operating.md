@@ -150,6 +150,26 @@ no copy and no list of its own. Back that directory up if the voices matter; del
 deletes the voice. Cloning and deleting answer this machine only, like installing, and a clip is
 limited to 25 MB. `docs/protocol.md` § 7 has the rules.
 
+## OpenAI clients
+
+`POST /v1/audio/speech` takes OpenAI's speech request, so a client written for OpenAI works once it
+is pointed at this server. Give it `http://<host>:8080/v1` as the base URL and any API key, which is
+ignored. `model` is the engine, or `engine:variant`, and `voice` is one of that engine's voice ids:
+
+```bash
+curl -X POST localhost:8080/v1/audio/speech \
+  -H 'content-type: application/json' \
+  -d '{"model":"chatterbox:turbo","input":"Right, that was The Verve Pipe.","voice":"narrator_02","response_format":"wav"}' \
+  --output line.wav
+```
+
+Three things surprise people. `tts-1` and `alloy` are refused rather than mapped to something here,
+so set the client's model and voice to real ones, or clone a voice with the id the client insists
+on. Leaving `response_format` out asks for `mp3`, as OpenAI does, and that needs ffmpeg with
+`libmp3lame` on the engine's box. And `instructions`, or a `speed` other than 1, is refused by an
+engine with no dial to carry it, instead of being quietly ignored. `docs/protocol.md` § 11 has the
+rules and the reasons.
+
 ## What to watch
 
 `GET /health` answers while every worker is down and never blocks on one.

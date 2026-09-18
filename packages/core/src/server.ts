@@ -23,6 +23,7 @@ import { installEventsRoutes } from './install/install.events.routes.js';
 import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
 import { residencyModule } from './residency/residency.module.js';
+import { openaiRoutes } from './openai/openai.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
 import { workerModule } from './workers/worker.module.js';
 import type { RhapsodeConfig } from './config.js';
@@ -77,6 +78,8 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         { plugin: enginesRoutes },
         { plugin: engineDetailRoutes },
         { plugin: speakRoutes },
+        // OpenAI's speech route, translated into the one above. § 11.
+        { plugin: openaiRoutes },
         { plugin: catalogRoutes },
         { plugin: installRoutes },
         // Given the lifecycle signal so a shutdown closes open event streams rather than waiting

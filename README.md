@@ -8,8 +8,8 @@ that describes honestly what each engine can actually do.
 > **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
 > a worker and streams `/speak` through it works end to end, engines install through the API, voices
 > clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,
-> against real weights on Apple Silicon. What is not here yet: Chatterbox measured on a CUDA card,
-> and the OpenAI and Wyoming shims.
+> against real weights on Apple Silicon, and OpenAI's speech route answers over the same core. What is
+> not here yet: Chatterbox measured on a CUDA card, and the Wyoming shim.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -107,7 +107,8 @@ failure where an engine reads the word "laugh" out loud cannot happen.
 The native API is the contract. Two shims sit over it, because adoption runs through other people's
 clients:
 
-- **OpenAI** `/v1/audio/speech`, where `model` selects the engine.
+- **OpenAI** `/v1/audio/speech`, where `model` selects the engine, or `engine:variant`. What OpenAI
+  asks for and an engine cannot do is refused rather than ignored: [`docs/protocol.md`](docs/protocol.md) § 11.
 - **Wyoming**, for Home Assistant voice pipelines.
 
 ## Trying it
