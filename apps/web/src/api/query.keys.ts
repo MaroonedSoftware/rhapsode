@@ -5,4 +5,9 @@
 export const queryKeys = {
     /** Every engine that exists, and what this box has of it. One key: the core answers all at once. */
     catalog: () => ['catalog'] as const,
+    installs: {
+        all: () => ['installs'] as const,
+        list: () => ['installs', 'list'] as const,
+        detail: (id: string) => ['installs', 'detail', id] as const,
+    },
 } as const;
