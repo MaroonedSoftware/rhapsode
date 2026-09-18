@@ -75,11 +75,19 @@ class TestLoading:
         with pytest.raises(Unsupported, match="no build"):
             engine(tmp_path).load("q2")
 
-    def test_a_mac_offloads_the_llama_and_decodes_on_the_cpu(self, orpheus: Recorder, tmp_path: Path) -> None:
+    def test_a_mac_runs_both_on_metal(self, orpheus: Recorder, tmp_path: Path) -> None:
+        # The codec on the CPU took 102 ms a window against 85 ms of audio, on MPS 7.8 ms.
         import snac
 
         loaded(tmp_path, device="mps")
         assert orpheus.llamas[-1].options["n_gpu_layers"] == -1
+        assert snac.codec.device == "mps"  # type: ignore[attr-defined]
+
+    def test_a_box_with_no_accelerator_runs_both_on_the_cpu(self, orpheus: Recorder, tmp_path: Path) -> None:
+        import snac
+
+        loaded(tmp_path, device="cpu")
+        assert orpheus.llamas[-1].options["n_gpu_layers"] == 0
         assert snac.codec.device == "cpu"  # type: ignore[attr-defined]
 
     def test_a_cuda_card_runs_the_codec_beside_the_llama(self, orpheus: Recorder, tmp_path: Path) -> None:

@@ -95,7 +95,7 @@ class OrpheusEngine(Engine):
         else:
             accelerated = self.device.type in {"cuda", "rocm", "mps"}
             self._source = LlamaCppSource(_gguf(variant), gpu=accelerated)
-        self._decoder = SnacDecoder("cuda" if self.device.type in {"cuda", "rocm"} else "cpu")
+        self._decoder = SnacDecoder(_torch_device(self.device))
 
     def fetch(self, variant: str) -> None:
         """Download a build's GGUF and the codec into the Hugging Face cache, where its load will look.
@@ -135,6 +135,8 @@ class OrpheusEngine(Engine):
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            elif torch.backends.mps.is_available():
+                torch.mps.empty_cache()
         except Exception:
             pass
 
@@ -221,6 +223,11 @@ def _full() -> str:
             "rhapsode.config.json"
         ) from error
     return os.path.dirname(paths[0])
+
+
+def _torch_device(device: Device) -> str:
+    """torch's name for the detected device. ROCm builds of torch answer to "cuda"."""
+    return {"cuda": "cuda", "rocm": "cuda", "mps": "mps"}.get(device.type, "cpu")
 
 
 def memory_fraction(device: Device) -> float:
