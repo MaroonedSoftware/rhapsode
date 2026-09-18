@@ -176,11 +176,22 @@ page's requests as coming from a site it does not know.
 ## Docker
 
 ```bash
-docker compose up -d --build     # the server on 127.0.0.1:8080, the page on http://localhost:8081
+docker compose up -d             # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-`docker/Dockerfile` builds two images from one build: `server`, the core, and `web`, the page behind
-nginx proxying `/api` as above. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
+Two images, `ghcr.io/maroonedsoftware/rhapsode-server` and `ghcr.io/maroonedsoftware/rhapsode-web`:
+the core, and the page behind nginx proxying `/api` as above. Each release publishes both for amd64
+and arm64, tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION`
+pins one. They share the version every package carries (`docs/protocol.md` § 9), so server 0.3.0
+is core 0.3.0, and it installs the engines that were released with it. `RHAPSODE_API_PORT` and
+`RHAPSODE_WEB_PORT` move the published ports.
+
+From a checkout, `compose.build.yaml` builds both from `docker/Dockerfile` instead, tagged `local`
+so that a build never passes for a release:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
 
 ### Two volumes
 
@@ -277,21 +288,20 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 ### unraid
 
-No image is published yet, so build both on the box from a checkout:
+Create a network, so that the page can find the server by name:
 
 ```bash
-docker build -f docker/Dockerfile --target server -t rhapsode-server .
-docker build -f docker/Dockerfile --target web -t rhapsode-web .
 docker network create rhapsode
 ```
 
-Then two containers on that network, so that the page can find the server by name:
+Then two containers on it, from the published images:
 
-- `rhapsode-server`: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
-  `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own `nobody:users`, port
-  8080, and `--stop-timeout 30` in Extra Parameters.
-- `rhapsode-web`: the same `/config` mapping, read-only, `RHAPSODE_UPSTREAM=rhapsode-server:8080`,
-  port 8081 to 80.
+- `rhapsode-server`, from `ghcr.io/maroonedsoftware/rhapsode-server`: `/config` to
+  `/mnt/user/appdata/rhapsode`, `/data` to a share such as `/mnt/user/rhapsode`, `--user 99:100` so
+  both are written as unraid's own `nobody:users`, port 8080, and `--stop-timeout 30` in Extra
+  Parameters.
+- `rhapsode-web`, from `ghcr.io/maroonedsoftware/rhapsode-web`: the same `/config` mapping,
+  read-only, `RHAPSODE_UPSTREAM=rhapsode-server:8080`, port 8081 to 80.
 
 Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
 so add it to `management.origins`. That is also the moment the page reaches the install routes from

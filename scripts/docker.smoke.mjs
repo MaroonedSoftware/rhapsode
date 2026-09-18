@@ -22,7 +22,12 @@ const api = `http://127.0.0.1:${env.RHAPSODE_API_PORT}`;
 const page = `http://127.0.0.1:${env.RHAPSODE_WEB_PORT}/api`;
 
 function compose(...args) {
-    const result = spawnSync('docker', ['compose', '--project-name', 'rhapsode-smoke', ...args], { cwd: root, env, stdio: 'inherit' });
+    // compose.build.yaml, so this tests the checkout it runs in and never a published image.
+    const result = spawnSync('docker', ['compose', '--project-name', 'rhapsode-smoke', '-f', 'compose.yaml', '-f', 'compose.build.yaml', ...args], {
+        cwd: root,
+        env,
+        stdio: 'inherit',
+    });
     if (result.status !== 0) throw new Error(`docker compose ${args.join(' ')} exited ${result.status}`);
 }
 

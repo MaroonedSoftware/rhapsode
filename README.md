@@ -127,9 +127,11 @@ from what its capability document says it can do, and clone a voice from a clip.
 server when its source, the core's, or `rhapsode.config.json` changes. To run the
 built server alone, as you would in production, `node apps/server/dist/main.js`.
 
-With nothing but Docker, `docker compose up` builds and starts the server and the page on the same
-two ports, keeping installed engines and their weights in a volume. [`docs/operating.md`](docs/operating.md)
-§ Docker has what it keeps where, and how to run it on unraid or with a GPU.
+With nothing but Docker, `docker compose up` pulls and starts the server and the page on the same
+two ports, keeping installed engines and their weights in a volume.
+`docker compose -f compose.yaml -f compose.build.yaml up --build` builds them from a checkout
+instead. [`docs/operating.md`](docs/operating.md) § Docker has what it keeps where, and how to run
+it on unraid or with a GPU.
 
 `pnpm wizard setup` builds the Python venv, builds the TypeScript packages, writes a
 `rhapsode.config.json` pointing the `tone` engine at that venv, and runs the conformance suite

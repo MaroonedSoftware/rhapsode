@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # One build, two images: `--target server` is the core and `--target web` is the page in front of
-# it. compose.yaml builds both, and docs/operating.md § Docker says why each choice here is made.
+# it. compose.build.yaml builds both, and docs/operating.md § Docker says why each choice here is made.
 
 ARG NODE_VERSION=22
 ARG PNPM_VERSION=11.23.0
