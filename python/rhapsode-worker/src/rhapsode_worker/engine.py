@@ -89,6 +89,9 @@ class SpeakRequest:
     voice: str | None = None
     variant: str | None = None
     format: str = "wav"
+    #: Always one the variant declares. The SDK resolves an absent one to the first it lists, so an
+    #: adapter never has to decide what "no language" means.
+    language: str = "en"
     delivery: str | None = None
     params: dict[str, float] = field(default_factory=dict)
     seed: int | None = None

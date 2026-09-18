@@ -81,6 +81,8 @@ class SpeakRequest(BaseModel):
     # Absent means whatever is loaded.
     variant: str | None = None
     format: Literal["wav", "mp3", "opus", "flac", "pcm"] | None = None
+    # From the effective variant's `languages`.
+    language: str | None = None
     # Closed, and deliberately has no word for "ordinary".
     delivery: Literal["hushed", "frantic"] | None = None
     # Validated against the effective variant's dials.

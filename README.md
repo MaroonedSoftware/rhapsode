@@ -5,10 +5,11 @@
 Point it at a box with a GPU, install the engines you want, and every client talks to one HTTP API
 that describes honestly what each engine can actually do.
 
-> **Status: early.** The worker protocol is implemented and conformance-tested, and a core that
-> spawns a worker and streams `/speak` through it works end to end. What is not here yet: a real
-> engine (the only one that ships is a tone generator with no weights), voice cloning through the
-> core, and the OpenAI and Wyoming shims.
+> **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
+> a worker and streams `/speak` through it works end to end, and there is a Chatterbox adapter whose
+> protocol surface passes the conformance suite against a stubbed model. What is not here yet:
+> Chatterbox verified against real weights on a GPU, voice cloning through the core, and the OpenAI
+> and Wyoming shims.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -137,6 +138,13 @@ curl -N -X POST localhost:8080/speak \
 The `tone` engine has no weights and makes a sine wave. It exists to prove the protocol rather than
 to make speech, which is exactly what makes it useful: it loads in microseconds, needs no GPU, and
 runs in CI on every commit. It is also the conformance fixture, and will stay one.
+
+For something that makes speech, install
+[`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) into its own virtualenv and point
+an engine entry at it. It is the engine the capability document was designed around, and the reason
+that document has two levels: `turbo` performs the cues and has no dials, `original` and
+`multilingual` have the dials and perform no cues, and which you get is a fact about the weights
+resident right now.
 
 ## Contributing an engine
 

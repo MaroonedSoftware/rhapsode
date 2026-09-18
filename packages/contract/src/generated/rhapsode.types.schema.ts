@@ -112,6 +112,7 @@ export const SpeakRequest = z.strictObject({
     voice: z.string().optional(),
     variant: z.string().optional().describe('Absent means whatever is loaded.'),
     format: z.enum(['wav', 'mp3', 'opus', 'flac', 'pcm']).optional(),
+    language: z.string().optional().describe("From the effective variant's `languages`."),
     delivery: z.enum(['hushed', 'frantic']).optional().describe('Closed, and deliberately has no word for "ordinary".'),
     params: z
         .record(
@@ -126,7 +127,7 @@ export const SpeakRequest = z.strictObject({
 export type SpeakRequest = z.infer<typeof SpeakRequest>;
 
 /**
- * generated from [LoadRequest](../../../../contracts/rhapsode.types.ck#L130)
+ * generated from [LoadRequest](../../../../contracts/rhapsode.types.ck#L131)
  */
 export const LoadRequest = z.strictObject({
     variant: z.string().optional(),
@@ -138,7 +139,7 @@ export type LoadRequest = z.infer<typeof LoadRequest>;
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L142)
+ * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L143)
  */
 export const ErrorDetail = z.looseObject({
     code: z
@@ -152,7 +153,7 @@ export const ErrorDetail = z.looseObject({
 export type ErrorDetail = z.infer<typeof ErrorDetail>;
 
 /**
- * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L160)
+ * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L161)
  */
 export const WorkerHealth = z.looseObject({
     process: z.enum(['up', 'draining']),
@@ -164,7 +165,7 @@ export const WorkerHealth = z.looseObject({
 export type WorkerHealth = z.infer<typeof WorkerHealth>;
 
 /**
- * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L179)
+ * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L180)
  */
 export const ResidencySummary = z.looseObject({
     resident: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -193,7 +194,7 @@ export const Variant = z.looseObject({
 export type Variant = z.infer<typeof Variant>;
 
 /**
- * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L168)
+ * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L169)
  */
 export const EngineSummary = z.looseObject({
     id: z.string(),
@@ -208,7 +209,7 @@ export const EngineSummary = z.looseObject({
 export type EngineSummary = z.infer<typeof EngineSummary>;
 
 /**
- * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L126)
+ * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L127)
  */
 export const EngineSpeakRequest = SpeakRequest.extend({
     engine: z.string(),
@@ -216,7 +217,7 @@ export const EngineSpeakRequest = SpeakRequest.extend({
 export type EngineSpeakRequest = z.infer<typeof EngineSpeakRequest>;
 
 /**
- * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L152)
+ * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L153)
  */
 export const ErrorBody = z.looseObject({
     error: ErrorDetail,
@@ -238,7 +239,7 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L186)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L187)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),

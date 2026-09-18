@@ -211,6 +211,17 @@ class Worker:
         if fmt not in encoding.available_formats():
             raise Unsupported(f'this worker cannot produce "{fmt}": {encoding.why_unavailable(fmt)}')
 
+        language = _optional_str(body, "language")
+        if language is None:
+            # The first the variant lists, so an adapter never receives "no language" and never has
+            # to invent an answer for it.
+            language = variant.languages[0] if variant.languages else "en"
+        elif language not in variant.languages:
+            raise Unsupported(
+                f'variant "{variant_key}" does not speak "{language}"; it speaks '
+                f"{', '.join(variant.languages) or 'nothing it declared'}"
+            )
+
         delivery = _optional_str(body, "delivery")
         if delivery is not None and delivery not in variant.deliveries:
             # The core drops a delivery the variant did not claim before dispatch, so reaching here
@@ -235,6 +246,7 @@ class Worker:
             voice=_optional_str(body, "voice"),
             variant=variant_name,
             format=fmt,
+            language=language,
             delivery=delivery,
             params=params,
             seed=seed,

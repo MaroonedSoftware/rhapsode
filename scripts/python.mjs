@@ -18,7 +18,13 @@ const venvBin = process.platform === 'win32' ? join(venv, 'Scripts') : join(venv
 const venvPython = join(venvBin, process.platform === 'win32' ? 'python.exe' : 'python');
 
 const PACKAGES = ['rhapsode-worker', 'rhapsode-engine-tone', 'conformance'];
-const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'pytest-timeout>=2.3', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11'];
+
+// Engine adapters are installed WITHOUT their engines. In production each one gets its own
+// virtualenv, which is the whole point of the design; here we want the adapter's own logic under
+// test without pulling torch and several gigabytes of weights into a shared dev environment. The
+// tests stub the model, which is the only part that needs any of that.
+const ADAPTERS = ['rhapsode-engine-chatterbox'];
+const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'pytest-timeout>=2.3', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11', 'numpy>=1.26'];
 
 // A sandbox or a corporate proxy that intercepts TLS makes pip's certificate check fail against a
 // certificate pip has no way to trust. RHAPSODE_PIP_TRUSTED_HOSTS is the escape hatch for that
@@ -48,6 +54,7 @@ const sync = () => {
     console.log('[python] installing packages and dev dependencies');
     run(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip', ...trustedHosts]);
     run(venvPython, ['-m', 'pip', 'install', '--quiet', ...trustedHosts, ...editable, ...DEV_DEPENDENCIES]);
+    run(venvPython, ['-m', 'pip', 'install', '--quiet', '--no-deps', ...trustedHosts, ...ADAPTERS.flatMap(name => ['-e', join(pythonRoot, name)])]);
 };
 
 const ensureSynced = () => {
@@ -58,7 +65,14 @@ const commands = {
     sync,
     test: () => {
         ensureSynced();
-        run(venvPython, ['-m', 'pytest', '-q', ...PACKAGES.map(name => join(pythonRoot, name, 'tests'))]);
+        // One invocation per package, not one across all of them. Each package has its own
+        // conftest, and pytest imports conftest by module name: pointed at several test directories
+        // at once, the first `conftest` found shadows the rest and every other package's tests fail
+        // to import their own helpers. Running per package also means each package's own pytest
+        // configuration actually applies, which is what a contributor running it by hand would get.
+        for (const name of [...PACKAGES, ...ADAPTERS]) {
+            run(venvPython, ['-m', 'pytest', '-q'], { cwd: join(pythonRoot, name) });
+        }
     },
     lint: () => {
         ensureSynced();
@@ -72,7 +86,9 @@ const commands = {
     },
     typecheck: () => {
         ensureSynced();
-        for (const name of PACKAGES) run(venvPython, ['-m', 'mypy'], { cwd: join(pythonRoot, name) });
+        for (const name of [...PACKAGES, ...ADAPTERS]) {
+            run(venvPython, ['-m', 'mypy'], { cwd: join(pythonRoot, name) });
+        }
     },
 };
 

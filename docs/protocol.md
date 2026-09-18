@@ -329,6 +329,7 @@ Content-Type: application/json
 | `voice` | Engine-scoped id from `GET /voices`. Absent means the engine default. |
 | `variant` | Absent means whatever is loaded, or the engine's default if nothing is. |
 | `format` | From `capabilities.formats`. The **response's** `Content-Type` is authoritative. |
+| `language` | From the effective variant's `languages`. Absent means the first one it lists. |
 | `delivery` | Only ever one the effective variant claimed; the core drops the rest. |
 | `params` | Against the effective variant's `dials` (§4). Unknown keys are refused, not ignored. |
 | `seed` | Optional. Reproducibility for engines that can. |
@@ -346,6 +347,17 @@ One note on the opus label, because it will look like a bug to somebody: what go
 Ogg-encapsulated Opus, for which `audio/ogg; codecs=opus` is the precise answer. `audio/opus` is
 what this contract says, it is what every client in this space already sends and accepts, and the
 response's own `Content-Type` is authoritative in any case.
+
+### `language` selects among what the variant declares
+
+`variants[...].languages` has been in the capability document from the start and there was no way to
+ask for one, which made a multilingual build indistinguishable from an English one. A variant that
+lists a single language ignores this field; one that lists several reads it, and a language it does
+not list is `unsupported`.
+
+It is a separate field rather than something inferred from the text because detection is a guess,
+and a guess that silently picks the wrong language produces a whole take in the wrong accent with
+nothing in the response to say so.
 
 ### Unknown keys in `params` are refused
 
@@ -474,7 +486,9 @@ class ChatterboxEngine(Engine):
         }
 
     def load(self, variant: str) -> None:
-        self.model = ChatterboxTTS.from_pretrained(variant, device=self.device)
+        # Each build is its own class upstream rather than an argument, which is a fact about that
+        # engine and not about this protocol. A variant name is whatever the adapter says it is.
+        self.model = BUILDS[variant].from_pretrained(device=self.device.torch())
 
     def unload(self) -> None:
         del self.model
@@ -484,8 +498,12 @@ class ChatterboxEngine(Engine):
                 for p in self.voice_dir.glob("*.wav")]
 
     def speak(self, req: SpeakRequest) -> Iterator[bytes]:
-        yield from self.model.stream(req.text, audio_prompt_path=self.path_for(req.voice),
-                                     **self.dials_for(req))
+        # An engine that streams yields as it goes. One that does not, and chatterbox does not,
+        # synthesises whole and chunks the result: the SDK's contract is an iterator of PCM, not a
+        # promise that the model is incremental.
+        yield from self.pcm_of(self.model.generate(req.text,
+                                                   audio_prompt_path=self.path_for(req.voice),
+                                                   **self.dials_for(req)))
 
 serve(ChatterboxEngine())
 ```

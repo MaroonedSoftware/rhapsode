@@ -117,6 +117,7 @@ contract SpeakRequest: {
     voice?: string
     variant?: string                                    # Absent means whatever is loaded.
     format?: enum(wav, mp3, opus, flac, pcm)
+    language?: string                                   # From the effective variant's `languages`.
     delivery?: enum(hushed, frantic)                    # Closed, and deliberately has no word for "ordinary".
     params?: record(string, number)                     # Validated against the effective variant's dials.
     seed?: int

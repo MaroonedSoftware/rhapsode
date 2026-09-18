@@ -48,8 +48,9 @@ same people.
 - ESM only, Node >= 22, TypeScript 6. `tsup` for JS, `tsc --emitDeclarationOnly` for types.
 - Tests live in a top-level `tests/` per package, mirroring `src/`, importing `../src/...`. Never
   colocated, and kept out of the build tsconfig so `tsc` only type-checks shippable code.
-- Python test modules need globally unique basenames. Two `test_placeholder.py` files in different
-  packages collide in collection.
+- Python tests run one pytest invocation per package, because pytest imports `conftest` by module
+  name: pointed at several test directories at once, the first `conftest` shadows the rest. Test
+  module basenames still need to be distinct within a package.
 - Dot-separated lowercase filenames: `worker.supervisor.ts`, `residency.manager.ts`.
 - Luxon, never `new Date()` or `Date.now()`.
 - `undefined` for "not set", never `null`.

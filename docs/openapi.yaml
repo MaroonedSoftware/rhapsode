@@ -548,6 +548,9 @@ components:
                 format:
                     type: string
                     enum: [wav, mp3, opus, flac, pcm]
+                language:
+                    type: string
+                    description: "From the effective variant's `languages`."
                 delivery:
                     type: string
                     enum: [hushed, frantic]
