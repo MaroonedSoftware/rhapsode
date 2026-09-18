@@ -714,7 +714,11 @@ install.
 `GET /installs/{job}/events` streams the job's events: step changes as `progress`, each line pip
 and the interpreter print as `log`, and the outcome as `status` or `error`. A client that
 reconnects with `Last-Event-ID` resumes where it left off, and one whose resume point has already
-fallen out of the replay buffer is sent a `resync` event and should re-read the job. The frame
+fallen out of the replay buffer is sent a `resync` event and should re-read the job. The stream does
+not end when the job does: a job's last event is a `progress` whose `status` is `done` or
+`failed`, and a client closes the stream when it sees one. Ending it from the server would make a
+browser's `EventSource` reconnect to a finished job over and over. The filter is pinned to the job
+in the path, so a query parameter cannot widen it to another job's output. The frame
 format is ServerKit's server feed, so the same client code reads it wherever ServerKit is used.
 
 ---

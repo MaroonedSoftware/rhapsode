@@ -19,6 +19,7 @@ import type { ManagedEngines } from './registry/managed.engines.js';
 import type { CommandRunner } from './install/command.runner.js';
 import { installModule } from './install/install.module.js';
 import { installRoutes } from './install/install.routes.js';
+import { installEventsRoutes } from './install/install.events.routes.js';
 import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
 import { residencyModule } from './residency/residency.module.js';
@@ -78,6 +79,9 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         { plugin: speakRoutes },
         { plugin: catalogRoutes },
         { plugin: installRoutes },
+        // Given the lifecycle signal so a shutdown closes open event streams rather than waiting
+        // out the grace period for clients that would otherwise watch forever.
+        { plugin: installEventsRoutes(builder.lifecycleSignal) },
     ];
     builder.setupRoutes(routes);
 
