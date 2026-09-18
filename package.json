@@ -4,6 +4,7 @@
     "license": "MIT",
     "scripts": {
         "build": "turbo run build",
+        "dev": "turbo run dev",
         "codegen": "contractkit && contractkit -c contractkit.models.json && contractkit -c contractkit.client.json && contractkit -c contractkit.sdk.json && node scripts/contract.models.mjs",
         "codegen:check": "node scripts/codegen.check.mjs",
         "lint": "turbo run lint",

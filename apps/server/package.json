@@ -18,7 +18,7 @@
         "format": "prettier --write . --ignore-path ../../.prettierignore",
         "test": "vitest run",
         "typecheck": "tsc --noEmit",
-        "dev": "node --watch dist/main.js"
+        "dev": "node scripts/dev.watch.mjs"
     },
     "dependencies": {
         "@rhapsode/contract": "workspace:*",
@@ -27,6 +27,8 @@
     "devDependencies": {
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
+        "@swc-node/register": "^1.12.1",
+        "@swc/core": "^1.16.2",
         "vitest": "^4.1.11"
     },
     "publishConfig": {

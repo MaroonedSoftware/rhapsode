@@ -23,8 +23,18 @@
             "dependsOn": ["^build"]
         },
         "dev": {
+            "dependsOn": ["^build"],
             "cache": false,
-            "persistent": true
+            "persistent": true,
+            "passThroughEnv": [
+                "RHAPSODE_CONFIG",
+                "RHAPSODE_API_TARGET",
+                "RHAPSODE_PIP_TRUSTED_HOSTS",
+                "HF_TOKEN",
+                "HF_HOME",
+                "DEV_WATCH_DEBOUNCE_MS",
+                "DEV_WATCH_KILL_AFTER_MS"
+            ]
         }
     }
 }

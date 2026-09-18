@@ -110,7 +110,7 @@ uninstall with each job's progress as it happens. It is a static app, and it tal
 through a proxy on its own origin at `/api`, so the core needs no CORS.
 
 ```bash
-pnpm --filter @rhapsode/web dev        # http://localhost:8081, proxying /api to 127.0.0.1:8080
+pnpm dev        # the server on :8080 and the page on http://localhost:8081, proxying /api to it
 ```
 
 `RHAPSODE_API_TARGET` points the dev server at a core elsewhere. To serve the built page, build it

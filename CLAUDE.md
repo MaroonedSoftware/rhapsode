@@ -34,6 +34,7 @@ of its implementations move in one commit" if one command tests both.
 
 ```bash
 pnpm install && pnpm wizard setup   # first time
+pnpm dev                            # the server on :8080 from source, restarting on edits; the web page on :8081
 pnpm build && pnpm test
 node scripts/python.mjs test        # the Python half alone
 pnpm wizard doctor                  # what is wrong with this checkout, and --fix for what it can mend

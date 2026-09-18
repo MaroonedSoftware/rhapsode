@@ -115,8 +115,12 @@ clients:
 ```bash
 pnpm install
 pnpm wizard setup
-node apps/server/dist/main.js
+pnpm dev
 ```
+
+`pnpm dev` starts the server on http://localhost:8080 and the web page on http://localhost:8081, and
+restarts the server when its source, the core's, or `rhapsode.config.json` changes. To run the
+built server alone, as you would in production, `node apps/server/dist/main.js`.
 
 `pnpm wizard setup` builds the Python venv, builds the TypeScript packages, writes a
 `rhapsode.config.json` pointing the `tone` engine at that venv, and runs the conformance suite
@@ -145,15 +149,9 @@ pnpm wizard install chatterbox
 
 It shows both licences and asks, has the server build the engine its own virtualenv, and offers to
 download the `turbo` weights (3.8 GB) so the first request does not wait on them. Or do the same
-from a web page:
-
-```bash
-pnpm --filter @rhapsode/web dev
-```
-
-and open http://localhost:8081. The wizard and the page are both only clients: the same thing is
-`POST /engines/chatterbox/install` and `POST /engines/chatterbox/pull`, which answer the machine the
-server runs on and nobody else unless `management.token` is set. See
+from the web page `pnpm dev` serves at http://localhost:8081. The wizard and the page are both only
+clients: the same thing is `POST /engines/chatterbox/install` and `POST /engines/chatterbox/pull`,
+which answer the machine the server runs on and nobody else unless `management.token` is set. See
 [`docs/protocol.md`](docs/protocol.md) § 10 and [`docs/operating.md`](docs/operating.md).
 
 [`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) is the engine the capability
