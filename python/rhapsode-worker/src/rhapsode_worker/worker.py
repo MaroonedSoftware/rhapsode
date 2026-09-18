@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 from . import encoding
@@ -89,7 +91,8 @@ class Worker:
         return document
 
     def voices(self) -> list[dict[str, Any]]:
-        return [voice.document() for voice in self.engine.voices()]
+        labels = self._labels().read()
+        return [_labelled(voice.document(), labels) for voice in self.engine.voices()]
 
     # ---------------------------------------------------------------- residency
 
@@ -193,11 +196,21 @@ class Worker:
     async def create_voice(self, request: CreateVoiceRequest) -> dict[str, Any]:
         check_voice_id(request.id)
         voice: Voice = await asyncio.to_thread(self.engine.create_voice, request)
-        return voice.document()
+        labels = self._labels()
+        if request.label:
+            labels.set(request.id, request.label)
+        else:
+            # A re-record with no label keeps no stale one from the recording it replaced.
+            labels.forget(request.id)
+        return _labelled(voice.document(), labels.read())
 
     async def delete_voice(self, voice_id: str) -> None:
         check_voice_id(voice_id)
         await asyncio.to_thread(self.engine.delete_voice, voice_id)
+        self._labels().forget(voice_id)
+
+    def _labels(self) -> VoiceLabels:
+        return VoiceLabels(self.engine.voice_dir)
 
     # ---------------------------------------------------------------- speaking
 
@@ -352,3 +365,48 @@ def _voice(body: dict[str, Any]) -> str | None:
     """The request's voice, checked as a name before an adapter turns it into a path."""
     voice = _optional_str(body, "voice")
     return None if voice is None else check_voice_id(voice)
+
+
+def _labelled(document: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
+    label = labels.get(document["id"])
+    return document if label is None else {**document, "label": label}
+
+
+class VoiceLabels:
+    """The label a clone was given, kept by the SDK so no adapter has to.
+
+    An adapter's voice store is a directory of reference clips, and a file name holds an id but not
+    "The Announcer". Both adapters rebuilt the label from the file name when listing, so a voice
+    created as "The Announcer" was listed as "Announcer" a moment later. One JSON file beside the
+    clips, named so that no adapter's listing mistakes it for a voice.
+    """
+
+    FILE = ".labels.json"
+
+    def __init__(self, voice_dir: Path) -> None:
+        self.path = voice_dir / self.FILE
+
+    def read(self) -> dict[str, str]:
+        try:
+            loaded = json.loads(self.path.read_text("utf-8"))
+        except (FileNotFoundError, ValueError):
+            return {}
+        return (
+            {key: value for key, value in loaded.items() if isinstance(value, str)}
+            if isinstance(loaded, dict)
+            else {}
+        )
+
+    def set(self, voice_id: str, label: str) -> None:
+        self._write({**self.read(), voice_id: label})
+
+    def forget(self, voice_id: str) -> None:
+        labels = self.read()
+        if labels.pop(voice_id, None) is not None:
+            self._write(labels)
+
+    def _write(self, labels: dict[str, str]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_name(f"{self.FILE}.tmp")
+        temporary.write_text(json.dumps(labels, sort_keys=True, indent=2), "utf-8")
+        temporary.replace(self.path)

@@ -33,10 +33,15 @@ def call(
         return error.code, json.loads(error.read())
 
 
-def multipart(voice_id: str) -> tuple[bytes, dict[str, str]]:
+def multipart(voice_id: str, label: str | None = None) -> tuple[bytes, dict[str, str]]:
     boundary = "rhapsodeboundary"
+    labelled = (
+        ""
+        if label is None
+        else f'--{boundary}\r\nContent-Disposition: form-data; name="label"\r\n\r\n{label}\r\n'
+    )
     body = (
-        f'--{boundary}\r\nContent-Disposition: form-data; name="id"\r\n\r\n{voice_id}\r\n'
+        labelled + f'--{boundary}\r\nContent-Disposition: form-data; name="id"\r\n\r\n{voice_id}\r\n'
         f'--{boundary}\r\nContent-Disposition: form-data; name="reference"; filename="clip.wav"\r\n'
         "Content-Type: audio/wav\r\n\r\nRIFF\r\n"
         f"--{boundary}--\r\n"
@@ -99,3 +104,25 @@ class TestPathFor:
         (tmp_path / "escape.wav").symlink_to(outside)
         with pytest.raises(Exception, match='no voice "escape"'):
             self.engine(tmp_path).path_for("escape")
+
+
+class TestLabels:
+    def test_a_clone_keeps_the_label_it_was_given(self, worker: RunningWorker) -> None:
+        # Both adapters rebuilt a label from the file name, so "The Announcer" came back as
+        # "Announcer" the moment anything listed it.
+        body, headers = multipart("announcer", label="The Announcer")
+        status, created = call(worker, "/voices", method="POST", body=body, headers=headers)
+        assert status == 201
+        assert json.loads(created)["label"] == "The Announcer"
+
+        _, listed = call(worker, "/voices", method="GET")
+        assert (
+            next(voice for voice in json.loads(listed) if voice["id"] == "announcer")["label"]
+            == "The Announcer"
+        )
+
+        assert call(worker, "/voices/announcer", method="DELETE")[0] == 204
+        body, headers = multipart("announcer")
+        _, recreated = call(worker, "/voices", method="POST", body=body, headers=headers)
+        # Deleting forgets the label, so the same id recreated without one is not named after the old.
+        assert json.loads(recreated)["label"] != "The Announcer"
