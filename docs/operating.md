@@ -238,6 +238,11 @@ style also needs, because it is not a CUDA image and nothing else would.
 Either way, `GET /engines/chatterbox/capabilities` says `"device": {"type": "cuda", ...}` once it
 worked. `cpu` there means the container cannot see the GPU, and Chatterbox will run, slowly, anyway.
 
+Measured on an RTX 4070 Ti SUPER through `compose.gpu.yaml`: installing Chatterbox took 93 seconds
+and 6.2 GB in `/data`, the first `turbo` sentence 50 seconds while 3.8 GB of weights arrived, and
+the next 0.45 seconds, holding 3.1 GB of VRAM. After both containers were replaced, the first
+sentence took 9 seconds, loading from the volume with nothing fetched.
+
 Docker's default ten-second stop kills a worker before the core has drained it. Compose waits 30
 seconds; with `docker run`, pass `--stop-timeout 30`.
 
