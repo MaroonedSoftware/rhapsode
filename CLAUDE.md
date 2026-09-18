@@ -38,7 +38,7 @@ pnpm dev                            # the server on :8080 from source, restartin
 pnpm build && pnpm test
 node scripts/python.mjs test        # the Python half alone
 pnpm wizard doctor                  # what is wrong with this checkout, and --fix for what it can mend
-pnpm wizard install chatterbox      # with the server running: install an engine through its API
+pnpm wizard install kokoro          # with the server running: install an engine through its API
 ```
 
 `pnpm wizard` is `packages/cli`, a johnny5 CLI like the ones in signet and kanban. It runs from

@@ -34,7 +34,7 @@ interface Ui {
  */
 const command: CommandModule<InstallOptions> = {
     description: 'Install an engine through the running server, and optionally download its weights',
-    args: [{ name: 'engine', description: 'An engine id from the catalog, such as chatterbox', required: true }],
+    args: [{ name: 'engine', description: 'An engine id from the catalog, such as kokoro', required: true }],
     options: [
         { flags: '--server <url>', description: 'The server to ask. Default: 127.0.0.1 on the configured port', envVar: 'RHAPSODE_SERVER' },
         { flags: '--token <token>', description: 'management.token, for a server on another machine', envVar: 'RHAPSODE_MANAGEMENT_TOKEN' },
@@ -44,7 +44,7 @@ const command: CommandModule<InstallOptions> = {
     run: async (opts, ctx, args) => {
         const engine = args[0];
         if (engine === undefined) {
-            ctx.logger.error('name an engine: `pnpm wizard install chatterbox`');
+            ctx.logger.error('name an engine: `pnpm wizard install kokoro`');
             return 1;
         }
 

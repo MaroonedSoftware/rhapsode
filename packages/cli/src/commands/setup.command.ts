@@ -89,7 +89,9 @@ const command: CommandModule = {
             }
 
             const where = port === undefined ? '' : `, then \`curl localhost:${port}/engines\``;
-            w.outro(`Ready. Start the server with \`node ${SERVER_ENTRY}\`${where}.`);
+            // Kokoro, because it is the engine that speaks on any machine: CPU only, a 205 MB
+            // download against Chatterbox's 3.8 GB, and faster than realtime on a laptop.
+            w.outro(`Ready. Start the server with \`node ${SERVER_ENTRY}\`${where}. For speech, \`pnpm wizard install kokoro\` with it running.`);
             return 0;
         });
     },

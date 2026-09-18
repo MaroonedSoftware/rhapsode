@@ -85,7 +85,7 @@ spawned with is constructed rather than inherited, so it never sees the core's `
 
 ## Installing engines
 
-`pnpm wizard install chatterbox` does it from a terminal, and anything else can do it through the
+`pnpm wizard install kokoro` does it from a terminal, and anything else can do it through the
 routes in `docs/protocol.md` § 10. Either way the server does the work, so it has to be running.
 
 What it installs is recorded in `rhapsode.engines.json` beside the config file (or beside wherever
@@ -100,11 +100,15 @@ server with `RHAPSODE_PIP_TRUSTED_HOSTS=pypi.org,files.pythonhosted.org`. It is 
 something a client can ask for.
 
 An engine's weights normally arrive on its first load, which for Chatterbox's `turbo` means a first
-`/speak` that waits about 75 seconds on a 3.8 GB download. `POST /engines/{id}/pull` (or the wizard's
+`/speak` that waits about 75 seconds on a 3.8 GB download, and for Kokoro's `fp16` 205 MB. `POST /engines/{id}/pull` (or the wizard's
 offer to pull) downloads them ahead of time, without loading anything.
 
 Uninstalling removes the virtualenv and leaves downloaded weights where the engine put them.
-Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants.
+Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokoro's are in
+`~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points.
+
+Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
+checks `install.python` first and stops, saying so, when that interpreter is outside the range.
 
 ## The web page
 

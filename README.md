@@ -8,7 +8,8 @@ that describes honestly what each engine can actually do.
 > **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
 > a worker and streams `/speak` through it works end to end, engines install through the API, voices
 > clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,
-> against real weights on Apple Silicon, and OpenAI's speech route answers over the same core. What is
+> against real weights on Apple Silicon, as does Kokoro, an ONNX engine that needs no GPU and no torch.
+> OpenAI's speech route answers over the same core. What is
 > not here yet: Chatterbox measured on a CUDA card, and the Wyoming shim.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
@@ -144,19 +145,23 @@ The `tone` engine has no weights and makes a sine wave. It exists to prove the p
 to make speech, which is exactly what makes it useful: it loads in microseconds, needs no GPU, and
 runs in CI on every commit. It is also the conformance fixture, and will stay one.
 
-For something that makes speech, install Chatterbox with the server running:
+For something that makes speech, install Kokoro with the server running:
 
 ```bash
-pnpm wizard install chatterbox
+pnpm wizard install kokoro
 ```
 
 It shows both licences and asks, has the server build the engine its own virtualenv, and offers to
-download the `turbo` weights (3.8 GB) so the first request does not wait on them. Or do the same
-from the web page `pnpm dev` serves at http://localhost:8081. The wizard and the page are both only
-clients: the same thing is `POST /engines/chatterbox/install` and `POST /engines/chatterbox/pull`,
+download the `fp16` weights (205 MB) so the first request does not wait on them. Kokoro runs on the
+CPU, brings no torch, and on an Apple Silicon laptop speaks at about nine times realtime, so it works
+on whatever machine you are reading this on. Or do the same from the web page `pnpm dev` serves at
+http://localhost:8081. The wizard and the page are both only clients: the same thing is
+`POST /engines/kokoro/install` and `POST /engines/kokoro/pull`,
 which answer the machine the server runs on and nobody else unless `management.token` is set. See
 [`docs/protocol.md`](docs/protocol.md) § 10 and [`docs/operating.md`](docs/operating.md).
 
+With a GPU, `pnpm wizard install chatterbox` is the next one to try: it clones voices and performs
+cues such as `[laugh]`, and its `turbo` weights are 3.8 GB.
 [`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) is the engine the capability
 document was designed around, and the reason that document has two levels: `turbo` performs the cues
 and has no dials, `original` and `multilingual` have the dials and perform no cues, and which you get
