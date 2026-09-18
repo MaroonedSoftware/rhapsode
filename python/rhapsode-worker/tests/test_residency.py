@@ -59,6 +59,14 @@ class TestLoading:
         error = json.loads(body)["error"]
         assert (status, error["code"], error["retryable"]) == (503, "oom", True)
 
+    def test_a_loader_that_throws_a_type_error_is_internal_and_not_the_callers_fault(self, failing) -> None:
+        # The request named a variant and nothing else. A 400 here tells the client its request was
+        # wrong, and a client that believes that drops a job that nothing it could change would fix.
+        _, base = failing("load_type_error")
+        status, body = call(base, "/load", {}, method="POST")
+        error = json.loads(body)["error"]
+        assert (status, error["code"]) == (500, "internal")
+
     def test_a_failed_load_leaves_the_worker_usable(self, failing) -> None:
         _, base = failing("load_oom")
         call(base, "/load", {}, method="POST")

@@ -35,6 +35,9 @@ class FailingEngine(Engine):
         type(self)._attempts += 1
         if MODE == "load_oom":
             raise RuntimeError("CUDA error: out of memory")
+        if MODE == "load_type_error":
+            # What an upstream loader looks like when an optional import it swallowed was None.
+            raise TypeError("'NoneType' object is not callable")
         if MODE == "load_oom_once" and type(self)._attempts == 1:
             # What a card that was briefly full looks like: the first load strands its partial
             # allocations, and the retry after an unload succeeds.
