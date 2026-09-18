@@ -22,6 +22,8 @@ outputs/
 # Local
 # What this box has: absolute venv paths and a port, which mean nothing on another machine.
 rhapsode.config.json
+# What the install API wrote on this box: absolute venv paths, like the config. protocol.md § 10.
+rhapsode.engines.json
 .env
 .env.*
 !.env.example
