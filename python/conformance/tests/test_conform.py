@@ -69,6 +69,11 @@ def dishonest() -> Iterator[str]:
     yield from _spawn("engines.dishonest", "dishonest")
 
 
+@pytest.fixture
+def unseeded() -> Iterator[str]:
+    yield from _spawn("engines.unseeded", "unseeded")
+
+
 def test_the_reference_engine_passes_everything(tone: str) -> None:
     with Worker(tone) as worker:
         report = run(worker)
@@ -99,3 +104,48 @@ def test_the_cli_exit_code_is_the_verdict(tone: str) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "speaks the contract" in result.stdout
+
+
+def test_a_comparison_that_cannot_fail_is_not_reported_as_passed(unseeded: str) -> None:
+    # A sampling model produces different audio on every call, so "the audio changed" is true
+    # whether or not a cue was performed. This engine performs nothing, and without a seed held
+    # fixed it used to pass both honesty checks. It must not pass them now.
+    with Worker(unseeded) as worker:
+        report = run(worker)
+
+    honesty = [r for r in report.results if "changes the audio" in r.name]
+    assert honesty, "the engine claims a cue and a delivery, so there should be checks for them"
+    assert all(r.skipped and not r.passed for r in honesty), [(r.name, r.passed, r.skipped) for r in honesty]
+    assert any(r.skipped and "seed reproduces" in r.name for r in report.results)
+
+
+def test_undecided_checks_are_not_a_failure_unless_asked(unseeded: str) -> None:
+    # Section 6 makes reproducibility optional, so an engine that cannot reproduce is not broken.
+    # An operator who needs the honesty checks decided can ask for --strict.
+    plain = subprocess.run(
+        [sys.executable, "-m", "rhapsode_conform", unseeded, "--no-colour"],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    strict = subprocess.run(
+        [sys.executable, "-m", "rhapsode_conform", unseeded, "--no-colour", "--strict"],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+
+    assert plain.returncode == 0, plain.stdout
+    assert "could not be decided" in plain.stdout
+    assert strict.returncode == 1
+
+
+def test_a_seeded_engine_has_its_honesty_checks_decided(tone: str) -> None:
+    with Worker(tone) as worker:
+        report = run(worker)
+
+    honesty = [r for r in report.results if "changes the audio" in r.name]
+    assert honesty and all(r.passed for r in honesty)
+    assert not report.skipped

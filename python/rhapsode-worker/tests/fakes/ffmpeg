@@ -1,0 +1,18 @@
+#!/bin/sh
+# An ffmpeg that is not ffmpeg, so that the "encoder is installed" branch can run on a machine
+# without one. The suite used to run in exactly one ffmpeg state on any given machine, and a test
+# written on a machine without it encoded "opus is unavailable" as a fact, which the first CI run
+# with a real ffmpeg disproved.
+#
+# It claims every encoder the SDK looks for and copies its input to its output. That is enough to
+# exercise the pipeline, the capability document and the error taxonomy; it says nothing about
+# whether real opus is valid opus, which is what CI's real ffmpeg is for.
+for argument in "$@"; do
+    if [ "$argument" = "-encoders" ]; then
+        echo " A..... libmp3lame           libmp3lame MP3 (MPEG audio layer 3)"
+        echo " A..... libopus              libopus Opus"
+        echo " A..... flac                 FLAC (Free Lossless Audio Codec)"
+        exit 0
+    fi
+done
+exec cat
