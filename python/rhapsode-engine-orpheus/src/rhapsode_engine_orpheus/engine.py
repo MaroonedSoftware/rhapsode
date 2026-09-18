@@ -31,11 +31,13 @@ from .prompt import MAX_TOKENS, prompt, segments, translate_cues
 #: SNAC 24 kHz, mono.
 SAMPLE_RATE = 24_000
 
-#: What the `full` build asks vLLM for, when the operator has not said. The weights are 7.6 GB in
-#: bfloat16, half the 15.2 GB of float32 on disk; the rest is vLLM's activations, its CUDA graphs and
-#: a KV cache for one 2048-token sequence. Not measured on a card yet: `RHAPSODE_ORPHEUS_GPU_MEMORY`,
-#: a fraction of the card, overrides it, and the first CUDA run is where to put a number here.
-FULL_MEMORY_BYTES = 10 * 2**30
+#: What the `full` build asks vLLM for, when the operator has not said. Measured on an RTX 4070 Ti
+#: SUPER (vLLM 0.29): 6.29 GiB for the weights and the runtime, 0.16 for activations and 0.02 for CUDA
+#: graphs, and one 2048-token sequence needs 0.22 of KV cache (28 layers, 8 KV heads of 128, bfloat16).
+#: That is 6.7 GiB, and this leaves the rest for more cache. vLLM's own default, 90% of the card, was
+#: an out-of-memory on a 16 GB card another engine was already using 5.3 GB of.
+#: `RHAPSODE_ORPHEUS_GPU_MEMORY`, a fraction of the card, overrides it.
+FULL_MEMORY_BYTES = 7 * 2**30
 
 #: vLLM's own default, and the most this engine will ask for however small the card.
 MOST_OF_A_CARD = 0.9
@@ -65,7 +67,10 @@ class OrpheusEngine(Engine):
     }
 
     native_format = NativeFormat(encoding="pcm_s16le", sample_rate=SAMPLE_RATE, channels=1)
-    default_variant = "q8"
+    #: None, so the first build `variants()` lists is the default, and that depends on what this box
+    #: installed: a fixed "q8" stopped the worker starting at all in the server image, which has vLLM
+    #: and no llama.cpp. The order there is the preference.
+    default_variant = None
 
     #: One model, one utterance at a time. llama.cpp decodes one sequence per context.
     concurrency = 1
@@ -79,12 +84,12 @@ class OrpheusEngine(Engine):
     # ------------------------------------------------------------------ what this engine can do
 
     def variants(self) -> dict[str, Variant]:
-        return variants(full=self._can_run_full())
-
-    def _can_run_full(self) -> bool:
-        """A CUDA card and vLLM, which is Linux on NVIDIA only. `find_spec` rather than an import,
-        because importing vLLM takes seconds and this is asked on every `/capabilities`."""
-        return self.device.type == "cuda" and importlib.util.find_spec("vllm") is not None
+        """What this box can load, by which backend its install brought. `find_spec` rather than an
+        import, because importing vLLM takes seconds and this is asked on every `/capabilities`."""
+        return variants(
+            gguf=importlib.util.find_spec("llama_cpp") is not None,
+            full=self.device.type == "cuda" and importlib.util.find_spec("vllm") is not None,
+        )
 
     # ------------------------------------------------------------------ residency
 
@@ -118,6 +123,12 @@ class OrpheusEngine(Engine):
             raise Unsupported(
                 'the "full" build runs on vLLM, which needs a CUDA card and '
                 "`pip install 'rhapsode-engine-orpheus[vllm]'` in this engine's virtualenv"
+            )
+        if variant in GGUF_FILES:
+            raise Unsupported(
+                f'the "{variant}" build runs on llama.cpp, which this install does not have: '
+                "`pip install 'rhapsode-engine-orpheus[llama]'` in this engine's virtualenv, "
+                "which needs a C++ compiler"
             )
         raise Unsupported(f'no build "{variant}"; this engine has {sorted(declared)}')
 
@@ -217,22 +228,8 @@ def _gguf(variant: str) -> str:
 
 
 def _full() -> str:
-    """Canopy's finetune, file by file, and the directory vLLM should load it from.
-
-    Gated, so a box with no token, or a token whose account has not accepted the terms, is refused
-    by the hub. That is a fact about this box's configuration, and `unsupported` with the fix in it
-    serves the operator better than the hub's 401 surfacing as `internal`.
-    """
-    from huggingface_hub.errors import GatedRepoError
-
-    try:
-        paths = [_download(FULL_REPOSITORY, filename, FULL_REVISION) for filename in FULL_FILES]
-    except GatedRepoError as error:
-        raise Unsupported(
-            f"{FULL_REPOSITORY} is gated: accept its terms at https://huggingface.co/{FULL_REPOSITORY} "
-            'and give this engine the token, as "env": { "HF_TOKEN": "..." } on its entry in '
-            "rhapsode.config.json"
-        ) from error
+    """The unquantised finetune, file by file, and the directory vLLM should load it from."""
+    paths = [_download(FULL_REPOSITORY, filename, FULL_REVISION) for filename in FULL_FILES]
     return os.path.dirname(paths[0])
 
 

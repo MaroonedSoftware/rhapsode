@@ -243,6 +243,36 @@ class TestFull:
     def test_not_declared_on_a_mac(self, orpheus: Recorder, tmp_path: Path) -> None:
         assert "full" not in engine(tmp_path, "mps").variants()
 
+    def test_the_first_listed_is_the_default_and_full_leads_where_it_can_run(
+        self, orpheus: Recorder, tmp_path: Path
+    ) -> None:
+        # No fixed default_variant: the SDK takes the first declared, and refuses to start with a
+        # default that is not declared, which "q8" was in the server image.
+        assert OrpheusEngine.default_variant is None
+        assert list(engine(tmp_path, "cuda").variants()) == ["full", "q8", "q4"]
+        assert engine(tmp_path, "mps").effective_variant(None) == "q8"
+
+    def test_a_cuda_box_without_llama_cpp_has_only_full(
+        self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # What the server image installs on Linux x86_64, where llama.cpp cannot be built.
+        monkeypatch.delitem(sys.modules, "llama_cpp")
+        assert list(engine(tmp_path, "cuda").variants()) == ["full"]
+
+    def test_a_gguf_build_without_llama_cpp_says_what_it_needs(
+        self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delitem(sys.modules, "llama_cpp")
+        with pytest.raises(Unsupported, match=r"llama\.cpp.*\[llama\].*compiler"):
+            engine(tmp_path, "cuda").load("q8")
+
+    def test_a_box_with_neither_backend_declares_nothing(
+        self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delitem(sys.modules, "llama_cpp")
+        monkeypatch.delitem(sys.modules, "vllm")
+        assert engine(tmp_path, "cpu").variants() == {}
+
     def test_not_declared_without_vllm(
         self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -275,28 +305,15 @@ class TestFull:
         assert len(audio) == 6 * SAMPLES_PER_FRAME * 2
         assert orpheus.llamas == []
 
-    def test_a_gated_refusal_says_how_to_get_in(
-        self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        import huggingface_hub
-        from harness.stubs import GatedRepoError
-
-        def refuse(**arguments: Any) -> str:
-            raise GatedRepoError("401")
-
-        monkeypatch.setattr(huggingface_hub, "hf_hub_download", refuse)
-        with pytest.raises(Unsupported, match=r"gated.*HF_TOKEN"):
-            engine(tmp_path, "cuda").fetch("full")
-
 
 class TestMemoryFraction:
     def test_the_budget_over_the_card(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("RHAPSODE_ORPHEUS_GPU_MEMORY", raising=False)
-        assert memory_fraction(Device("cuda", "4090", vram_bytes=24 * 2**30)) == round(10 / 24, 3)
+        assert memory_fraction(Device("cuda", "4090", vram_bytes=24 * 2**30)) == round(7 / 24, 3)
 
     def test_never_more_than_vllms_own_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("RHAPSODE_ORPHEUS_GPU_MEMORY", raising=False)
-        assert memory_fraction(Device("cuda", "small", vram_bytes=8 * 2**30)) == 0.9
+        assert memory_fraction(Device("cuda", "small", vram_bytes=6 * 2**30)) == 0.9
         assert memory_fraction(Device("cuda", "unknown")) == 0.9
 
     def test_the_operator_overrides_it(self, monkeypatch: pytest.MonkeyPatch) -> None:

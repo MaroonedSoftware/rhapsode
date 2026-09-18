@@ -30,22 +30,27 @@ Then in `rhapsode.config.json`:
   run through llama.cpp on Metal, CUDA or the CPU. On a CUDA box with vLLM, also `full`: Canopy's
   own weights, unquantised.
 
-## The `full` build
+## Which builds a box gets
+
+The package installs the backend that runs where it lands without compiling anything:
+
+- **Linux x86_64: vLLM, and the `full` build.** The finetune unquantised, from unsloth's ungated
+  bfloat16 copy (6.6 GB), on an NVIDIA card. The worker lists `full` only when it sees CUDA.
+  llama-cpp-python is a source package there, and the server image has no C++ compiler to build it.
+- **Everywhere else, such as a Mac: llama.cpp, and `q8` and `q4`.**
+
+A Linux box without an NVIDIA card installs the GGUF builds instead, which needs a C++ compiler:
 
 ```bash
-/opt/rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[vllm]'
+/opt/rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[llama]'
 ```
 
-Linux and a CUDA card only, and the worker lists `full` only where both are true. The weights are
-gated: accept the terms on [the model page](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft),
-then give the engine a token in its `env`:
+The default is the first build the worker lists: `full` where it can run, then `q8`.
 
-```json
-{ "engines": { "orpheus": { "venv": "/opt/rhapsode/venvs/orpheus", "env": { "HF_TOKEN": "hf_..." } } } }
-```
+Measured on an RTX 4070 Ti SUPER in the server image, beside another engine holding 5.3 GB: `full`
+loaded in 17 to 26 seconds, streamed at 1.05 times real time with the first audio after 0.34
+seconds, and held 7.5 GB. vLLM claims 7 GiB of the card up front.
+`RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, as a fraction of the card, overrides that.
 
-The download is 15.2 GB of float32, named file by file: the repository itself is 56.7 GB, because it
-also holds the optimizer state from training. vLLM claims a fixed share of the card when it loads,
-10 GiB worth by default. `RHAPSODE_ORPHEUS_GPU_MEMORY` in the same `env`, as a fraction of the card,
-overrides that. Nobody has run this build on a CUDA card yet, so treat both numbers as a starting
-point.
+On an Apple M5 Pro, `q8` ran at about a quarter of real time: fine for `stream: false`, too slow
+to feed a live stream.

@@ -106,36 +106,34 @@ offer to pull) downloads them ahead of time, without loading anything.
 Uninstalling removes the virtualenv and leaves downloaded weights where the engine put them.
 Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokoro's are in
 `~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points. Orpheus's are in
-`~/.cache/huggingface` too: 3.5 GB for `q8`, 2.1 GB for `q4`, and 80 MB for the codec both share.
+`~/.cache/huggingface` too: 3.5 GB for `q8`, 2.1 GB for `q4`, 6.6 GB for `full`, and 80 MB for
+the codec they share.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
 
-### Orpheus and llama.cpp
+### Orpheus
 
-Orpheus runs through `llama-cpp-python`, which pip builds from source unless a wheel matches. On a
-Mac that build uses Metal and needs the Xcode command line tools (`xcode-select --install`). On a
-CUDA box, point pip at the prebuilt CUDA wheels before starting the server, because the install
-inherits `PIP_EXTRA_INDEX_URL` from the server's environment and a client cannot set it:
+What an Orpheus install brings depends on the box, because only one of its two backends installs
+without compiling anything:
+
+- **Linux x86_64, the server image included: vLLM**, and the `full` build on an NVIDIA card. The
+  weights are unsloth's ungated copy, 6.6 GB, so no token is needed. vLLM claims 7 GiB of the card
+  when it loads; `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, a fraction of the card, moves
+  that.
+- **Anywhere else: llama.cpp**, and the `q8` and `q4` builds. On a Mac pip builds it with Metal,
+  which needs the Xcode command line tools (`xcode-select --install`).
+
+The catalog's default is `q8`, which a Linux box does not have, so pull `full` by name there:
+`POST /engines/orpheus/pull` with `{"variant": "full"}`. A request that names no variant uses
+`full` anyway, because the core skips a default the worker does not list.
+
+A Linux box with no NVIDIA card gets no variant it can run. Install the GGUF builds into the
+engine's virtualenv by hand, which needs a C++ compiler, then restart the engine:
 
 ```bash
-PIP_EXTRA_INDEX_URL=https://abetlen.github.io/llama-cpp-python/whl/cu124 node apps/server/dist/main.js
+~/.rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[llama]'
 ```
-
-Without it the install still succeeds, with a CPU build. Real time needs about 82 tokens a second
-(seven per 85 ms frame), and whether a CPU reaches that depends on the machine.
-
-Orpheus also has a `full` build, Canopy's unquantised weights on vLLM, for a Linux box with a CUDA
-card. The catalog install does not include vLLM, which is several gigabytes and pins its own torch.
-Add it to the engine's virtualenv by hand, then restart the engine:
-
-```bash
-~/.rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[vllm]'
-```
-
-Those weights are gated, and a worker's environment is built from scratch, so the token has to be in
-the engine's `env` in your config file (`"env": { "HF_TOKEN": "hf_..." }`). Without it, a pull of
-`full` is refused as `unsupported`, with a message that says exactly this.
 
 ## The web page
 

@@ -12,18 +12,21 @@ requires-python = ">=3.11"
 dependencies = [
     "rhapsode-worker",
     "numpy>=1.26",
-    # The Llama. A wheel for the CPU, built from source with Metal on a Mac (which needs the Xcode
-    # command line tools), and for CUDA from its own index through PIP_EXTRA_INDEX_URL. The repository's
-    # shared dev venv installs this package with --no-deps, so none of it is needed to test the adapter.
-    "llama-cpp-python>=0.3.16",
-    # The codec, which brings torch. It is the only part of this engine that needs it.
+    # The codec, which brings torch. torch's wheels carry their own CUDA.
     "snac>=1.2.1",
     "huggingface_hub>=0.23",
+    # The Llama, by where it can run without compiling anything. On Linux x86_64 that is vLLM, whose
+    # wheels bring CUDA, for the `full` build on an NVIDIA card: llama-cpp-python is a source package
+    # there, and the server image has no C++ compiler to build it with (measured: "CMAKE_CXX_COMPILER
+    # not set"). Everywhere else llama.cpp, for the GGUF builds, which pip builds with Metal on a Mac.
+    # A Linux box without an NVIDIA card asks for the other one: `[llama]`.
+    "vllm>=0.10; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "transformers>=4.45; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "llama-cpp-python>=0.3.16; sys_platform != 'linux' or platform_machine != 'x86_64'",
 ]
 
 [project.optional-dependencies]
-# The `full` build: Canopy's own weights through vLLM, on Linux with a CUDA card. Several gigabytes,
-# and it pins its own torch, so it is asked for by name rather than installed with every engine.
+llama = ["llama-cpp-python>=0.3.16"]
 vllm = ["vllm>=0.10", "transformers>=4.45"]
 
 [tool.hatch.build.targets.wheel]

@@ -108,7 +108,14 @@ class VllmSource:
 
     def __init__(self, model_dir: str, *, memory_fraction: float) -> None:
         import asyncio
+        import os
         import threading
+
+        # vLLM samples top-p through FlashInfer by default, which compiles its kernel with nvcc on
+        # first use, and a box that installed its CUDA from wheels has no nvcc: in the server image
+        # every load failed with "Could not find nvcc". PyTorch's sampler needs nothing compiled.
+        # A default, so an engine's `env` can still choose FlashInfer where the toolkit is present.
+        os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
 
         from transformers import AutoTokenizer
         from vllm import AsyncEngineArgs, AsyncLLMEngine
@@ -126,6 +133,10 @@ class VllmSource:
             # fills what the weights leave with KV cache. The residency manager expects engines to
             # share a card, so the engine asks for its budget rather than accepting the default.
             gpu_memory_utilization=memory_fraction,
+            # One utterance at a time, as the SDK serves it. vLLM's default of several hundred sizes
+            # its memory profile for that many sequences, and at this model's 156,940-token vocabulary
+            # their logits alone ran a 16 GB card shared with another engine out of memory.
+            max_num_seqs=1,
         )
 
         async def build() -> Any:

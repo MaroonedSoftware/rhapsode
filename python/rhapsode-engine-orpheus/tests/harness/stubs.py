@@ -237,6 +237,7 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
     snac.codec = codec  # type: ignore[attr-defined]
 
     llama_cpp = types.ModuleType("llama_cpp")
+    llama_cpp.__spec__ = importlib.machinery.ModuleSpec("llama_cpp", None)
     llama_cpp.Llama = lambda model_path, **options: FakeLlama(recorder, model_path, **options)  # type: ignore[attr-defined]
 
     hub = types.ModuleType("huggingface_hub")
@@ -251,22 +252,14 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
     hub.hf_hub_download = hf_hub_download  # type: ignore[attr-defined]
     hub.snapshot_download = snapshot_download  # type: ignore[attr-defined]
-    errors = types.ModuleType("huggingface_hub.errors")
-    errors.GatedRepoError = GatedRepoError  # type: ignore[attr-defined]
-    hub.errors = errors  # type: ignore[attr-defined]
 
     return {
         "torch": torch,
         "snac": snac,
         "llama_cpp": llama_cpp,
         "huggingface_hub": hub,
-        "huggingface_hub.errors": errors,
         **vllm_modules(recorder),
     }
-
-
-class GatedRepoError(Exception):
-    pass
 
 
 def vllm_modules(recorder: Recorder) -> dict[str, types.ModuleType]:

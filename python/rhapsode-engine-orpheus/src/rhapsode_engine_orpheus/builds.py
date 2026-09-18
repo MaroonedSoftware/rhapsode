@@ -57,22 +57,20 @@ GGUF_FILES: dict[str, str] = {
     "q4": "orpheus-3b-0.1-ft-Q4_K_M.gguf",
 }
 
-#: Canopy's own finetune, for the `full` build on vLLM. Gated: downloading it needs a Hugging Face
-#: account that has accepted the terms on the model page, and its token in `HF_TOKEN`.
-FULL_REPOSITORY = "canopylabs/orpheus-3b-0.1-ft"
-FULL_REVISION = "4206a56e5a68cf6cf96900a8a78acd3370c02eb6"
+#: The finetune unquantised, for the `full` build on vLLM: unsloth's bfloat16 copy of Canopy's
+#: weights, the same conversion the GGUFs come from. Canopy's own repository is gated, so it needs an
+#: account and a token, and it holds the weights in float32 beside the optimizer and FSDP state from
+#: training, 56.7 GB where this is 6.6. vLLM runs the model in bfloat16 either way.
+FULL_REPOSITORY = "unsloth/orpheus-3b-0.1-ft"
+FULL_REVISION = "eae2b6e5e429c81b95ac42a883ac64f126583d43"
 
-#: Only what inference reads, named file by file. The repository is 56.7 GB because it also holds the
-#: optimizer and FSDP state from training, which a whole-repository download would fetch; these are
-#: 15.2 GB of float32 weights, which vLLM casts to bfloat16 as it loads them.
+#: Only what inference reads, named file by file, so a later upload beside them is never fetched.
 FULL_FILES: tuple[str, ...] = (
     "config.json",
     "generation_config.json",
     "model.safetensors.index.json",
-    "model-00001-of-00004.safetensors",
-    "model-00002-of-00004.safetensors",
-    "model-00003-of-00004.safetensors",
-    "model-00004-of-00004.safetensors",
+    "model-00001-of-00002.safetensors",
+    "model-00002-of-00002.safetensors",
     "special_tokens_map.json",
     "tokenizer.json",
     "tokenizer_config.json",
@@ -83,15 +81,17 @@ SNAC_REPOSITORY = "hubertsiuzdak/snac_24khz"
 SNAC_REVISION = "d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec"
 
 
-def variants(*, full: bool = False) -> dict[str, Variant]:
+def variants(*, gguf: bool = True, full: bool = False) -> dict[str, Variant]:
     """Every build claims the same thing, because every build is the same finetune.
 
     No deliveries: Orpheus has no whisper and no intensity control, and a word it cannot perform is
     one it must not claim. The sampling dials are real ones: upstream documents that the temperature
     and repetition penalty change the pace of the reading.
 
-    `full` is declared only where it can load, which the engine decides: a variant listed on a box
+    Each build is declared only where it can load, which the engine decides: a variant listed on a box
     that cannot run it is a promise every load of it breaks. protocol.md § 4.
     """
     claimed = Variant(cues=CUES, deliveries=(), dials=dict(DIALS), languages=("en",))
-    return {name: claimed for name in (*GGUF_FILES, *(("full",) if full else ()))}
+    # Unquantised first where it can run, then the larger quantisation: the first is the default.
+    names = (*(("full",) if full else ()), *(GGUF_FILES if gguf else ()))
+    return {name: claimed for name in names}
