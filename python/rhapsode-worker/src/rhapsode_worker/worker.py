@@ -8,7 +8,7 @@ from typing import Any
 
 from . import encoding
 from .engine import CreateVoiceRequest, Engine, SpeakRequest, Voice, check_voice_id
-from .errors import BadRequest, Internal, Overloaded, Unsupported, WorkerError, classify
+from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
 
@@ -142,14 +142,7 @@ class Worker:
         except BaseException as error:
             self.model = "unloaded"
             self.engine.variant = None
-            failure = classify(error)
-            if isinstance(failure, BadRequest) and not isinstance(error, WorkerError):
-                # The caller named a variant and nothing else, so a TypeError out of upstream's
-                # loader is the adapter's fault, not the request's. Chatterbox's watermarker
-                # import failing under setuptools 81 surfaced as a 400 that told the client its
-                # request was wrong, which is the one answer that makes a client drop the job.
-                failure = Internal(f"{type(error).__name__}: {error}")
-            raise failure from error
+            raise classify(error) from error
         self.engine.variant = variant
         self.model = "loaded"
         self.log.info("loaded", variant=variant)
@@ -192,15 +185,8 @@ class Worker:
             raise Unsupported(f'no variant "{variant}"; this engine has {sorted(declared)}')
         try:
             await asyncio.to_thread(self.engine.fetch, variant)
-        except WorkerError:
-            raise
         except BaseException as error:
-            failure = classify(error)
-            # The same reasoning as a load: the caller named a variant and nothing else, so a
-            # TypeError from inside a download library is the adapter's to explain, not the caller's.
-            if isinstance(failure, BadRequest):
-                failure = Internal(f"{type(error).__name__}: {error}")
-            raise failure from error
+            raise classify(error) from error
 
     # ---------------------------------------------------------------- voices
 

@@ -61,6 +61,9 @@ class FailingEngine(Engine):
     def speak(self, request: SpeakRequest) -> Iterator[bytes]:
         if MODE == "raise_before_any_audio":
             raise RuntimeError("the adapter threw on entry")
+        if MODE == "type_error_before_any_audio":
+            # What upstream Chatterbox raised cloning on Apple Silicon: a float64 tensor MPS refuses.
+            raise TypeError("Cannot convert a MPS Tensor to float64 dtype")
 
         if MODE == "tiny":
             # Smaller than the core's 256-byte floor, which is the shape of a server answering 200

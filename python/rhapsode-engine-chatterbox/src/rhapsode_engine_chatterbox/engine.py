@@ -104,6 +104,7 @@ class ChatterboxEngine(Engine):
         # onto the CPU with `device in ["cpu", "mps"]`, which a torch.device never satisfies, so on
         # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
         self._model = build.from_pretrained(device=self._torch_device())
+        _float32_loudness(self._model)
 
     def fetch(self, variant: str) -> None:
         """Download a build's weights into the Hugging Face cache, where its load will find them.
@@ -270,6 +271,26 @@ class ChatterboxEngine(Engine):
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
+
+
+def _float32_loudness(model: Any) -> None:
+    """Make turbo's loudness step hand back float32, which is what every later step computes in.
+
+    Turbo normalises a reference clip with pyloudnorm, which returns float64, and the array goes to
+    the device as it is. MPS has no float64, so on Apple Silicon every clone failed at its first
+    `speak` with "Cannot convert a MPS Tensor to float64 dtype" (measured, turbo, chatterbox-tts
+    0.1.7). The other builds have no such step. Wrapped per instance rather than patched on the
+    class, so nothing outside this adapter is changed.
+    """
+    original = getattr(model, "norm_loudness", None)
+    if original is None:
+        return
+
+    def float32(wav: Any, sr: int, *args: Any, **kwargs: Any) -> Any:
+        result = original(wav, sr, *args, **kwargs)
+        return result.astype("float32") if hasattr(result, "astype") else result
+
+    model.norm_loudness = float32
 
 
 def chunked_pcm(waveform: Any, chunk_samples: int = CHUNK_SAMPLES) -> Iterator[bytes]:

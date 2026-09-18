@@ -93,7 +93,10 @@ def classify(error: BaseException) -> WorkerError:
 
     if isinstance(error, NotImplementedError):
         return Unsupported(str(error) or "not supported by this engine")
-    if isinstance(error, (ValueError, TypeError, KeyError)):
-        return BadRequest(str(error))
+    # A ValueError, TypeError or KeyError out of adapter code is the adapter's, not the request's.
+    # The SDK checks every request before an adapter sees it and raises BadRequest itself when one is
+    # wrong, so by the time an adapter throws, the request was fine. This mapped them to bad_request,
+    # and Chatterbox on Apple Silicon answered a clone with a 400 for a float64 tensor the GPU could
+    # not hold: the one answer that makes a client drop a job it had every reason to keep.
 
     return Internal(f"{type(error).__name__}: {error}")

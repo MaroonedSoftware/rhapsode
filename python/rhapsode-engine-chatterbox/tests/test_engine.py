@@ -296,3 +296,31 @@ class TestFetching:
         built.fetch("turbo")
         assert built._model is None
         assert "turbo" not in chatterbox
+
+
+class TestCloningOnAppleSilicon:
+    def test_turbo_loudness_comes_back_as_float32(self) -> None:
+        # pyloudnorm returns float64 and MPS cannot hold it, so every clone failed on a Mac.
+        import numpy as np
+
+        from rhapsode_engine_chatterbox.engine import _float32_loudness
+
+        class Turbo:
+            def norm_loudness(self, wav: Any, sr: int) -> Any:
+                return wav.astype("float64") * 2
+
+        model = Turbo()
+        _float32_loudness(model)
+        out = model.norm_loudness(np.ones(4, dtype="float32"), 24_000)
+        assert out.dtype == np.float32
+        assert list(out) == [2.0, 2.0, 2.0, 2.0]
+
+    def test_a_build_without_the_step_is_left_alone(self) -> None:
+        from rhapsode_engine_chatterbox.engine import _float32_loudness
+
+        class Original:
+            pass
+
+        model = Original()
+        _float32_loudness(model)
+        assert not hasattr(model, "norm_loudness")
