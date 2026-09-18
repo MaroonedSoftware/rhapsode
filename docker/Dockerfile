@@ -43,8 +43,11 @@ FROM node:${NODE_VERSION}-bookworm-slim AS server
 # ffmpeg for mp3, opus and flac, which docs/operating.md § Formats says the SDK cannot frame itself.
 # Debian's build has all three encoders. tini because node as PID 1 reaps nothing, and pip and the
 # workers leave orphans behind them. No python3, on purpose: see the seeded config in entrypoint.mjs.
+# gcc and libc6-dev because Triton, under vLLM, compiles a small C helper the first time a worker
+# launches a kernel, and without a C compiler Orpheus's `full` build failed every load with "Failed
+# to find C compiler". C only, and no CUDA toolkit: nothing here compiles C++ or CUDA.
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates ffmpeg tini \
+    && apt-get install --yes --no-install-recommends ca-certificates ffmpeg tini gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /usr/local/bin/uv
 
