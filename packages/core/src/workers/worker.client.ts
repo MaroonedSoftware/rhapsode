@@ -96,6 +96,43 @@ export class WorkerClient {
         await response.body.dump();
     }
 
+    /**
+     * A clone, streamed to the worker as it arrives. § 7.
+     *
+     * The body is the caller's multipart upload, passed through with its own `Content-Type` so the
+     * boundary survives, and never parsed or held here: the core keeps no copy of a voice.
+     */
+    async createVoice(body: Readable, contentType: string, signal: AbortSignal): Promise<Voice> {
+        let response;
+        try {
+            response = await this.pool.request({
+                path: '/voices',
+                method: 'POST',
+                headers: { 'content-type': contentType },
+                body,
+                signal,
+                headersTimeout: CONTROL_TIMEOUT_MS,
+                bodyTimeout: CONTROL_TIMEOUT_MS,
+            });
+        } catch (error) {
+            // The cap tripping mid-upload arrives here as the body's own error, and is the caller's.
+            if (error instanceof RhapsodeError) throw error;
+            if ((error as { cause?: unknown }).cause instanceof RhapsodeError) throw (error as { cause: RhapsodeError }).cause;
+            throw new RhapsodeError('model_unavailable', 'the worker did not answer POST /voices', { cause: error });
+        }
+        const parsed = await response.body.json().catch(() => undefined);
+        if (response.statusCode >= 400) throw fromWorkerEnvelope(parsed, response.statusCode);
+        return parsed as Voice;
+    }
+
+    async deleteVoice(voice: string): Promise<void> {
+        const response = await this.request('DELETE', `/voices/${encodeURIComponent(voice)}`);
+        if (response.statusCode >= 400) {
+            throw fromWorkerEnvelope(await response.body.json().catch(() => undefined), response.statusCode);
+        }
+        await response.body.dump();
+    }
+
     /** Drain and exit. The 202 arrives before the process goes, so the socket closing is the proof. */
     async terminate(): Promise<void> {
         await this.request('POST', '/terminate', {});
@@ -166,7 +203,7 @@ export class WorkerClient {
         return parsed as T;
     }
 
-    private async request(method: 'GET' | 'POST', path: string, body?: unknown) {
+    private async request(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) {
         try {
             return await this.pool.request({
                 path,

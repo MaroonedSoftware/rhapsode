@@ -1,3 +1,6 @@
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+
 import type { ServerKitModule } from '@maroonedsoftware/fastify';
 import { Logger } from '@maroonedsoftware/logger';
 
@@ -9,6 +12,7 @@ import { WorkerRegistry } from './worker.registry.js';
 export const workerModule = (settings: RhapsodeConfig): ServerKitModule => {
     const options: SupervisorOptions = {
         socketDir: settings.workers?.socketDir,
+        voiceDir: resolve(settings.workers?.voiceDir ?? join(homedir(), '.rhapsode', 'voices')),
         startupTimeoutSeconds: settings.workers?.startupTimeoutSeconds ?? DEFAULTS.startupTimeoutSeconds,
         drainGraceMs: settings.workers?.drainGraceMs ?? DEFAULTS.drainGraceMs,
         maxRestarts: settings.workers?.maxRestarts ?? DEFAULTS.maxRestarts,

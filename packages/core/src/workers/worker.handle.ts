@@ -22,6 +22,12 @@ const MAX_SOCKET_PATH = 100;
 
 export interface SupervisorOptions {
     socketDir?: string;
+    /**
+     * Each local worker's voice store is `<voiceDir>/<engine>`, unless the engine's `env` names one.
+     * Without it a worker stores voices under its working directory, which is the core's, and under
+     * `pnpm dev` that is inside the repository.
+     */
+    voiceDir?: string;
     startupTimeoutSeconds: number;
     drainGraceMs: number;
     maxRestarts: number;
@@ -119,6 +125,7 @@ export class LocalWorkerHandle implements WorkerHandle {
                 HOME: process.env.HOME ?? '',
                 LANG: process.env.LANG ?? 'C.UTF-8',
                 TMPDIR: process.env.TMPDIR ?? tmpdir(),
+                ...(this.options.voiceDir === undefined ? {} : { RHAPSODE_VOICE_DIR: join(this.options.voiceDir, this.id) }),
                 ...this.entry.env,
                 [WORKER_ENV.listen]: `unix:${socketPath}`,
                 [WORKER_ENV.engine]: this.id,

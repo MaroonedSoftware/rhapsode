@@ -23,6 +23,8 @@ export interface RhapsodeConfig {
     };
     workers?: {
         socketDir?: string;
+        /** Where each local worker keeps its voices, as `<voiceDir>/<engine>`. Default `~/.rhapsode/voices`. */
+        voiceDir?: string;
         startupTimeoutSeconds?: number;
         drainGraceMs?: number;
         maxRestarts?: number;

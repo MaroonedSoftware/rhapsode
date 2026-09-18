@@ -34,6 +34,9 @@ rather than about the contract.
         // Keep this short. A unix socket path is limited to about 100 bytes and the failure is an
         // opaque EINVAL at bind time; rhapsode checks the length and refuses with a better message.
         "socketDir": "/run/rhapsode",
+        // Each local worker keeps its cloned voices in <voiceDir>/<engine>. An engine's own `env`
+        // can name RHAPSODE_VOICE_DIR instead. Default ~/.rhapsode/voices.
+        "voiceDir": "/var/lib/rhapsode/voices",
         "startupTimeoutSeconds": 60,
         "drainGraceMs": 10000,
         "maxRestarts": 5,
