@@ -15,7 +15,7 @@ let running: Awaited<ReturnType<typeof buildServer>> | undefined;
 
 /** A server with one extra route behind the guard, standing in for the § 10 routes to come. */
 async function start(settings: RhapsodeConfig = {}, managed?: ManagedEngines) {
-    const builder = await buildServer(settings, silent(), managed);
+    const builder = await buildServer(settings, silent(), { managed });
     builder.app.get('/guarded', { onRequest: managementGuard }, async () => ({ ok: true }));
     running = builder;
     await builder.app.ready();

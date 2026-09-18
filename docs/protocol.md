@@ -649,8 +649,11 @@ An install is four steps, and a job reports which one it is on:
 `RHAPSODE_PIP_TRUSTED_HOSTS` is honoured from the server's own environment and cannot be set
 through the API. Weakening certificate verification stays a decision made on the box.
 
-Installing an engine that is already installed or already installing is `conflict`. An id that is
-not in the catalog is `unknown_engine`.
+Installing an engine that is already installed or already installing is `conflict`, and so is
+installing one the operator's config names, even disabled: that entry would win over whatever the
+install recorded. An id that is not in the catalog is `unknown_engine`. A server started without a
+managed file (a core embedded as a library can be) answers `unsupported`, because it has nowhere to
+record the result.
 
 ### The managed file
 
@@ -664,7 +667,11 @@ rule that keeps both honest.
 
 `DELETE /engines/{id}` terminates the worker, removes the engine from the registry and from the
 managed file, and deletes its virtualenv, but only a virtualenv inside `install.venvDir`. An engine
-the operator configured is `conflict`: it is theirs to remove, by editing their file.
+the operator configured is `conflict`: it is theirs to remove, by editing their file. So is an
+engine that is speaking, because an uninstall that cut a stream off would hand that caller a
+truncated file for a reason it could not have predicted; the removal happens under the same lock a
+load takes, so nothing can start one in between. An engine that is not installed is
+`unknown_engine`.
 
 Weights are left alone. They live in the engine's own cache (for Chatterbox, the Hugging Face cache
 in the user's home), which other tools on the box share, and 9.7 GB is not something to delete as a
@@ -695,6 +702,10 @@ does not implement `fetch` answers `unsupported`, and its weights arrive on firs
 carries `error`, an ordinary error envelope body. **One job runs at a time and the rest queue**,
 because two pip installs racing for one disk and one network connection finish later than the same
 two in a line, and a failure in one is easier to read without the other interleaved.
+
+An id `GET /installs/{job}` does not know is `bad_request` with a `404`, as an unknown route is:
+the request named something that is not there, and a finished job is only kept until fifty newer
+ones have finished after it.
 
 Jobs live in memory. A restart forgets them, and a job running at shutdown is stopped and marked
 `failed`. That loses nothing that matters: a half-built virtualenv is caught by step 1 of the next

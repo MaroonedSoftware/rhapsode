@@ -16,6 +16,9 @@ import { managementModule } from './management/management.module.js';
 import { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 import { engineModule } from './registry/engine.module.js';
 import type { ManagedEngines } from './registry/managed.engines.js';
+import type { CommandRunner } from './install/command.runner.js';
+import { installModule } from './install/install.module.js';
+import { installRoutes } from './install/install.routes.js';
 import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
 import { residencyModule } from './residency/residency.module.js';
@@ -29,7 +32,14 @@ import type { RhapsodeConfig } from './config.js';
  * `apps/server` is a composition root and nothing else; this is where the order lives, because the
  * order is a decision rather than a detail.
  */
-export async function buildServer(settings: RhapsodeConfig, logger?: Logger, managed?: ManagedEngines): Promise<ServerKitServerBuilder> {
+export interface BuildOptions {
+    /** The engines this API installed, and where it records them. Absent, the server cannot install. */
+    managed?: ManagedEngines;
+    /** How an install runs its commands. Replaced in tests, so an install can be driven without pip. */
+    runner?: CommandRunner;
+}
+
+export async function buildServer(settings: RhapsodeConfig, logger?: Logger, options: BuildOptions = {}): Promise<ServerKitServerBuilder> {
     // AppConfig is keyed by string at its edges, and RhapsodeConfig is the typed view of the same
     // object. Services take their own section rather than this, which is ServerKit's rule.
     const config = new AppConfig(settings as unknown as Record<string, unknown>);
@@ -42,9 +52,11 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, man
     // worker module last would kill the children out from under streams still reading them.
     const modules: ServerKitModule[] = [
         managementModule(settings),
-        engineModule(settings, managed),
+        engineModule(settings, options.managed),
         workerModule(settings),
         residencyModule(settings),
+        // Last, so it shuts down first: a running pip is stopped before the workers it would register.
+        installModule(settings, options.runner),
     ];
 
     const container = await builder.setup(config, log, modules);
@@ -65,6 +77,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, man
         { plugin: engineDetailRoutes },
         { plugin: speakRoutes },
         { plugin: catalogRoutes },
+        { plugin: installRoutes },
     ];
     builder.setupRoutes(routes);
 

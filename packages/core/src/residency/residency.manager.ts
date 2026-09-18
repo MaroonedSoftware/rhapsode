@@ -123,6 +123,25 @@ export class ResidencyManager {
         return this.lease(resident);
     }
 
+    /**
+     * Take an engine out of residency for good, and run `removal` while nothing can load it.
+     *
+     * Under the transition lock, so that a `/speak` arriving mid-uninstall cannot spawn the worker
+     * being removed. Refused while the engine is speaking: an uninstall that cut off a stream in
+     * progress would hand that caller a truncated file for a reason it could not have predicted.
+     */
+    async forget(engineId: string, removal: () => Promise<void>): Promise<void> {
+        await this.transition.run(async () => {
+            const resident = this.residents.get(engineId);
+            if (resident !== undefined && resident.leases > 0) {
+                throw new RhapsodeError('conflict', `"${engineId}" is speaking; remove it once it has finished`);
+            }
+            if (resident?.idleTimer !== undefined) clearTimeout(resident.idleTimer);
+            this.residents.delete(engineId);
+            await removal();
+        });
+    }
+
     private hold(resident: Resident): void {
         resident.leases += 1;
         resident.lastUsedAt = DateTime.utc();

@@ -36,6 +36,18 @@ export interface RhapsodeConfig {
          */
         token?: string;
     };
+    /** protocol.md § 10. */
+    install?: {
+        /** Each installed engine gets `<venvDir>/<id>`. Default `~/.rhapsode/venvs`. */
+        venvDir?: string;
+        /**
+         * Where adapter sources are looked for before the package index. Default: the `python/`
+         * directory of the checkout this core is running from, when there is one.
+         */
+        sourceDir?: string;
+        /** The interpreter that creates each virtualenv. Default `python3`. */
+        python?: string;
+    };
     engines?: Record<string, Partial<EngineEntry> & { enabled?: boolean }>;
 }
 
