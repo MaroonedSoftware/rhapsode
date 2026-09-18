@@ -1,0 +1,101 @@
+"""Voice ids are names, and nothing an adapter turns into a path can be anything else. protocol.md § 7."""
+
+from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+import pytest
+from conftest import RunningWorker
+
+from rhapsode_worker import BadRequest
+from rhapsode_worker.engine import Engine, check_voice_id
+
+
+def call(
+    worker: RunningWorker,
+    path: str,
+    *,
+    method: str,
+    body: bytes | None = None,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, Any]:
+    request = urllib.request.Request(
+        f"{worker.base_url}{path}", data=body, headers=headers or {}, method=method
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
+
+
+def multipart(voice_id: str) -> tuple[bytes, dict[str, str]]:
+    boundary = "rhapsodeboundary"
+    body = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="id"\r\n\r\n{voice_id}\r\n'
+        f'--{boundary}\r\nContent-Disposition: form-data; name="reference"; filename="clip.wav"\r\n'
+        "Content-Type: audio/wav\r\n\r\nRIFF\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+    return body, {"content-type": f"multipart/form-data; boundary={boundary}"}
+
+
+class TestTheGrammar:
+    @pytest.mark.parametrize("voice", ["narrator", "narrator_02", "N-3", "a", "x" * 64])
+    def test_admits_a_name(self, voice: str) -> None:
+        assert check_voice_id(voice) == voice
+
+    @pytest.mark.parametrize(
+        "voice",
+        ["../../x", "*", "a*", "[ab]", "", ".hidden", "-x", "_x", "a b", "x" * 65, "a/b", "a\\\\b", "é"],
+    )
+    def test_refuses_anything_else(self, voice: str) -> None:
+        with pytest.raises(BadRequest, match="is not a name"):
+            check_voice_id(voice)
+
+
+class TestOverHttp:
+    def test_a_clone_named_as_a_path_is_refused_before_the_adapter_sees_it(
+        self, worker: RunningWorker
+    ) -> None:
+        # Before this, the Chatterbox adapter wrote the upload to voice_dir / "../../x.wav".
+        body, headers = multipart("../../x")
+        status, error = call(worker, "/voices", method="POST", body=body, headers=headers)
+        assert status == 400
+        assert "is not a name" in error["error"]["message"]
+
+    def test_a_delete_of_a_pattern_is_refused(self, worker: RunningWorker) -> None:
+        # Before this, `*` globbed to whichever voice sorted first.
+        status, error = call(worker, "/voices/%2A", method="DELETE")
+        assert (status, error["error"]["code"]) == (400, "bad_request")
+
+    def test_a_speak_naming_a_path_is_refused(self, worker: RunningWorker) -> None:
+        body = json.dumps({"text": "hello", "voice": "../../etc/passwd"}).encode()
+        status, error = call(
+            worker, "/speak", method="POST", body=body, headers={"content-type": "application/json"}
+        )
+        assert (status, error["error"]["code"]) == (400, "bad_request")
+
+
+class TestPathFor:
+    def engine(self, tmp_path: Path) -> Engine:
+        built = Engine()
+        built.voice_dir = tmp_path
+        return built
+
+    def test_matches_the_stem_exactly_and_nothing_like_it(self, tmp_path: Path) -> None:
+        (tmp_path / "narrator.wav").write_bytes(b"RIFF")
+        (tmp_path / "narrator_02.wav").write_bytes(b"RIFF")
+        assert self.engine(tmp_path).path_for("narrator").name == "narrator.wav"
+        assert self.engine(tmp_path).path_for("narrator_02").name == "narrator_02.wav"
+
+    def test_does_not_follow_a_link_out_of_the_voice_directory(self, tmp_path: Path) -> None:
+        outside = tmp_path.parent / f"{tmp_path.name}-outside.wav"
+        outside.write_bytes(b"RIFF")
+        (tmp_path / "escape.wav").symlink_to(outside)
+        with pytest.raises(Exception, match='no voice "escape"'):
+            self.engine(tmp_path).path_for("escape")

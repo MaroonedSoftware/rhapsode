@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from . import encoding, streaming
-from .engine import CreateVoiceRequest
+from .engine import CreateVoiceRequest, check_voice_id
 from .errors import BadRequest, WorkerError, classify
 from .worker import Worker
 
@@ -65,7 +65,7 @@ def create_app(worker: Worker) -> Starlette:
         once to fill a list, and a buffered failure is a status rather than a broken connection.
         """
         worker.reject_if_draining()
-        voice = request.path_params["voice"]
+        voice = check_voice_id(request.path_params["voice"])
         await worker.ensure_loaded(None)
 
         native = worker.engine.native_format

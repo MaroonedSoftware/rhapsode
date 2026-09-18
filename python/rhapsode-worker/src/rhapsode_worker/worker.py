@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 from . import encoding
-from .engine import CreateVoiceRequest, Engine, SpeakRequest, Voice
+from .engine import CreateVoiceRequest, Engine, SpeakRequest, Voice, check_voice_id
 from .errors import BadRequest, Internal, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
@@ -205,10 +205,12 @@ class Worker:
     # ---------------------------------------------------------------- voices
 
     async def create_voice(self, request: CreateVoiceRequest) -> dict[str, Any]:
+        check_voice_id(request.id)
         voice: Voice = await asyncio.to_thread(self.engine.create_voice, request)
         return voice.document()
 
     async def delete_voice(self, voice_id: str) -> None:
+        check_voice_id(voice_id)
         await asyncio.to_thread(self.engine.delete_voice, voice_id)
 
     # ---------------------------------------------------------------- speaking
@@ -272,7 +274,7 @@ class Worker:
 
         return SpeakRequest(
             text=text,
-            voice=_optional_str(body, "voice"),
+            voice=_voice(body),
             variant=variant_name,
             format=fmt,
             language=language,
@@ -358,3 +360,9 @@ def _validate_params(
 
 
 __all__ = ["SUPPORTED_CONTRACTS", "Worker", "WorkerError"]
+
+
+def _voice(body: dict[str, Any]) -> str | None:
+    """The request's voice, checked as a name before an adapter turns it into a path."""
+    voice = _optional_str(body, "voice")
+    return None if voice is None else check_voice_id(voice)

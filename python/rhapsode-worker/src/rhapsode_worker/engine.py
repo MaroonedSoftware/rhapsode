@@ -8,6 +8,7 @@ item long: claim only what the loaded variant can actually perform.
 from __future__ import annotations
 
 import platform
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,24 @@ from typing import Any, ClassVar
 from .errors import BadRequest, UnknownVoice, Unsupported
 
 DEFAULT_MAX_CHARACTERS = 4096
+
+#: What a voice id may be. protocol.md § 7.
+#:
+#: A name, because an adapter makes a file of it and an SDK method finds the file again by it. Checked
+#: once here, before any adapter sees one: the Chatterbox adapter wrote `voice_dir / f"{id}{suffix}"`,
+#: so an id of `../../x` put the upload outside the voice directory, and `path_for` matched ids with
+#: a glob, so an id of `*` resolved to whichever voice sorted first and a delete of `*` removed it.
+VOICE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def check_voice_id(voice: str) -> str:
+    """The id, if it is one, and a `bad_request` naming the rule if it is not."""
+    if not VOICE_ID.fullmatch(voice):
+        raise BadRequest(
+            f'voice id "{voice}" is not a name: use letters, digits, "-" and "_", starting with a '
+            "letter or digit, at most 64 characters"
+        )
+    return voice
 
 
 @dataclass(frozen=True)
@@ -262,11 +281,13 @@ class Engine:
         """Resolve a voice id to a file, with the traversal check in one place rather than in each adapter."""
         if voice is None:
             raise UnknownVoice("this request named no voice and this engine has no default")
-        if "/" in voice or "\\" in voice or voice in {".", ".."}:
-            raise BadRequest(f'voice id "{voice}" is not a name')
+        check_voice_id(voice)
 
+        # An exact stem match rather than a glob, so no character in an id is a pattern.
         root = self.voice_dir.resolve()
-        for candidate in sorted(root.glob(f"{voice}.*")) if root.is_dir() else []:
+        for candidate in sorted(root.iterdir()) if root.is_dir() else []:
+            if candidate.stem != voice or not candidate.is_file():
+                continue
             resolved = candidate.resolve()
             if resolved.is_relative_to(root):
                 return resolved
