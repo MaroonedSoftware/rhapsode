@@ -86,7 +86,6 @@ class ChatterboxEngine(Engine):
         this engine and not about the protocol. The import is here rather than at module scope so
         that the adapter is importable, and testable, without torch.
         """
-        import torch
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
         from chatterbox.tts import ChatterboxTTS
         from chatterbox.tts_turbo import ChatterboxTurboTTS
@@ -100,7 +99,10 @@ class ChatterboxEngine(Engine):
         if build is None:
             raise Unsupported(f'no build "{variant}"; this engine has {sorted(builds)}')
 
-        self._model = build.from_pretrained(device=torch.device(self._torch_device()))
+        # A string, never a torch.device. Upstream decides whether to map a CUDA-saved checkpoint
+        # onto the CPU with `device in ["cpu", "mps"]`, which a torch.device never satisfies, so on
+        # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
+        self._model = build.from_pretrained(device=self._torch_device())
 
     def unload(self) -> None:
         """Drop the model, then ask the runtime for the memory back.

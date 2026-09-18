@@ -19,3 +19,17 @@ Then in `rhapsode.config.json`:
 ```
 
 The weights are MIT and commercially usable, which the catalog says before you install anything.
+
+## What it costs to install
+
+Measured on an Apple Silicon Mac (MPS), September 2026:
+
+- The virtualenv, torch included, is 1.5 GB.
+- The weights come from Hugging Face the first time each variant loads, and land in
+  `~/.cache/huggingface`. `turbo` is 3.8 GB, and all three variants together are 9.7 GB.
+- Loading `turbo` once it is cached takes about 10 s. A first `/speak` through the core (spawn, load,
+  speak) took 17 s, and a warm one about 1 s for 2.4 s of audio.
+
+Apple Silicon works through MPS with no configuration. The residency figures in the protocol (memory
+stranded by an OOM, the share an unload reclaims) were measured on CUDA and are not verified on
+unified memory.

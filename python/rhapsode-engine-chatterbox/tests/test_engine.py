@@ -37,6 +37,14 @@ class TestLoading:
             built.load(name)
             assert chatterbox[name].name == name
 
+    def test_the_device_reaches_upstream_as_a_string(self, chatterbox, tmp_path: Path) -> None:
+        # Upstream picks its checkpoint map_location with `device in ["cpu", "mps"]`. A torch.device
+        # fails that comparison, and on Apple Silicon the load died deserializing onto CUDA.
+        built = engine(tmp_path)
+        built.device = Device(type="mps", name="test")
+        built.load("turbo")
+        assert chatterbox["turbo"].device == "mps"
+
     def test_a_build_this_engine_does_not_have_is_refused(self, chatterbox, tmp_path: Path) -> None:
         with pytest.raises(Unsupported, match="no build"):
             engine(tmp_path).load("enormous")

@@ -18,6 +18,10 @@ dependencies = [
     # its own virtualenv. The repository's shared dev venv installs this package with --no-deps, so
     # the adapter's own logic is under test without any of that.
     "chatterbox-tts>=0.1.7",
+    # Upstream's watermarker (resemble-perth 1.0.1) imports pkg_resources, which setuptools 81
+    # removed. The import failure is swallowed, the watermarker becomes None, and every build then
+    # fails to load with "'NoneType' object is not callable". A fresh venv got setuptools 84.
+    "setuptools<81",
 ]
 
 [tool.hatch.build.targets.wheel]
