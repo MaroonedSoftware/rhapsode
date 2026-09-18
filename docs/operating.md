@@ -217,6 +217,27 @@ pnpm wizard install kokoro --server http://127.0.0.1:8081/api
 block in `/config/rhapsode.config.json`, not in the container's environment, because a worker's
 environment is constructed rather than inherited.
 
+### GPUs
+
+```bash
+docker compose -f compose.yaml -f compose.gpu.yaml up -d
+```
+
+The image has no CUDA of its own and needs none: the torch wheels Chatterbox installs from PyPI
+carry the CUDA runtime. What cannot come with them is the driver, which has to match the host's
+kernel module. So the host needs the NVIDIA driver and the NVIDIA Container Toolkit, and the
+container has to ask for the GPU, which is what `compose.gpu.yaml` adds. The toolkit then mounts the
+driver in for every process in the container, workers included, whatever their constructed
+environment leaves out.
+
+On unraid, with the Nvidia-Driver plugin installed, the server container asks with
+`--runtime=nvidia` in Extra Parameters and a `NVIDIA_VISIBLE_DEVICES` variable, set to `all` or to a
+GPU's UUID from the plugin's page. The image already sets the `NVIDIA_DRIVER_CAPABILITIES` that
+style also needs, because it is not a CUDA image and nothing else would.
+
+Either way, `GET /engines/chatterbox/capabilities` says `"device": {"type": "cuda", ...}` once it
+worked. `cpu` there means the container cannot see the GPU, and Chatterbox will run, slowly, anyway.
+
 Docker's default ten-second stop kills a worker before the core has drained it. Compose waits 30
 seconds; with `docker run`, pass `--stop-timeout 30`.
 

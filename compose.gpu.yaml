@@ -1,0 +1,15 @@
+# Every NVIDIA GPU on the host, for the server. docs/operating.md § Docker, GPUs.
+#
+#   docker compose -f compose.yaml -f compose.gpu.yaml up -d
+#
+# The host needs the NVIDIA driver and the NVIDIA Container Toolkit. The image needs nothing more:
+# PyPI's torch wheels carry their own CUDA, and the toolkit mounts in the driver they talk to.
+services:
+    server:
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
