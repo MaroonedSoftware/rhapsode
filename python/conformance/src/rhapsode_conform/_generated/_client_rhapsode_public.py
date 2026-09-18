@@ -5,7 +5,7 @@ from urllib.parse import quote
 from typing import Any, Literal, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
-from ._models_rhapsode_types import Capabilities, CoreHealth, CreateVoiceForm, EngineSpeakRequest, EngineSummary, ErrorBody, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
 
 
 class EngineCapabilities200Response(TypedDict):
@@ -114,8 +114,128 @@ class Speak503Response(TypedDict):
     data: ErrorBody
 
 
+class UninstallEngine204Response(TypedDict):
+    status: Literal[204]
+
+
+class UninstallEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UninstallEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UninstallEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallEngine202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: InstallJob
+
+
+class InstallEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class PullEngine202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: InstallJob
+
+
+class PullEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class PullEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class PullEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallJobs200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: list[InstallJob]
+
+
+class InstallJobs403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallJob200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: InstallJob
+
+
+class InstallJob403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallJob404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallJobEvents200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["text/event-stream"]
+    data: str
+
+
+class InstallJobEvents403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class InstallJobEvents404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 _ENGINES_RESPONSE: TypeAdapter[list[EngineSummary]] = TypeAdapter(list[EngineSummary])
 _ENGINE_VOICES_RESPONSE_200: TypeAdapter[list[Voice]] = TypeAdapter(list[Voice])
+_CATALOG_RESPONSE: TypeAdapter[list[CatalogEntry]] = TypeAdapter(list[CatalogEntry])
+_INSTALL_JOBS_RESPONSE_200: TypeAdapter[list[InstallJob]] = TypeAdapter(list[InstallJob])
 
 
 class RhapsodePublicClient(BaseClient):
@@ -192,3 +312,68 @@ class RhapsodePublicClient(BaseClient):
         if _content_type == "audio/l16":
             return { "status": 200, "content_type": "audio/l16", "data": result }
         return { "status": 200, "content_type": "audio/wav", "data": result }
+
+    async def catalog(self) -> list[CatalogEntry]:
+        """
+        Open to every caller: it only reads, and its licences are what § 4 promises before install.
+        """
+        result = await self._fetch("/catalog", method="GET")
+        return _CATALOG_RESPONSE.validate_python(result)
+
+    async def uninstall_engine(self, engine: str) -> UninstallEngine204Response | UninstallEngine403Response | UninstallEngine404Response | UninstallEngine409Response:
+        """
+        Only an engine this API installed. One the operator configured is theirs to remove.
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(403, 404, 409))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 204 }
+
+    async def install_engine(self, engine: str) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
+
+    async def pull_engine(self, engine: str, body: PullRequest) -> PullEngine202Response | PullEngine403Response | PullEngine404Response | PullEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/pull", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(403, 404, 409))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
+
+    async def install_jobs(self) -> InstallJobs200Response | InstallJobs403Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full("/installs", method="GET", response_kind="auto", expect_statuses=(403,))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": _INSTALL_JOBS_RESPONSE_200.validate_python(result) }
+
+    async def install_job(self, job: str) -> InstallJob200Response | InstallJob403Response | InstallJob404Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(str(job), safe='')}", method="GET", response_kind="auto", expect_statuses=(403, 404))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": InstallJob.model_validate(result) }
+
+    async def install_job_events(self, job: str) -> InstallJobEvents200Response | InstallJobEvents403Response | InstallJobEvents404Response:
+        """
+        Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(str(job), safe='')}/events", method="GET", response_kind="auto", expect_statuses=(403, 404))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "text/event-stream", "data": result }

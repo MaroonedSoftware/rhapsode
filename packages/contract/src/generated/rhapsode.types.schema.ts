@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 const _ZodBinary = z.custom<Buffer>(val => Buffer.isBuffer(val), { error: 'Must be binary data' });
+type _JsonValue = string | number | boolean | null | _JsonValue[] | { [key: string]: _JsonValue };
+const _ZodJson: z.ZodType<_JsonValue> = z.lazy(() =>
+    z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(_ZodJson), z.record(z.string(), _ZodJson)]),
+);
 
 /**
  * generated from [Dial](../../../../contracts/rhapsode.types.ck#L15)
@@ -143,7 +147,18 @@ export type LoadRequest = z.infer<typeof LoadRequest>;
  */
 export const ErrorDetail = z.looseObject({
     code: z
-        .enum(['bad_request', 'unknown_engine', 'unknown_voice', 'unsupported', 'model_unavailable', 'oom', 'overloaded', 'internal'])
+        .enum([
+            'bad_request',
+            'unknown_engine',
+            'unknown_voice',
+            'unsupported',
+            'model_unavailable',
+            'oom',
+            'overloaded',
+            'internal',
+            'forbidden',
+            'conflict',
+        ])
         .describe(
             'A closed set that § 9 grows at the end. A reader that meets a code from a newer contract must\nnot lose the envelope over it: `message` and `retryable` are the two fields that decide what\nthe caller does next, and they parse fine. The core falls back to `internal` for the code and\nkeeps the rest, rather than reporting a parse failure in place of the real error.',
         ),
@@ -174,6 +189,27 @@ export const ResidencySummary = z.looseObject({
     blockedBy: z.string().optional().describe('Named, because a wait at maxResidentModels 1 looks exactly like a hang.'),
 });
 export type ResidencySummary = z.infer<typeof ResidencySummary>;
+
+/**
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L223)
+ */
+export const PullRequest = z.strictObject({
+    variant: z.string().optional().describe("Absent means the engine's default variant."),
+});
+export type PullRequest = z.infer<typeof PullRequest>;
+
+/**
+ * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
+ * declared here so a client can parse it without depending on ServerKit.
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L229)
+ */
+export const FeedProgress = z.looseObject({
+    phase: z.string().describe("The job's step."),
+    index: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
+    total: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
+    status: z.enum(['running', 'done', 'failed']),
+});
+export type FeedProgress = z.infer<typeof FeedProgress>;
 
 /**
  * What one build of an engine can perform. Capabilities depend on which build is loaded, which is
@@ -209,6 +245,24 @@ export const EngineSummary = z.looseObject({
 export type EngineSummary = z.infer<typeof EngineSummary>;
 
 /**
+ * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
+ * both licences, because the weights licence is only worth reading before the install.
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L200)
+ */
+export const CatalogEntry = z.looseObject({
+    id: z.string(),
+    displayName: z.string(),
+    license: License,
+    package: z.string().describe('The Python distribution the installer installs.'),
+    defaultVariant: z.string().optional(),
+    installed: z.enum(['no', 'installing', 'yes']),
+    managed: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .describe('Installed through the API, so removable by it.'),
+});
+export type CatalogEntry = z.infer<typeof CatalogEntry>;
+
+/**
  * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L127)
  */
 export const EngineSpeakRequest = SpeakRequest.extend({
@@ -223,6 +277,39 @@ export const ErrorBody = z.looseObject({
     error: ErrorDetail,
 });
 export type ErrorBody = z.infer<typeof ErrorBody>;
+
+/**
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L210)
+ */
+export const InstallJob = z.looseObject({
+    id: z.string(),
+    engine: z.string(),
+    kind: z.enum(['install', 'pull']),
+    variant: z.string().optional().describe('For a pull: the variant being fetched.'),
+    state: z.enum(['queued', 'running', 'succeeded', 'failed']),
+    step: z.enum(['venv', 'packages', 'verify', 'register', 'weights']).optional(),
+    createdAt: z.string().describe('ISO 8601, UTC.'),
+    startedAt: z.string().optional(),
+    finishedAt: z.string().optional(),
+    error: ErrorDetail.optional().describe('Present exactly when `state` is `failed`.'),
+});
+export type InstallJob = z.infer<typeof InstallJob>;
+
+/**
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L236)
+ */
+export const FeedEvent = z.looseObject({
+    id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
+    ts: z.string(),
+    source: z.string(),
+    level: z.enum(['debug', 'info', 'warn', 'error']),
+    kind: z.enum(['progress', 'status', 'log', 'error', 'heartbeat']),
+    message: z.string().optional(),
+    correlationId: z.string().optional().describe('The job id.'),
+    progress: FeedProgress.optional(),
+    data: _ZodJson.optional(),
+});
+export type FeedEvent = z.infer<typeof FeedEvent>;
 
 /**
  * The resident build, and everything true only while it is resident. Absent from the capability

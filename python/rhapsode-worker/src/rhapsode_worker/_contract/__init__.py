@@ -6,6 +6,7 @@
 
 from ._models_rhapsode_types import (
     Capabilities,
+    CatalogEntry,
     Cloning,
     CoreHealth,
     CreateVoiceForm,
@@ -17,9 +18,13 @@ from ._models_rhapsode_types import (
     EngineSummary,
     ErrorBody,
     ErrorDetail,
+    FeedEvent,
+    FeedProgress,
+    InstallJob,
     License,
     LoadRequest,
     NativeFormat,
+    PullRequest,
     ResidencySummary,
     SpeakRequest,
     Streaming,
@@ -30,6 +35,7 @@ from ._models_rhapsode_types import (
 
 __all__ = [
     "Capabilities",
+    "CatalogEntry",
     "Cloning",
     "CoreHealth",
     "CreateVoiceForm",
@@ -41,9 +47,13 @@ __all__ = [
     "EngineSummary",
     "ErrorBody",
     "ErrorDetail",
+    "FeedEvent",
+    "FeedProgress",
+    "InstallJob",
     "License",
     "LoadRequest",
     "NativeFormat",
+    "PullRequest",
     "ResidencySummary",
     "SpeakRequest",
     "Streaming",

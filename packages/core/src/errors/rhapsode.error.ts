@@ -10,6 +10,8 @@ export const TAXONOMY = {
     oom: { status: 503, retryable: true },
     overloaded: { status: 429, retryable: true },
     internal: { status: 500, retryable: false },
+    forbidden: { status: 403, retryable: false },
+    conflict: { status: 409, retryable: false },
 } as const;
 
 export type ErrorCode = keyof typeof TAXONOMY;

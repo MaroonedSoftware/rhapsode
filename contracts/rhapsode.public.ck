@@ -128,3 +128,108 @@ operation /speak: {
         }
     }
 }
+
+############################################################################################
+# Managing engines. protocol.md § 10. Everything below except /catalog answers loopback callers,
+# or a bearer token when one is configured, and nobody else.
+############################################################################################
+
+operation /catalog: {
+    get: {
+        # Open to every caller: it only reads, and its licences are what § 4 promises before install.
+        sdk: catalog
+        response: {
+            200: { application/json: array(CatalogEntry) }
+        }
+    }
+}
+
+operation /engines/{engine}: {
+    params: {
+        engine: string
+    }
+    delete: {
+        # Only an engine this API installed. One the operator configured is theirs to remove.
+        sdk: uninstallEngine
+        response: {
+            204:
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /engines/{engine}/install: {
+    params: {
+        engine: string
+    }
+    post: {
+        sdk: installEngine
+        response: {
+            202: { application/json: InstallJob }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /engines/{engine}/pull: {
+    params: {
+        engine: string
+    }
+    post: {
+        sdk: pullEngine
+        request: {
+            application/json: PullRequest
+        }
+        response: {
+            202: { application/json: InstallJob }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /installs: {
+    get: {
+        sdk: installJobs
+        response: {
+            200: { application/json: array(InstallJob) }
+            403: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /installs/{job}: {
+    params: {
+        job: string
+    }
+    get: {
+        sdk: installJob
+        response: {
+            200: { application/json: InstallJob }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /installs/{job}/events: {
+    params: {
+        job: string
+    }
+    get: {
+        # Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit
+        # cannot express a stream, so this declares the route and the shapes and nothing more.
+        sdk: installJobEvents
+        response: {
+            200: { text/event-stream: string }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+        }
+    }
+}
+

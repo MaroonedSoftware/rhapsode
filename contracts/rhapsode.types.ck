@@ -145,7 +145,7 @@ contract mode(loose) ErrorDetail: {
     # not lose the envelope over it: `message` and `retryable` are the two fields that decide what
     # the caller does next, and they parse fine. The core falls back to `internal` for the code and
     # keeps the rest, rather than reporting a parse failure in place of the real error.
-    code: enum(bad_request, unknown_engine, unknown_voice, unsupported, model_unavailable, oom, overloaded, internal)
+    code: enum(bad_request, unknown_engine, unknown_voice, unsupported, model_unavailable, oom, overloaded, internal, forbidden, conflict)
     message: string
     retryable: boolean
 }
@@ -189,4 +189,58 @@ contract mode(loose) CoreHealth: {
     status: enum(ok, degraded)
     engines: array(EngineSummary)
     residency: ResidencySummary
+}
+
+############################################################################################
+# Managing engines. protocol.md § 10.
+############################################################################################
+
+# What exists, installed or not. `/engines` is what this box has; this is what it could have, with
+# both licences, because the weights licence is only worth reading before the install.
+contract mode(loose) CatalogEntry: {
+    id: string
+    displayName: string
+    license: License
+    package: string                             # The Python distribution the installer installs.
+    defaultVariant?: string
+    installed: enum(no, installing, yes)
+    managed: boolean                            # Installed through the API, so removable by it.
+}
+
+contract mode(loose) InstallJob: {
+    id: string
+    engine: string
+    kind: enum(install, pull)
+    variant?: string                            # For a pull: the variant being fetched.
+    state: enum(queued, running, succeeded, failed)
+    step?: enum(venv, packages, verify, register, weights)
+    createdAt: string                           # ISO 8601, UTC.
+    startedAt?: string
+    finishedAt?: string
+    error?: ErrorDetail                         # Present exactly when `state` is `failed`.
+}
+
+contract PullRequest: {
+    variant?: string                            # Absent means the engine's default variant.
+}
+
+# One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
+# declared here so a client can parse it without depending on ServerKit.
+contract mode(loose) FeedProgress: {
+    phase: string                               # The job's step.
+    index: int
+    total: int
+    status: enum(running, done, failed)
+}
+
+contract mode(loose) FeedEvent: {
+    id: int                                     # The Last-Event-ID resume key.
+    ts: string
+    source: string
+    level: enum(debug, info, warn, error)
+    kind: enum(progress, status, log, error, heartbeat)
+    message?: string
+    correlationId?: string                      # The job id.
+    progress?: FeedProgress
+    data?: json
 }

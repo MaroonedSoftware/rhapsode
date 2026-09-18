@@ -227,6 +227,199 @@ paths:
                         'application/json':
                             schema:
                                 '$ref': '#/components/schemas/ErrorBody'
+    '/catalog':
+        get:
+            operationId: catalog
+            description: 'Open to every caller: it only reads, and its licences are what § 4 promises before install.'
+            responses:
+                '200':
+                    description: 'Successful response'
+                    content:
+                        'application/json':
+                            schema:
+                                type: array
+                                items:
+                                    '$ref': '#/components/schemas/CatalogEntry'
+    '/engines/{engine}':
+        delete:
+            operationId: uninstallEngine
+            description: 'Only an engine this API installed. One the operator configured is theirs to remove.'
+            parameters:
+                - name: engine
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '204':
+                    description: 'No content'
+                '403':
+                    description: Forbidden
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '404':
+                    description: 'Not found'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '409':
+                    description: Conflict
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+    '/engines/{engine}/install':
+        post:
+            operationId: installEngine
+            parameters:
+                - name: engine
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '202':
+                    description: 'Response 202'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/InstallJob'
+                '403':
+                    description: Forbidden
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '404':
+                    description: 'Not found'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '409':
+                    description: Conflict
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+    '/engines/{engine}/pull':
+        post:
+            operationId: pullEngine
+            parameters:
+                - name: engine
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: true
+                content:
+                    'application/json':
+                        schema:
+                            '$ref': '#/components/schemas/PullRequest'
+            responses:
+                '202':
+                    description: 'Response 202'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/InstallJob'
+                '403':
+                    description: Forbidden
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '404':
+                    description: 'Not found'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '409':
+                    description: Conflict
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+    '/installs':
+        get:
+            operationId: installJobs
+            responses:
+                '200':
+                    description: 'Successful response'
+                    content:
+                        'application/json':
+                            schema:
+                                type: array
+                                items:
+                                    '$ref': '#/components/schemas/InstallJob'
+                '403':
+                    description: Forbidden
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+    '/installs/{job}':
+        get:
+            operationId: installJob
+            parameters:
+                - name: job
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: 'Successful response'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/InstallJob'
+                '403':
+                    description: Forbidden
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '404':
+                    description: 'Not found'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+    '/installs/{job}/events':
+        get:
+            operationId: installJobEvents
+            description: "Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit"
+            parameters:
+                - name: job
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '200':
+                    description: 'Successful response'
+                    content:
+                        'text/event-stream':
+                            schema:
+                                type: string
+                '403':
+                    description: Forbidden
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
+                '404':
+                    description: 'Not found'
+                    content:
+                        'application/json':
+                            schema:
+                                '$ref': '#/components/schemas/ErrorBody'
     '/capabilities':
         get:
             operationId: workerCapabilities
@@ -592,6 +785,8 @@ components:
                         - oom
                         - overloaded
                         - internal
+                        - forbidden
+                        - conflict
                     description: "A closed set that § 9 grows at the end. A reader that meets a code from a newer contract must\nnot lose the envelope over it: `message` and `retryable` are the two fields that decide what\nthe caller does next, and they parse fine. The core falls back to `internal` for the code and\nkeeps the rest, rather than reporting a parse failure in place of the real error."
                 message:
                     type: string
@@ -671,3 +866,61 @@ components:
                 residency:
                     '$ref': '#/components/schemas/ResidencySummary'
             required: [contract, status, engines, residency]
+        CatalogEntry:
+            type: object
+            properties:
+                id:
+                    type: string
+                displayName:
+                    type: string
+                license:
+                    '$ref': '#/components/schemas/License'
+                package:
+                    type: string
+                    description: 'The Python distribution the installer installs.'
+                defaultVariant:
+                    type: string
+                installed:
+                    type: string
+                    enum: ['no', installing, 'yes']
+                managed:
+                    type: boolean
+                    description: 'Installed through the API, so removable by it.'
+            required: [id, displayName, license, package, installed, managed]
+            description: "What exists, installed or not. `/engines` is what this box has; this is what it could have, with\nboth licences, because the weights licence is only worth reading before the install."
+        InstallJob:
+            type: object
+            properties:
+                id:
+                    type: string
+                engine:
+                    type: string
+                kind:
+                    type: string
+                    enum: [install, pull]
+                variant:
+                    type: string
+                    description: 'For a pull: the variant being fetched.'
+                state:
+                    type: string
+                    enum: [queued, running, succeeded, failed]
+                step:
+                    type: string
+                    enum: [venv, packages, verify, register, weights]
+                createdAt:
+                    type: string
+                    description: 'ISO 8601, UTC.'
+                startedAt:
+                    type: string
+                finishedAt:
+                    type: string
+                error:
+                    '$ref': '#/components/schemas/ErrorDetail'
+                    description: 'Present exactly when `state` is `failed`.'
+            required: [id, engine, kind, state, createdAt]
+        PullRequest:
+            type: object
+            properties:
+                variant:
+                    type: string
+                    description: "Absent means the engine's default variant."

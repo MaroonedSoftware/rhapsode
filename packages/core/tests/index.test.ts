@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { ErrorDetail } from '@rhapsode/contract';
+
 import { CATALOG, DEFAULTS, EngineRegistry, RhapsodeError, TAXONOMY } from '../src/index.js';
 
 describe('the core barrel', () => {
@@ -20,6 +22,13 @@ describe('the error taxonomy', () => {
         expect(TAXONOMY.model_unavailable).toEqual({ status: 503, retryable: true });
         expect(TAXONOMY.overloaded).toEqual({ status: 429, retryable: true });
         expect(TAXONOMY.unknown_engine).toEqual({ status: 404, retryable: false });
+        expect(TAXONOMY.forbidden).toEqual({ status: 403, retryable: false });
+        expect(TAXONOMY.conflict).toEqual({ status: 409, retryable: false });
+    });
+
+    it('has exactly the codes the contract declares', () => {
+        // Two lists of the same set drift the day somebody grows one. § 9 grows it at the end.
+        expect(Object.keys(TAXONOMY)).toEqual(ErrorDetail.shape.code.options);
     });
 
     it('names what is installed when an engine is not', () => {

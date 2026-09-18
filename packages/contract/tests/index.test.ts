@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { Capabilities, CONTRACT_MAJOR, CUES, DELIVERIES, SpeakRequest, Variant } from '../src/index.js';
+import {
+    Capabilities,
+    CatalogEntry,
+    CONTRACT_MAJOR,
+    CUES,
+    DELIVERIES,
+    ErrorDetail,
+    FeedEvent,
+    InstallJob,
+    SpeakRequest,
+    Variant,
+} from '../src/index.js';
 
 describe('the contract', () => {
     it('is major 1', () => {
@@ -45,5 +56,53 @@ describe('the generated schemas', () => {
 
     it('refuses an empty text', () => {
         expect(() => SpeakRequest.parse({ text: '' })).toThrow();
+    });
+});
+
+describe('the management shapes', () => {
+    it('parse a catalog entry for an engine this box does not have', () => {
+        const parsed = CatalogEntry.parse({
+            id: 'chatterbox',
+            displayName: 'Chatterbox',
+            license: { code: 'MIT', weights: 'MIT', weightsCommercialUse: true },
+            package: 'rhapsode-engine-chatterbox',
+            defaultVariant: 'turbo',
+            installed: 'no',
+            managed: false,
+        });
+
+        expect(parsed.installed).toBe('no');
+    });
+
+    it('parse a failed job, whose error is an ordinary envelope body', () => {
+        const parsed = InstallJob.parse({
+            id: 'j1',
+            engine: 'chatterbox',
+            kind: 'install',
+            state: 'failed',
+            step: 'packages',
+            createdAt: '2026-09-18T14:02:11.000Z',
+            error: { code: 'internal', message: 'pip exited 1', retryable: false },
+        });
+
+        expect(parsed.error?.code).toBe('internal');
+    });
+
+    it('parse a feed event as ServerKit frames it', () => {
+        const parsed = FeedEvent.parse({
+            id: 7,
+            ts: '2026-09-18T14:02:12.000Z',
+            source: 'install',
+            level: 'info',
+            kind: 'progress',
+            correlationId: 'j1',
+            progress: { phase: 'packages', index: 2, total: 4, status: 'running' },
+        });
+
+        expect(parsed.progress?.phase).toBe('packages');
+    });
+
+    it('carry the two management error codes at the end of the taxonomy', () => {
+        expect(ErrorDetail.shape.code.options.slice(-2)).toEqual(['forbidden', 'conflict']);
     });
 });
