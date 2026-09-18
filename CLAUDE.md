@@ -21,6 +21,8 @@ Two languages, one protocol.
 
 - `packages/sdk` is a typed client for the public API, generated from the same contracts and
   committed. It depends on nothing, for the same reason `packages/contract` depends only on zod.
+- `apps/web` is a web page for installing engines, a client of the management API and nothing the
+  wizard lacks. Its rules are in [`apps/web/CLAUDE.md`](apps/web/CLAUDE.md).
 
 Dependency direction is one-way: `apps/server` → `packages/core` → `packages/contract`. The SDK
 depends on the core only to test against it.

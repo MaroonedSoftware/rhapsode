@@ -103,6 +103,42 @@ offer to pull) downloads them ahead of time, without loading anything.
 Uninstalling removes the virtualenv and leaves downloaded weights where the engine put them.
 Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants.
 
+## The web page
+
+`apps/web` is a page for the same routes: the catalog with both licences, and install, pull and
+uninstall with each job's progress as it happens. It is a static app, and it talks to the core
+through a proxy on its own origin at `/api`, so the core needs no CORS.
+
+```bash
+pnpm --filter @rhapsode/web dev        # http://localhost:8081, proxying /api to 127.0.0.1:8080
+```
+
+`RHAPSODE_API_TARGET` points the dev server at a core elsewhere. To serve the built page, build it
+with `pnpm build` and put `apps/web/dist` behind anything that serves files and proxies `/api`. With
+nginx:
+
+```nginx
+location ^~ /api/ {
+    proxy_pass http://127.0.0.1:8080/;
+    # The core believes this only from a proxy on its own machine, and only ever to trust a caller
+    # less. Without it, everyone who can reach this page would reach the install routes as local.
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # An install's events stream stays open while it runs.
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+}
+location / {
+    root /srv/rhapsode-web;
+    try_files $uri /index.html;
+}
+```
+
+The install routes answer the machine the core runs on, so a page opened from another machine shows
+the catalog and says installing is only for this one. That is deliberate: the page has no sign-in,
+and those routes run pip. If you serve the page under a name of your own, such as
+`https://rhapsode.home.arpa`, add that origin to `management.origins`, or the core will refuse the
+page's requests as coming from a site it does not know.
+
 ## What to watch
 
 `GET /health` answers while every worker is down and never blocks on one.

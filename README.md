@@ -8,8 +8,8 @@ that describes honestly what each engine can actually do.
 > **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
 > a worker and streams `/speak` through it works end to end, engines install through the API, and
 > the Chatterbox adapter passes the conformance suite against real weights on Apple Silicon. What is
-> not here yet: Chatterbox measured on a CUDA card, voice cloning through the core, a web page over
-> the install API, and the OpenAI and Wyoming shims.
+> not here yet: Chatterbox measured on a CUDA card, voice cloning through the core, and the OpenAI
+> and Wyoming shims.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -144,9 +144,16 @@ pnpm wizard install chatterbox
 ```
 
 It shows both licences and asks, has the server build the engine its own virtualenv, and offers to
-download the `turbo` weights (3.8 GB) so the first request does not wait on them. The wizard is only
-a client: the same thing is `POST /engines/chatterbox/install` and `POST /engines/chatterbox/pull`,
-which answer the machine the server runs on and nobody else unless `management.token` is set. See
+download the `turbo` weights (3.8 GB) so the first request does not wait on them. Or do the same
+from a web page:
+
+```bash
+pnpm --filter @rhapsode/web dev
+```
+
+and open http://localhost:8081. The wizard and the page are both only clients: the same thing is
+`POST /engines/chatterbox/install` and `POST /engines/chatterbox/pull`, which answer the machine the
+server runs on and nobody else unless `management.token` is set. See
 [`docs/protocol.md`](docs/protocol.md) § 10 and [`docs/operating.md`](docs/operating.md).
 
 [`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) is the engine the capability
