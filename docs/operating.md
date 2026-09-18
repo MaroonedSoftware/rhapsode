@@ -142,6 +142,14 @@ and those routes run pip. If you serve the page under a name of your own, such a
 `https://rhapsode.home.arpa`, add that origin to `management.origins`, or the core will refuse the
 page's requests as coming from a site it does not know.
 
+## Voices
+
+A cloned voice is a reference clip in the engine's voice store, `<workers.voiceDir>/<engine>`
+(`~/.rhapsode/voices/<engine>` by default), beside a `.labels.json` the SDK keeps. The core keeps
+no copy and no list of its own. Back that directory up if the voices matter; deleting a clip there
+deletes the voice. Cloning and deleting answer this machine only, like installing, and a clip is
+limited to 25 MB. `docs/protocol.md` § 7 has the rules.
+
 ## What to watch
 
 `GET /health` answers while every worker is down and never blocks on one.

@@ -6,9 +6,20 @@ rules, so that somebody who knows one knows the other.
 
 ## What it is for
 
-A page over `docs/protocol.md` § 10: the catalog, and install, pull and uninstall with each job
-followed as it happens. It holds no logic the wizard lacks and gets no route of its own. If the
-page needs something the API does not offer, the API grows it, in the spec first.
+Two pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
+uninstall with each job followed as it happens. **Try it** (`/try`) is § 6 and § 7: say a line with
+an installed engine, offering only what the chosen variant's capability document claims, and list,
+preview, clone and delete its voices. The page holds no logic the API lacks and gets no route of
+its own. If the page needs something the API does not offer, the API grows it, in the spec first.
+
+**The capability document decides what is offered.** Cues, deliveries, dials and languages come
+from the chosen variant and nothing is hardcoded per engine. A new engine appears correctly with
+no change here, which is the property § 4 is for. Speak asks for `stream: false`: the page plays a
+finished file, and § 6 says a buffered request reports a failure strictly better.
+
+**A preview is played from the `previewUrl` the core gave**, prefixed with `/api`, never a URL the
+page builds, with the voice's `spec` in the query so a re-recorded voice is not served from the
+browser's cache.
 
 ## Design language
 

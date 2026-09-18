@@ -6,10 +6,10 @@ Point it at a box with a GPU, install the engines you want, and every client tal
 that describes honestly what each engine can actually do.
 
 > **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
-> a worker and streams `/speak` through it works end to end, engines install through the API, and
-> the Chatterbox adapter passes the conformance suite against real weights on Apple Silicon. What is
-> not here yet: Chatterbox measured on a CUDA card, voice cloning through the core, and the OpenAI
-> and Wyoming shims.
+> a worker and streams `/speak` through it works end to end, engines install through the API, voices
+> clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,
+> against real weights on Apple Silicon. What is not here yet: Chatterbox measured on a CUDA card,
+> and the OpenAI and Wyoming shims.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -118,8 +118,10 @@ pnpm wizard setup
 pnpm dev
 ```
 
-`pnpm dev` starts the server on http://localhost:8080 and the web page on http://localhost:8081, and
-restarts the server when its source, the core's, or `rhapsode.config.json` changes. To run the
+`pnpm dev` starts the server on http://localhost:8080 and the web page on http://localhost:8081,
+where you can install engines, and under **Try it** hear one, choose its cues, delivery and dials
+from what its capability document says it can do, and clone a voice from a clip. It restarts the
+server when its source, the core's, or `rhapsode.config.json` changes. To run the
 built server alone, as you would in production, `node apps/server/dist/main.js`.
 
 `pnpm wizard setup` builds the Python venv, builds the TypeScript packages, writes a
