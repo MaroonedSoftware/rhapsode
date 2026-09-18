@@ -58,3 +58,37 @@ export function useSpeak() {
         },
     });
 }
+
+export interface CloneRequest {
+    id: string;
+    label?: string;
+    reference: File;
+}
+
+/**
+ * A clone, uploaded as the browser's own multipart form. The core streams it to the worker and
+ * keeps no copy. A management route: a page from another machine is refused. § 7.
+ */
+export function useCloneVoice(engine: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, label, reference }: CloneRequest) => {
+            const form = new FormData();
+            form.set('id', id);
+            if (label !== undefined && label !== '') form.set('label', label);
+            form.set('reference', reference, reference.name);
+            return unwrap<Voice>(await sdk.public.createVoice(engine, form));
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.engine.voices(engine) }),
+    });
+}
+
+export function useDeleteVoice(engine: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (voice: string) => {
+            unwrap(await sdk.public.deleteVoice(engine, voice));
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.engine.voices(engine) }),
+    });
+}

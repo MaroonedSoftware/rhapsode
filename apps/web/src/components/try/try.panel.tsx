@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, Group, NumberInput, SegmentedControl, Select, SimpleGrid, Slider, Stack, Text, Textarea, Title } from '@mantine/core';
 import { IconPlayerPlay } from '@tabler/icons-react';
-import type { Variant } from '@rhapsode/sdk';
+import type { Variant, Voice } from '@rhapsode/sdk';
 
 import { useCapabilities, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
 import { PageSkeleton } from '../shared/page.skeleton';
+import { VoicesCard } from './voices.card';
 
 const SAMPLE = 'Right, that was The Verve Pipe. [laugh] Nobody warned me about that intro.';
 
@@ -36,7 +37,8 @@ export function TryPanel({ engine, defaultVariant }: TryPanelProps) {
             engine={engine}
             variants={variants}
             initial={initial}
-            voices={voices.data?.map(voice => ({ value: voice.id, label: voice.label })) ?? []}
+            voices={voices.data ?? []}
+            referenceSeconds={capabilities.data.current?.cloning.referenceSeconds}
         />
     );
 }
@@ -45,10 +47,11 @@ interface ControlsProps {
     engine: string;
     variants: Record<string, Variant>;
     initial: string;
-    voices: { value: string; label: string }[];
+    voices: Voice[];
+    referenceSeconds?: number[];
 }
 
-function Controls({ engine, variants, initial, voices }: ControlsProps) {
+function Controls({ engine, variants, initial, voices, referenceSeconds }: ControlsProps) {
     const speak = useSpeak();
     const [variant, setVariant] = useState(initial);
     const [voice, setVoice] = useState<string | undefined>(undefined);
@@ -118,131 +121,136 @@ function Controls({ engine, variants, initial, voices }: ControlsProps) {
     };
 
     return (
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-            <Card>
-                <Stack gap="md">
-                    <Select
-                        label="Variant"
-                        description="Which build of the engine. Each performs different things."
-                        data={Object.keys(variants)}
-                        value={variant}
-                        onChange={value => value && changeVariant(value)}
-                        allowDeselect={false}
-                    />
-                    <Select
-                        label="Voice"
-                        placeholder="The engine's default"
-                        data={voices}
-                        value={voice ?? null}
-                        onChange={value => setVoice(value ?? undefined)}
-                        clearable
-                    />
-                    {languages.length > 1 ? (
+        <Stack gap="lg">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+                <Card>
+                    <Stack gap="md">
                         <Select
-                            label="Language"
-                            data={languages}
-                            value={language ?? languages[0]}
-                            onChange={value => setLanguage(value ?? undefined)}
+                            label="Variant"
+                            description="Which build of the engine. Each performs different things."
+                            data={Object.keys(variants)}
+                            value={variant}
+                            onChange={value => value && changeVariant(value)}
+                            allowDeselect={false}
                         />
-                    ) : undefined}
-                    {claims.deliveries.length > 0 ? (
-                        <Stack gap={4}>
-                            <Text size="sm" fw={500}>
-                                Delivery
-                            </Text>
-                            <SegmentedControl
-                                data={[{ value: '', label: 'Ordinary' }, ...claims.deliveries.map(entry => ({ value: entry, label: entry }))]}
-                                value={delivery}
-                                onChange={setDelivery}
+                        <Select
+                            label="Voice"
+                            placeholder="The engine's default"
+                            data={voices.map(entry => ({ value: entry.id, label: entry.label }))}
+                            value={voice !== undefined && voices.some(entry => entry.id === voice) ? voice : null}
+                            onChange={value => setVoice(value ?? undefined)}
+                            clearable
+                        />
+                        {languages.length > 1 ? (
+                            <Select
+                                label="Language"
+                                data={languages}
+                                value={language ?? languages[0]}
+                                onChange={value => setLanguage(value ?? undefined)}
                             />
-                        </Stack>
-                    ) : undefined}
-                    {Object.entries(claims.dials).map(([name, dial]) => (
-                        <Stack key={name} gap={4}>
-                            <Group justify="space-between">
+                        ) : undefined}
+                        {claims.deliveries.length > 0 ? (
+                            <Stack gap={4}>
                                 <Text size="sm" fw={500}>
-                                    {name}
+                                    Delivery
                                 </Text>
-                                <Text size="sm" c="dimmed" className="rh-num">
-                                    {(dials[name] ?? dial.default).toFixed(2)}
-                                </Text>
-                            </Group>
-                            <Slider
-                                thumbLabel={name}
-                                min={dial.min}
-                                max={dial.max}
-                                step={(dial.max - dial.min) / 100}
-                                value={dials[name] ?? dial.default}
-                                onChange={value => setDials(current => ({ ...current, [name]: value }))}
-                                label={value => value.toFixed(2)}
-                            />
-                        </Stack>
-                    ))}
-                    <NumberInput
-                        label="Seed"
-                        description="The same seed and line give the same audio, on engines that honour one."
-                        placeholder="Random"
-                        value={seed ?? ''}
-                        onChange={value => setSeed(typeof value === 'number' ? value : undefined)}
-                        allowDecimal={false}
-                        min={0}
-                    />
-                </Stack>
-            </Card>
+                                <SegmentedControl
+                                    data={[{ value: '', label: 'Ordinary' }, ...claims.deliveries.map(entry => ({ value: entry, label: entry }))]}
+                                    value={delivery}
+                                    onChange={setDelivery}
+                                />
+                            </Stack>
+                        ) : undefined}
+                        {Object.entries(claims.dials).map(([name, dial]) => (
+                            <Stack key={name} gap={4}>
+                                <Group justify="space-between">
+                                    <Text size="sm" fw={500}>
+                                        {name}
+                                    </Text>
+                                    <Text size="sm" c="dimmed" className="rh-num">
+                                        {(dials[name] ?? dial.default).toFixed(2)}
+                                    </Text>
+                                </Group>
+                                <Slider
+                                    thumbLabel={name}
+                                    min={dial.min}
+                                    max={dial.max}
+                                    step={(dial.max - dial.min) / 100}
+                                    value={dials[name] ?? dial.default}
+                                    onChange={value => setDials(current => ({ ...current, [name]: value }))}
+                                    label={value => value.toFixed(2)}
+                                />
+                            </Stack>
+                        ))}
+                        <NumberInput
+                            label="Seed"
+                            description="The same seed and line give the same audio, on engines that honour one."
+                            placeholder="Random"
+                            value={seed ?? ''}
+                            onChange={value => setSeed(typeof value === 'number' ? value : undefined)}
+                            allowDecimal={false}
+                            min={0}
+                        />
+                    </Stack>
+                </Card>
 
-            <Card>
-                <Stack gap="md">
-                    <Title order={2} size="h4">
-                        Line
-                    </Title>
-                    <Textarea
-                        ref={textarea}
-                        aria-label="Line"
-                        value={text}
-                        onChange={event => setText(event.currentTarget.value)}
-                        autosize
-                        minRows={4}
-                    />
-                    {claims.cues.length > 0 ? (
-                        <Stack gap={4}>
+                <Card>
+                    <Stack gap="md">
+                        <Title order={2} size="h4">
+                            Line
+                        </Title>
+                        <Textarea
+                            ref={textarea}
+                            aria-label="Line"
+                            value={text}
+                            onChange={event => setText(event.currentTarget.value)}
+                            autosize
+                            minRows={4}
+                        />
+                        {claims.cues.length > 0 ? (
+                            <Stack gap={4}>
+                                <Text size="xs" c="dimmed">
+                                    Cues this variant performs. Click to insert at the cursor.
+                                </Text>
+                                <Group gap={6}>
+                                    {claims.cues.map(cue => (
+                                        <Button key={cue} variant="light" size="compact-xs" radius="xl" onClick={() => insertCue(cue)}>
+                                            {cue}
+                                        </Button>
+                                    ))}
+                                </Group>
+                            </Stack>
+                        ) : (
                             <Text size="xs" c="dimmed">
-                                Cues this variant performs. Click to insert at the cursor.
+                                This variant performs no cues. Any in the line are removed before it is spoken, so it never reads one out.
                             </Text>
-                            <Group gap={6}>
-                                {claims.cues.map(cue => (
-                                    <Button key={cue} variant="light" size="compact-xs" radius="xl" onClick={() => insertCue(cue)}>
-                                        {cue}
-                                    </Button>
-                                ))}
-                            </Group>
-                        </Stack>
-                    ) : (
-                        <Text size="xs" c="dimmed">
-                            This variant performs no cues. Any in the line are removed before it is spoken, so it never reads one out.
-                        </Text>
-                    )}
-                    <Group>
-                        <Button leftSection={<IconPlayerPlay size={16} />} onClick={say} loading={speak.isPending} disabled={text.trim() === ''}>
-                            Speak
-                        </Button>
-                    </Group>
-                    {slow && speak.isPending ? (
-                        <Alert color="blue" title="Loading the model">
-                            A first request, or one for a different variant, loads the model before it speaks. That can take a while, and longer still
-                            if its weights have not been downloaded.
-                        </Alert>
-                    ) : undefined}
-                    {speak.isError ? <ErrorAlert title="That was not spoken" error={speak.error} fallback="The server did not answer." /> : undefined}
-                    {played ? (
-                        <Stack gap={4}>
-                            <audio controls autoPlay src={played.url} style={{ width: '100%' }} aria-label="Spoken line" />
-                            <Text size="xs" c="dimmed" className="rh-num">
-                                {(played.milliseconds / 1000).toFixed(1)} s to speak, {Math.round(played.bytes / 1024)} KB
-                            </Text>
-                        </Stack>
-                    ) : undefined}
-                </Stack>
-            </Card>
-        </SimpleGrid>
+                        )}
+                        <Group>
+                            <Button leftSection={<IconPlayerPlay size={16} />} onClick={say} loading={speak.isPending} disabled={text.trim() === ''}>
+                                Speak
+                            </Button>
+                        </Group>
+                        {slow && speak.isPending ? (
+                            <Alert color="blue" title="Loading the model">
+                                A first request, or one for a different variant, loads the model before it speaks. That can take a while, and longer
+                                still if its weights have not been downloaded.
+                            </Alert>
+                        ) : undefined}
+                        {speak.isError ? (
+                            <ErrorAlert title="That was not spoken" error={speak.error} fallback="The server did not answer." />
+                        ) : undefined}
+                        {played ? (
+                            <Stack gap={4}>
+                                <audio controls autoPlay src={played.url} style={{ width: '100%' }} aria-label="Spoken line" />
+                                <Text size="xs" c="dimmed" className="rh-num">
+                                    {(played.milliseconds / 1000).toFixed(1)} s to speak, {Math.round(played.bytes / 1024)} KB
+                                </Text>
+                            </Stack>
+                        ) : undefined}
+                    </Stack>
+                </Card>
+            </SimpleGrid>
+            <VoicesCard engine={engine} voices={voices} referenceSeconds={referenceSeconds} onCloned={setVoice} />
+        </Stack>
     );
 }
