@@ -139,17 +139,25 @@ def create_app(worker: Worker) -> Starlette:
                 finally:
                     release()
 
-            source = encoding.encode(
-                spoken.format,
-                streaming.from_blocking(lambda: worker.pcm(spoken)),
-                sample_rate=native.sample_rate,
-                channels=native.channels,
-            )
-
             # Pull the first chunk before a status exists. Starlette sends http.response.start
             # before it pulls anything, so without this an unknown voice or an OOM during the
             # on-demand load would already have committed a 200, and the only move left would be to
             # abort a connection that could have carried a perfectly good 404.
+            #
+            # Twice, because either side can fail first. The engine's PCM is primed before encoding,
+            # since a streamed WAV yields its header before asking the engine for anything, and
+            # priming only the encoded stream primed that header: an unknown voice in wav was an
+            # aborted connection. The encoded stream is primed after, so an ffmpeg that cannot start
+            # is still a status.
+            first_pcm, pcm = await streaming.prime(streaming.from_blocking(lambda: worker.pcm(spoken)))
+            if first_pcm is None:
+                raise WorkerError("the engine produced no audio")
+            source = encoding.encode(
+                spoken.format,
+                pcm,
+                sample_rate=native.sample_rate,
+                channels=native.channels,
+            )
             first, rest = await streaming.prime(source)
             if first is None:
                 raise WorkerError("the engine produced no audio")

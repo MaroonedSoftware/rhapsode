@@ -114,6 +114,20 @@ class TestFailingAfterTheHeadersHaveGone:
         assert body["error"]["retryable"] is False
         connection.close()
 
+    def test_a_failure_before_the_first_byte_of_a_wav_is_a_clean_error_too(self, failing) -> None:
+        # A streamed WAV opens with a header the SDK writes itself, before the engine is asked for
+        # anything. Priming the encoded stream primed the header, so an unknown voice raised after
+        # the 200 and the core saw a dropped connection where a 404 belonged. Found by the OpenAI
+        # shim's test asking tone for "alloy" in wav.
+        _, handshake = failing("raise_before_any_audio")
+        connection = connect(handshake)
+        response = speak(connection, text="x", format="wav", stream=True)
+
+        assert response.status == 500
+        body = json.loads(response.read())
+        assert body["error"]["code"] == "internal"
+        connection.close()
+
     def test_an_oom_before_the_first_byte_is_retryable(self, failing) -> None:
         _, handshake = failing("load_oom")
         connection = connect(handshake)
