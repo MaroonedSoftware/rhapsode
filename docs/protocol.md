@@ -950,16 +950,25 @@ Named so that nobody has to guess whether they were forgotten.
    engine expose a second endpoint? The first pollutes every engine's request shape; the second
    splits the API. Leaning towards a second endpoint declared in capabilities, so engines that do
    not do dialogue are unaffected.
-2. **Does the core ever hold audio?** Buffering enables retry-on-truncation and content-addressed
-   caching; streaming through means constant memory. Probably: stream through by default, buffer
-   only when `stream: false` was asked for.
-3. **Voice namespacing across engines.** A station voice that means "the same person" on three
-   engines is a client concern, not this server's. Resisting it is probably right, and is worth
-   writing down as a decision rather than leaving as an omission.
+2. **Does the core ever hold audio?** Decided: only when `stream: false` was asked for, and only
+   the one response, in memory. § 6 already depends on it: the floor can only become an error
+   envelope if the core has the whole body before it writes a status, and `Content-Length` and the
+   duration header can only be headers if the length is known. A `stream: true` response goes
+   through at constant memory. The buffer is bounded by the variant's `maxCharacters`, not by
+   anything the client sends. Retry-on-truncation and content-addressed caching were the arguments
+   for buffering everything. Neither is in v1, and whichever arrives first reopens this.
+3. **Voice namespacing across engines.** Decided: not this server's job. A voice id is scoped to
+   its engine (§ 7) and names one engine's rendering of one reference. The same clip cloned on two
+   engines gives two voices that sound related, not one voice, and an alias spanning them would
+   promise a sameness the server cannot deliver and add a second id space for the § 7 rules to
+   police. A client that means "the same person" on three engines keeps its own table of
+   `(engine, voice)` pairs, which is also the only place that knows which of those it thinks are
+   close enough.
 4. **In-process ONNX engines.** Decided: no. ONNX engines are Python workers like every other
    engine, for the reasons in § 8, and "engine" in the registry keeps meaning one thing.
-5. **Where the core lives.** `MaroonedSoftware` already publishes ServerKit and ContractKit, which
-   the core builds on, so the provenance line writes itself. Open only on whether the Python worker
-   SDK ships from the same repository or its own: same repo keeps the protocol and both of its
-   implementations in one place and one commit, and separate repos let the SDK version on its own
-   cadence. Leaning towards one repo until the SDK has outside users.
+5. **Where the core lives.** Decided: `MaroonedSoftware/rhapsode`, one repository holding the
+   protocol, the core and the Python worker SDK. `MaroonedSoftware` already publishes ServerKit and
+   ContractKit, which the core builds on. A change to the protocol has to land in both
+   implementations at once or one of them is wrong, and one repository with one `pnpm test` is what
+   makes that a single commit rather than a coordinated pair of releases. The cost is that the SDK
+   cannot version on its own cadence. Revisit when it has outside users who need it to.

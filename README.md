@@ -9,8 +9,9 @@ that describes honestly what each engine can actually do.
 > a worker and streams `/speak` through it works end to end, engines install through the API, voices
 > clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,
 > against real weights on Apple Silicon, as does Kokoro, an ONNX engine that needs no GPU and no torch.
-> OpenAI's speech route answers over the same core. What is
-> not here yet: Chatterbox measured on a CUDA card, and the Wyoming shim.
+> What Chatterbox costs on a CUDA card in a container is measured in
+> [`docs/operating.md`](docs/operating.md). OpenAI's speech route answers over the same core. What
+> is not here yet: the Wyoming shim.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
