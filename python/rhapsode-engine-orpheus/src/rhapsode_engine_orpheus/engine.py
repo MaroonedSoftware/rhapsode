@@ -8,7 +8,16 @@ from typing import Any, ClassVar
 from rhapsode_worker import Engine, NativeFormat, SpeakRequest, UnknownVoice, Unsupported, Variant, Voice
 
 from .backends import LlamaCppSource, Sampling, TokenSource
-from .builds import DEFAULT_VOICE, GGUF_FILES, GGUF_REPOSITORY, GGUF_REVISION, VOICES, variants
+from .builds import (
+    DEFAULT_VOICE,
+    GGUF_FILES,
+    GGUF_REPOSITORY,
+    GGUF_REVISION,
+    SNAC_REPOSITORY,
+    SNAC_REVISION,
+    VOICES,
+    variants,
+)
 from .codes import Framer
 from .decoder import SnacDecoder
 from .prompt import MAX_TOKENS, prompt, segments, translate_cues
@@ -65,6 +74,17 @@ class OrpheusEngine(Engine):
         accelerated = self.device.type in {"cuda", "rocm", "mps"}
         self._source = LlamaCppSource(_gguf(variant), gpu=accelerated)
         self._decoder = SnacDecoder("cuda" if self.device.type in {"cuda", "rocm"} else "cpu")
+
+    def fetch(self, variant: str) -> None:
+        """Download a build's GGUF and the codec into the Hugging Face cache, where its load will look.
+
+        The same files at the same revisions `load` asks for, so the load that follows is a cache hit.
+        `q8` is 3.5 GB, which a first `/speak` would otherwise spend its whole budget downloading.
+        """
+        if variant not in GGUF_FILES:
+            raise Unsupported(f'no build "{variant}"; this engine has {sorted(GGUF_FILES)}')
+        _gguf(variant)
+        _snac()
 
     def unload(self) -> None:
         """Close the Llama, drop the codec, and ask torch for the memory back.
@@ -145,14 +165,25 @@ class OrpheusEngine(Engine):
 
 def _gguf(variant: str) -> str:
     """The build's GGUF, from the Hugging Face cache, downloading it if it is not there yet."""
+    return _download(GGUF_REPOSITORY, GGUF_FILES[variant], GGUF_REVISION)
+
+
+def _snac() -> None:
+    """The two files `SNAC.from_pretrained` reads, copied from snac 1.2.1 rather than imported, because
+    importing snac imports torch and fetching has no use for it."""
+    for filename in ("config.json", "pytorch_model.bin"):
+        _download(SNAC_REPOSITORY, filename, SNAC_REVISION)
+
+
+def _download(repository: str, filename: str, revision: str) -> str:
     import os
 
     from huggingface_hub import hf_hub_download
 
     path: str = hf_hub_download(
-        repo_id=GGUF_REPOSITORY,
-        filename=GGUF_FILES[variant],
-        revision=GGUF_REVISION,
+        repo_id=repository,
+        filename=filename,
+        revision=revision,
         token=os.getenv("HF_TOKEN") or None,
     )
     return path

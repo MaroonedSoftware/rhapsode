@@ -10,7 +10,14 @@ from harness.stubs import Recorder
 from rhapsode_worker import Log, SpeakRequest, UnknownVoice, Unsupported
 from rhapsode_worker.engine import Device
 
-from rhapsode_engine_orpheus.builds import GGUF_FILES, GGUF_REPOSITORY, GGUF_REVISION, VOICES
+from rhapsode_engine_orpheus.builds import (
+    GGUF_FILES,
+    GGUF_REPOSITORY,
+    GGUF_REVISION,
+    SNAC_REPOSITORY,
+    SNAC_REVISION,
+    VOICES,
+)
 from rhapsode_engine_orpheus.codes import SAMPLES_PER_FRAME
 from rhapsode_engine_orpheus.engine import OrpheusEngine
 from rhapsode_engine_orpheus.prompt import MAX_TOKENS, SEGMENT_CHARACTERS
@@ -167,3 +174,27 @@ class TestSpeaking:
         built = loaded(tmp_path)
         spoken(built)
         assert built.log.warnings == []  # type: ignore[attr-defined]
+
+
+class TestFetching:
+    def test_fetch_downloads_the_build_and_the_codec_at_their_revisions(
+        self, orpheus: Recorder, tmp_path: Path
+    ) -> None:
+        engine(tmp_path).fetch("q4")
+        fetched = {
+            (download["repo_id"], download["filename"], download["revision"])
+            for download in orpheus.downloads
+        }
+        assert fetched == {
+            (GGUF_REPOSITORY, GGUF_FILES["q4"], GGUF_REVISION),
+            (SNAC_REPOSITORY, "config.json", SNAC_REVISION),
+            (SNAC_REPOSITORY, "pytorch_model.bin", SNAC_REVISION),
+        }
+
+    def test_fetch_loads_nothing(self, orpheus: Recorder, tmp_path: Path) -> None:
+        engine(tmp_path).fetch("q8")
+        assert orpheus.llamas == []
+
+    def test_fetch_refuses_a_build_this_engine_does_not_have(self, orpheus: Recorder, tmp_path: Path) -> None:
+        with pytest.raises(Unsupported, match="no build"):
+            engine(tmp_path).fetch("q2")
