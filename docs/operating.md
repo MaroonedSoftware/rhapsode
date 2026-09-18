@@ -105,10 +105,25 @@ offer to pull) downloads them ahead of time, without loading anything.
 
 Uninstalling removes the virtualenv and leaves downloaded weights where the engine put them.
 Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokoro's are in
-`~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points.
+`~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points. Orpheus's are in
+`~/.cache/huggingface` too: 3.5 GB for `q8`, 2.1 GB for `q4`, and 80 MB for the codec both share.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
+
+### Orpheus and llama.cpp
+
+Orpheus runs through `llama-cpp-python`, which pip builds from source unless a wheel matches. On a
+Mac that build uses Metal and needs the Xcode command line tools (`xcode-select --install`). On a
+CUDA box, point pip at the prebuilt CUDA wheels before starting the server, because the install
+inherits `PIP_EXTRA_INDEX_URL` from the server's environment and a client cannot set it:
+
+```bash
+PIP_EXTRA_INDEX_URL=https://abetlen.github.io/llama-cpp-python/whl/cu124 node apps/server/dist/main.js
+```
+
+Without it the install still succeeds, with a CPU build. Real time needs about 82 tokens a second
+(seven per 85 ms frame), and whether a CPU reaches that depends on the machine.
 
 ## The web page
 

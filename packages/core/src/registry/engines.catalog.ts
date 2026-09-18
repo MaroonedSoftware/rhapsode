@@ -65,6 +65,22 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'GPL through phonemizer and eSpeak NG, which kokoro-onnx (MIT) phonemizes with. Weights: hexgrad/Kokoro-82M, Apache-2.0.',
         },
     },
+    orpheus: {
+        displayName: 'Orpheus',
+        module: 'rhapsode_engine_orpheus',
+        package: 'rhapsode-engine-orpheus',
+        // q8 rather than q4: the two are 1.4 GB apart, and what the coarser quantisation costs in the
+        // reading has not been heard yet, so the default is the build nearer Canopy's own weights.
+        defaultVariant: 'q8',
+        license: {
+            code: 'Apache-2.0',
+            weights: 'Apache-2.0',
+            weightsCommercialUse: true,
+            // Canopy's finetune is a Llama 3.2 derivative, and the builds are community GGUF
+            // conversions of it, not Canopy's own files. Both are worth knowing before install.
+            notes: 'https://huggingface.co/canopylabs/orpheus-3b-0.1-ft, a finetune of Llama 3.2 3B, run from unsloth GGUF conversions',
+        },
+    },
     tone: {
         displayName: 'Tone',
         module: 'rhapsode_engine_tone',

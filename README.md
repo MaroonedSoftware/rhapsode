@@ -171,6 +171,11 @@ document was designed around, and the reason that document has two levels: `turb
 and has no dials, `original` and `multilingual` have the dials and perform no cues, and which you get
 is a fact about the weights resident right now.
 
+[`rhapsode-engine-orpheus`](python/rhapsode-engine-orpheus/) is the second engine that performs
+cues, seven of the eight, and the first that streams audio while the model is still generating.
+`pnpm wizard install orpheus` works the same way, and its `q8` build is 3.5 GB with no account
+needed to download it.
+
 ## Contributing an engine
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write
