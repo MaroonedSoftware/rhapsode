@@ -1,3 +1,4 @@
+import { IsHttpError } from '@maroonedsoftware/errors';
 import { DispatchError } from '@rhapsode/contract';
 
 /** Every code in the taxonomy, with the status and the retryability each one carries. § 6. */
@@ -66,6 +67,15 @@ export function asRhapsodeError(error: unknown): RhapsodeError {
         return new RhapsodeError(error.code, error.message, { cause: error });
     }
 
+    if (IsHttpError(error)) {
+        // ServerKit's own refusals: a policy's 403, the body gate's 400, 411 and 415. Before this
+        // branch every one of them went out as an `internal` 500, which told a client whose request
+        // was wrong that the server had broken. A policy puts its client-facing reason in `details`.
+        const detail = (error.details as { message?: unknown } | undefined)?.message;
+        const message = typeof detail === 'string' ? detail : error.message;
+        return new RhapsodeError(codeForStatus(error.statusCode), message, { cause: error });
+    }
+
     return new RhapsodeError('internal', error instanceof Error ? error.message : String(error), { cause: error });
 }
 
@@ -81,4 +91,16 @@ export function fromWorkerEnvelope(body: unknown, fallbackStatus: number): Rhaps
     // status it used, which is the one signal that cannot be unfamiliar.
     const derived = (Object.entries(TAXONOMY) as [ErrorCode, { status: number }][]).find(([, entry]) => entry.status === fallbackStatus);
     return new RhapsodeError(derived?.[0] ?? 'internal', message);
+}
+
+/**
+ * The code for a status that arrived without one. 401 is `forbidden` because the only thing here
+ * that authenticates is the management guard, and to a client the two mean the same: not you.
+ */
+function codeForStatus(status: number): ErrorCode {
+    if (status === 401 || status === 403) return 'forbidden';
+    if (status === 409) return 'conflict';
+    if (status === 429) return 'overloaded';
+    if (status >= 500) return 'internal';
+    return 'bad_request';
 }

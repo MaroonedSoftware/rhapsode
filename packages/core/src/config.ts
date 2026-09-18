@@ -28,6 +28,14 @@ export interface RhapsodeConfig {
         maxRestarts?: number;
         restartDecaySeconds?: number;
     };
+    /** protocol.md § 10. */
+    management?: {
+        /**
+         * Admits a caller from anywhere that presents it as a bearer token. Without it, management
+         * routes answer loopback callers only. They run pip, so this is a root password for the box.
+         */
+        token?: string;
+    };
     engines?: Record<string, Partial<EngineEntry> & { enabled?: boolean }>;
 }
 

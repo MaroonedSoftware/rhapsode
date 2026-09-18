@@ -1,5 +1,6 @@
 import { AppConfig } from '@maroonedsoftware/appconfig';
 import {
+    authenticationPlugin,
     bodyParserPlugin,
     serverKitContextPlugin,
     ServerKitServerBuilder,
@@ -10,6 +11,8 @@ import { Logger } from '@maroonedsoftware/logger';
 
 import { rhapsodeErrorPlugin } from './errors/error.plugin.js';
 import { healthRoutes } from './health/health.routes.js';
+import { catalogRoutes } from './management/catalog.routes.js';
+import { managementModule } from './management/management.module.js';
 import { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 import { engineModule } from './registry/engine.module.js';
 import type { ManagedEngines } from './registry/managed.engines.js';
@@ -37,7 +40,12 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, man
     // Registration order is the shutdown contract: ServerKit runs `shutdown` hooks in reverse, so
     // this order means shutdown unwinds speak, then residency, then the workers. Registering the
     // worker module last would kill the children out from under streams still reading them.
-    const modules: ServerKitModule[] = [engineModule(settings, managed), workerModule(settings), residencyModule(settings)];
+    const modules: ServerKitModule[] = [
+        managementModule(settings),
+        engineModule(settings, managed),
+        workerModule(settings),
+        residencyModule(settings),
+    ];
 
     const container = await builder.setup(config, log, modules);
 
@@ -45,6 +53,9 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, man
         // First, so that a request failing anywhere later still produces the protocol's envelope.
         rhapsodeErrorPlugin(container),
         serverKitContextPlugin(container),
+        // Resolves a bearer token into a session for the management guard, and strips the header
+        // from every request whether or not it is used, so no log line ever carries it. § 10.
+        authenticationPlugin(),
         bodyParserPlugin(),
     ]);
 
@@ -53,6 +64,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, man
         { plugin: enginesRoutes },
         { plugin: engineDetailRoutes },
         { plugin: speakRoutes },
+        { plugin: catalogRoutes },
     ];
     builder.setupRoutes(routes);
 
