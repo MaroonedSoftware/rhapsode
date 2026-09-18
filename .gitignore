@@ -24,3 +24,19 @@ outputs/
 !.env.example
 *.sock
 .DS_Store
+
+# Turbo
+.turbo/
+
+# Python virtualenv for the worker SDK and its engines
+python/.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# pnpm writes a project-local store when the configured store path is unreachable.
+.pnpm-store/
+
+# ContractKit's build cache.
+.contractkit/
+.scratch/

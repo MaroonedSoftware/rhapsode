@@ -1,0 +1,196 @@
+"""The engine-scoped subset of the public API, over HTTP. protocol.md § 1, § 4, § 6, § 7."""
+
+from __future__ import annotations
+
+import io
+import json
+import urllib.error
+import urllib.request
+import wave
+from typing import Any
+
+from conftest import RunningWorker
+
+
+def get(worker: RunningWorker, path: str) -> Any:
+    with urllib.request.urlopen(f"{worker.base_url}{path}", timeout=30) as response:
+        return json.loads(response.read())
+
+
+def post(worker: RunningWorker, path: str, body: dict[str, Any]) -> tuple[int, bytes, str]:
+    request = urllib.request.Request(
+        f"{worker.base_url}{path}",
+        data=json.dumps(body).encode(),
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.status, response.read(), response.headers.get("content-type", "")
+    except urllib.error.HTTPError as error:
+        return error.code, error.read(), error.headers.get("content-type", "")
+
+
+def failure(worker: RunningWorker, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    status, raw, _ = post(worker, "/speak", body)
+    return status, json.loads(raw)["error"]
+
+
+class TestCapabilities:
+    def test_current_is_absent_until_something_is_resident(self, worker: RunningWorker) -> None:
+        # § 4 as amended: a worker in up(unloaded) has nothing to describe, and an invented answer
+        # is worse than no answer.
+        assert "current" not in get(worker, "/capabilities")
+
+        post(worker, "/load", {"variant": "dialled"})
+        current = get(worker, "/capabilities")["current"]
+        assert current["variant"] == "dialled"
+        assert current["nativeFormat"] == {"encoding": "pcm_s16le", "sampleRate": 24000, "channels": 1}
+
+    def test_variants_describe_builds_that_differ(self, worker: RunningWorker) -> None:
+        # The whole reason the document has two levels. An engine whose variants are identical
+        # cannot demonstrate the problem it solves.
+        variants = get(worker, "/capabilities")["variants"]
+        assert variants["plain"]["cues"] and not variants["plain"]["dials"]
+        assert variants["dialled"]["dials"] and not variants["dialled"]["cues"]
+
+    def test_both_licences_are_named(self, worker: RunningWorker) -> None:
+        # The weights licence is the one package metadata never reveals and the one that decides
+        # whether a commercial user may ship.
+        licence = get(worker, "/capabilities")["license"]
+        assert set(licence) >= {"code", "weights", "weightsCommercialUse"}
+
+    def test_formats_names_only_what_this_worker_can_produce(self, worker: RunningWorker) -> None:
+        formats = get(worker, "/capabilities")["formats"]
+        assert "wav" in formats and "pcm" in formats
+        for name in formats:
+            status, body, _ = post(worker, "/speak", {"text": "check", "format": name, "stream": False})
+            assert status == 200, (name, body[:200])
+
+    def test_cloning_is_derived_rather_than_declared(self, worker: RunningWorker) -> None:
+        # An adapter that did not implement create_voice cannot advertise cloning, and one that did
+        # cannot forget to. Nothing here is the adapter author's to remember.
+        post(worker, "/load", {})
+        assert get(worker, "/capabilities")["current"]["cloning"]["supported"] is False
+
+
+class TestVoices:
+    def test_a_voice_carries_an_opaque_spec_and_a_preview_url(self, worker: RunningWorker) -> None:
+        voices = get(worker, "/voices")
+        assert voices
+        for voice in voices:
+            assert voice["spec"]
+            assert voice["previewUrl"] == f"/voices/{voice['id']}/preview"
+
+    def test_the_spec_changes_when_the_rendering_would(self, worker: RunningWorker) -> None:
+        # Keyed on the id instead, a remapped voice serves its old preview forever, because the id
+        # is exactly the part that does not change when somebody edits what is under it.
+        before = {voice["id"]: voice["spec"] for voice in get(worker, "/voices")}
+        post(worker, "/load", {"variant": "dialled"})
+        after = {voice["id"]: voice["spec"] for voice in get(worker, "/voices")}
+        assert before.keys() == after.keys()
+        assert all(before[key] != after[key] for key in before)
+
+
+class TestSpeak:
+    def test_it_loads_on_demand(self, worker: RunningWorker) -> None:
+        # § 3: /speak does not fail with "no model loaded" and does not require /load first. The
+        # alternative costs a round trip per utterance to ask a question the server already knows.
+        assert get(worker, "/health")["model"] == "unloaded"
+        status, body, _ = post(worker, "/speak", {"text": "one two three", "stream": False})
+        assert status == 200 and len(body) > 256
+        assert get(worker, "/health")["model"] == "loaded"
+
+    def test_wav_is_framed_correctly_when_the_length_is_known(self, worker: RunningWorker) -> None:
+        _, body, content_type = post(
+            worker, "/speak", {"text": "a longer line here", "format": "wav", "stream": False}
+        )
+        assert content_type == "audio/wav"
+        with wave.open(io.BytesIO(body)) as parsed:
+            assert parsed.getnchannels() == 1
+            assert parsed.getframerate() == 24000
+            assert parsed.getnframes() > 0
+
+    def test_pcm_carries_the_parameters_that_make_it_playable(self, worker: RunningWorker) -> None:
+        # Raw PCM with no rate and no channel count is not playable by anything, so the Content-Type
+        # parameters are the only description those bytes ever get.
+        _, body, content_type = post(worker, "/speak", {"text": "hello", "format": "pcm", "stream": False})
+        assert content_type == "audio/L16; rate=24000; channels=1"
+        assert len(body) % 2 == 0
+
+    def test_longer_text_makes_more_audio(self, worker: RunningWorker) -> None:
+        _, short, _ = post(worker, "/speak", {"text": "one", "format": "pcm", "stream": False})
+        _, long, _ = post(worker, "/speak", {"text": "one " * 40, "format": "pcm", "stream": False})
+        assert len(long) > len(short)
+
+    def test_a_seed_is_reproducible(self, worker: RunningWorker) -> None:
+        body = {"text": "repeatable", "format": "pcm", "seed": 20260917, "stream": False}
+        _, first, _ = post(worker, "/speak", body)
+        _, second, _ = post(worker, "/speak", body)
+        assert first == second
+
+
+class TestTheErrorTaxonomy:
+    def test_an_unknown_dial_names_the_key_and_what_the_variant_has(self, worker: RunningWorker) -> None:
+        # Ignoring it is wrong for the same reason a silently discarded dial is wrong: the client
+        # believes it asked for something. And a message that does not say what to send instead is
+        # not a bug report delivered to the right person in under a second.
+        status, error = failure(worker, {"text": "x", "variant": "dialled", "params": {"nope": 1}})
+        assert (status, error["code"], error["retryable"]) == (400, "bad_request", False)
+        assert '"nope"' in error["message"]
+        assert "gain" in error["message"] and "pitch" in error["message"]
+
+    def test_a_dial_out_of_range_is_refused(self, worker: RunningWorker) -> None:
+        status, error = failure(worker, {"text": "x", "variant": "dialled", "params": {"pitch": 99}})
+        assert (status, error["code"]) == (400, "bad_request")
+
+    def test_a_variant_that_does_not_exist_is_refused_rather_than_swapped(
+        self, worker: RunningWorker
+    ) -> None:
+        # Falling back to the default would produce audio the caller did not ask for and has no way
+        # to notice, which is the failure this document spends its length arguing against.
+        status, error = failure(worker, {"text": "x", "variant": "nosuch"})
+        assert (status, error["code"]) == (422, "unsupported")
+
+    def test_a_delivery_the_variant_does_not_claim_is_refused(self, worker: RunningWorker) -> None:
+        status, error = failure(worker, {"text": "x", "variant": "plain", "delivery": "hushed"})
+        assert (status, error["code"]) == (422, "unsupported")
+
+    def test_a_format_this_worker_cannot_produce_says_why(self, worker: RunningWorker) -> None:
+        status, error = failure(worker, {"text": "x", "format": "opus"})
+        assert (status, error["code"], error["retryable"]) == (422, "unsupported", False)
+        assert "opus" in error["message"]
+
+    def test_text_past_the_ceiling_is_refused(self, worker: RunningWorker) -> None:
+        status, error = failure(worker, {"text": "x" * 99_999})
+        assert (status, error["code"]) == (400, "bad_request")
+
+    def test_every_envelope_carries_a_retryable_flag(self, worker: RunningWorker) -> None:
+        # It is a field and not something a caller infers from the status, because a caller that
+        # conflates "wrong request" with "server was busy" either retries forever or throws work
+        # away that would have succeeded next time.
+        for body in ({"text": ""}, {"text": "x", "format": "opus"}, {"text": "x", "variant": "no"}):
+            _, error = failure(worker, body)
+            assert isinstance(error["retryable"], bool)
+            assert set(error) == {"code", "message", "retryable"}
+
+
+class TestResidency:
+    def test_unloading_nothing_is_a_success(self, worker: RunningWorker) -> None:
+        # Idempotent and never fatal, because the core unloads on a schedule it owns and cannot
+        # know what a crash left behind.
+        for _ in range(3):
+            status, raw, _ = post(worker, "/unload", {})
+            assert status == 200
+            assert json.loads(raw)["model"] == "unloaded"
+
+    def test_asking_for_another_variant_swaps_it(self, worker: RunningWorker) -> None:
+        post(worker, "/load", {"variant": "plain"})
+        assert get(worker, "/health")["variant"] == "plain"
+        post(worker, "/speak", {"text": "x", "variant": "dialled", "stream": False})
+        assert get(worker, "/health")["variant"] == "dialled"
+
+    def test_health_answers_while_nothing_is_loaded(self, worker: RunningWorker) -> None:
+        health = get(worker, "/health")
+        assert health["process"] == "up"
+        assert health["model"] == "unloaded"

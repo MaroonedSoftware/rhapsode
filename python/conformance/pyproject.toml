@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-conform"
+version = "0.0.0"
+description = "Point it at a worker and it says whether that worker is one."
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27"]
+
+[project.scripts]
+rhapsode-conform = "rhapsode_conform.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_conform"]
+
+[tool.ruff]
+# Generated from contracts/. Linting a generator's output is a diff that comes back.
+extend-exclude = ["src/**/_generated"]
+line-length = 110
+target-version = "py311"
+
+[tool.mypy]
+strict = true
+exclude = ["_generated"]
+files = ["src"]

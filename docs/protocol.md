@@ -28,7 +28,7 @@ Every rule below that looks arbitrary is one somebody already paid for, and says
 | `GET /engines/{id}/voices` | `GET /voices` |
 | `POST /speak` (with `engine`) | `POST /speak` |
 | `GET /health` | `GET /health` |
-| (core policy) | `POST /load`, `POST /unload` |
+| (core policy) | `POST /load`, `POST /unload`, `POST /terminate` |
 
 This is the single decision everything else falls out of, and it buys four things:
 
@@ -59,6 +59,10 @@ RHAPSODE_WORKER_ENGINE=chatterbox
 RHAPSODE_WORKER_CONTRACT=1
 ```
 
+`RHAPSODE_WORKER_CONTRACT` is the highest contract the core speaks, not a demand. The worker answers
+at the highest version it supports that is not above it, and says which in the handshake. §9 has the
+rest.
+
 ### Handshake
 
 **The worker prints exactly one JSON line to stdout when it is bound and ready, and nothing else to
@@ -80,9 +84,18 @@ to the log stream after the handshake, so the rule cannot be broken by accident.
 
 ### Stop
 
-`SIGTERM` means drain: refuse new requests with `503`, finish what is in flight, exit 0. The core
-sends `SIGKILL` after a grace period it owns. A worker that exits on its own is a crash and the core
-restarts it with backoff, holding the restart count against it.
+`SIGTERM` means drain: refuse new requests as `overloaded`, finish what is in flight, exit 0. The
+error table in § 6 is what fixes the status, and it says `429` and retryable, which is the answer
+this case wants: a request refused by a draining worker is one the core should send somewhere else
+or send again, not one it should write off. (This paragraph said `503` and the table said `429`. The
+table wins, because a caller reads the code and the `retryable` flag rather than the prose.) The
+core sends `SIGKILL` after a grace period it owns. `POST /terminate` (§3) is the same sequence asked
+for over HTTP rather than signalled, and is what reclaims a card from a worker the core cannot
+signal.
+
+An exit the core did not ask for is a crash, and the core restarts it with backoff, holding the
+restart count against it. An exit that follows a `SIGTERM` or a `/terminate` is not, however it is
+timed: a worker that finishes draining a second after the core stopped waiting has done its job.
 
 ---
 
@@ -126,6 +139,15 @@ the model held, because the graphics runtime keeps the rest until the process ex
 needs both verbs and must know they differ: `unload` for "I may want this again shortly",
 `terminate` for "I need the card back". A residency manager with only `unload` will slowly lose a
 card to nothing.
+
+**Which is why `terminate` is a worker verb and not a core one.** The obvious implementation is for
+the core to signal the process it spawned, and that works for exactly as long as every worker is
+local. A remote worker (§1) is a URL on somebody else's box, so a core that terminates by signalling
+silently degrades to `unload` over TCP, and the 30% it cannot reclaim goes unreported.
+`POST /terminate` means drain and exit 0: the worker ends its own process, and whatever supervises
+it locally restarts it. The core still sends the signal to a local worker that has stopped
+answering, but the verb is what it reaches for first, and it is the only thing that works in both
+places.
 
 ### Core policy, not worker policy
 
@@ -202,6 +224,19 @@ what is loaded" and "what would I get if I asked for a different variant" as sep
 
 Engines with one build report a single variant and `current` mirrors it. The shape costs them
 nothing.
+
+**`current` is absent when no model is resident**, because a worker in `up(unloaded)` has nothing to
+describe and an invented answer is worse than no answer. `variants` is always present, so the
+question "what could this engine do" is always answerable and only "what can it do right now" goes
+away. A client that reads `current` unconditionally will find this on the first request after a
+restart, which is the cheapest possible time to find it.
+
+So nothing in the core may depend on `current`. It resolves the **effective variant** first, from
+the request's `variant` if it named one, from the resident variant if one is loaded, and from the
+engine's default otherwise, then reads `variants[effective]`. That rule is total, and it gives the
+same answer as `current` in every case where `current` means anything. It also covers the case the
+two-level document exists for: a request that names a variant which is not the one loaded, where
+`current` describes weights that are about to be evicted.
 
 ### `license` carries code and weights separately
 
@@ -294,13 +329,35 @@ Content-Type: application/json
 | `voice` | Engine-scoped id from `GET /voices`. Absent means the engine default. |
 | `variant` | Absent means whatever is loaded, or the engine's default if nothing is. |
 | `format` | From `capabilities.formats`. The **response's** `Content-Type` is authoritative. |
-| `delivery` | Only ever one the variant claimed; the core drops the rest before dispatch. |
-| `params` | Validated against `capabilities.current.dials`. Unknown keys are refused, not ignored. |
+| `language` | From the effective variant's `languages`. Absent means the first one it lists. |
+| `delivery` | Only ever one the effective variant claimed; the core drops the rest. |
+| `params` | Against the effective variant's `dials` (§4). Unknown keys are refused, not ignored. |
 | `seed` | Optional. Reproducibility for engines that can. |
 | `stream` | `true` streams chunked; `false` buffers and sets `Content-Length`. |
 
-Response: `200`, `Content-Type: audio/opus`, chunked. Optionally `X-Rhapsode-Duration-Ms` as a trailer
-when the engine knows.
+Response: `200`, `Content-Type: audio/opus`, chunked.
+
+`X-Rhapsode-Duration-Ms` is an ordinary **header** when `stream: false`, because the duration is
+known before the headers go out, and a **trailer** when `stream: true`, because it is not. Treat the
+trailer as best effort and never require it: `fetch` exposes no trailer API in Node or in a browser,
+so only a client built on a raw HTTP library can read one. A client that needs the duration on every
+response should ask for `stream: false`.
+
+One note on the opus label, because it will look like a bug to somebody: what goes on the wire is
+Ogg-encapsulated Opus, for which `audio/ogg; codecs=opus` is the precise answer. `audio/opus` is
+what this contract says, it is what every client in this space already sends and accepts, and the
+response's own `Content-Type` is authoritative in any case.
+
+### `language` selects among what the variant declares
+
+`variants[...].languages` has been in the capability document from the start and there was no way to
+ask for one, which made a multilingual build indistinguishable from an English one. A variant that
+lists a single language ignores this field; one that lists several reads it, and a language it does
+not list is `unsupported`.
+
+It is a separate field rather than something inferred from the text because detection is a guess,
+and a guess that silently picks the wrong language produces a whole take in the wrong accent with
+nothing in the response to say so.
 
 ### Unknown keys in `params` are refused
 
@@ -322,6 +379,16 @@ produces a segment that airs as a click, and the only place to notice is at the 
 The check belongs at the end, not on the first chunk, because a short error body can arrive in
 several pieces and "was any of this plausibly audio" is only answerable once it stops.
 
+**The floor behaves differently in the two modes, and that is deliberate.** With `stream: true` the
+headers are long gone by the time the count is known, so a body under the floor is an abort and the
+client cannot be told why. With `stream: false` the core has the whole body before it writes
+anything, so the same failure is an ordinary error envelope with a code and a `retryable` flag.
+
+Which is the general rule and worth stating once: **`stream: false` reports failures strictly better
+than `stream: true` does**, because every failure is still a pre-headers failure. Streaming buys
+first-byte latency and pays for it in diagnosis. A caller rendering a file rather than feeding a
+player should ask for `stream: false` and will get a better error the day something breaks.
+
 ### Errors
 
 ```json
@@ -331,6 +398,7 @@ several pieces and "was any of this plausibly audio" is only answerable once it 
 | Code | HTTP | Retryable | Meaning |
 | --- | --- | --- | --- |
 | `bad_request` | 400 | no | Malformed, or a `params` key the variant does not have |
+| `unknown_engine` | 404 | no | Not in `GET /engines`. Core only; a worker is one engine |
 | `unknown_voice` | 404 | no | Not in `GET /voices` |
 | `unsupported` | 422 | no | A format, language or feature this variant does not do |
 | `model_unavailable` | 503 | **yes** | Loading, evicted, or a load that ran out of time |
@@ -369,6 +437,13 @@ GET /voices
 on it. The reason it exists rather than clients keying on `id`: the id is exactly the part that does
 *not* change when somebody edits what is under it, so a remapped voice served its old preview
 forever, and the only fix that works is a token the engine mints. Treat it as opaque; never parse it.
+
+**`previewUrl` is worker-scoped, and the core rewrites it.** The worker knows nothing about engine
+ids in paths, so it answers `/voices/{id}/preview`, which is correct on its own socket and a `404`
+to anybody who followed it from the public API. The core rewrites each one to
+`/engines/{engine}/voices/{id}/preview` on the way out. This is the only field the core edits while
+proxying, and the only reason it does is that the worker cannot know its own prefix. A client should
+follow the URL it was given and never build one.
 
 Cloning, where the variant supports it:
 
@@ -411,7 +486,9 @@ class ChatterboxEngine(Engine):
         }
 
     def load(self, variant: str) -> None:
-        self.model = ChatterboxTTS.from_pretrained(variant, device=self.device)
+        # Each build is its own class upstream rather than an argument, which is a fact about that
+        # engine and not about this protocol. A variant name is whatever the adapter says it is.
+        self.model = BUILDS[variant].from_pretrained(device=self.device.torch())
 
     def unload(self) -> None:
         del self.model
@@ -421,8 +498,12 @@ class ChatterboxEngine(Engine):
                 for p in self.voice_dir.glob("*.wav")]
 
     def speak(self, req: SpeakRequest) -> Iterator[bytes]:
-        yield from self.model.stream(req.text, audio_prompt_path=self.path_for(req.voice),
-                                     **self.dials_for(req))
+        # An engine that streams yields as it goes. One that does not, and chatterbox does not,
+        # synthesises whole and chunks the result: the SDK's contract is an iterator of PCM, not a
+        # promise that the model is incremental.
+        yield from self.pcm_of(self.model.generate(req.text,
+                                                   audio_prompt_path=self.path_for(req.voice),
+                                                   **self.dials_for(req)))
 
 serve(ChatterboxEngine())
 ```
@@ -431,8 +512,9 @@ serve(ChatterboxEngine())
 
 - Binds the socket, prints the handshake line, captures stray `stdout`, frames logs as JSON on
   stderr.
-- Serves `/health`, `/capabilities`, `/voices`, `/load`, `/unload`, `/speak`. `capabilities()` is
-  assembled from `variants()`, `native_format`, `license` and the detected device.
+- Serves `/health`, `/capabilities`, `/voices`, `/load`, `/unload`, `/terminate` and `/speak`.
+  `capabilities()` is assembled from `variants()`, `native_format`, `license` and the detected
+  device, and `current` is omitted entirely while nothing is loaded.
 - **Encodes.** The engine yields its native PCM; the SDK produces wav, mp3, opus, flac or raw
   through ffmpeg. Without this, every adapter reimplements format conversion and they all do it
   differently. This is the single largest reduction in adapter burden in the design.
@@ -456,9 +538,20 @@ on that and nothing else checks it.
 `contract` is an integer in the handshake, in `/capabilities`, and in the public API.
 
 - Changes are **additive only** within a major. New optional fields, new enum members at the end.
-- The core refuses a worker whose `contract` major exceeds its own, with a message naming both.
-- A worker declares the range it supports; the core picks the highest in common.
+- The core offers its own maximum in `RHAPSODE_WORKER_CONTRACT` at spawn.
+- The worker answers at the highest version it supports that is not greater than the offer, and
+  reports that number as `contract` in its handshake line and in `/capabilities`.
+- If the offer is below everything the worker supports, the worker exits non-zero before printing a
+  handshake, naming both numbers on stderr.
+- The core refuses a worker whose reported `contract` exceeds its own, with a message naming both.
 - Clients ignore fields they do not know, and must not fail on an unrecognised cue or dial name.
+
+The negotiation is one-sided on purpose: the core states a ceiling and the worker picks under it.
+The alternative, both sides declaring a range and meeting in the middle, needs a range on the wire,
+and there is nowhere to put one that an old core would understand. A single integer in each
+direction is enough because the only question that has ever needed answering is "can you speak the
+version I speak", and additive-only evolution means the answer is yes for every version at or below
+the offer.
 
 The core and its workers ship separately, so they **will** disagree in the field. Designing for that
 on day one costs about forty lines. Retrofitting it costs a client that sniffs your OpenAPI document

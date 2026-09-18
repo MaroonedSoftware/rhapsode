@@ -1,0 +1,51 @@
+{
+    "name": "@rhapsode/core",
+    "version": "0.0.0",
+    "description": "Routing, worker supervision and model residency. Never imports torch and holds no engine knowledge.",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "license": "MIT",
+    "files": [
+        "dist/**",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --sourcemap && tsc --emitDeclarationOnly --declaration",
+        "build:ci": "eslint --max-warnings=0 && pnpm run build",
+        "lint": "eslint --fix",
+        "format": "prettier --write . --ignore-path ../../.prettierignore",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@maroonedsoftware/appconfig": "^2.6.1",
+        "@maroonedsoftware/errors": "^1.9.1",
+        "@maroonedsoftware/fastify": "^0.3.7",
+        "@maroonedsoftware/logger": "^1.1.9",
+        "@maroonedsoftware/servercore": "^0.3.0",
+        "@maroonedsoftware/zod": "^0.8.0",
+        "@rhapsode/contract": "workspace:*",
+        "fastify": "^5.12.5",
+        "injectkit": "^1.7.1",
+        "luxon": "^3.7.2",
+        "undici": "^8.9.0",
+        "zod": "^4.5.4"
+    },
+    "devDependencies": {
+        "@repo/config-eslint": "workspace:*",
+        "@repo/config-typescript": "workspace:*",
+        "@types/luxon": "^3.7.1",
+        "vitest": "^4.1.11"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-chatterbox"
+version = "0.0.0"
+description = "Chatterbox for rhapsode: the engine the capability document was designed around."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker",
+    # Used directly, to turn a finished waveform into PCM. torch brings it too, but depending on it
+    # through torch would make the adapter's own conversion untestable without several gigabytes.
+    "numpy>=1.26",
+    # Brings torch and several gigabytes of weights with it, which is exactly why every engine gets
+    # its own virtualenv. The repository's shared dev venv installs this package with --no-deps, so
+    # the adapter's own logic is under test without any of that.
+    "chatterbox-tts>=0.1.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_chatterbox"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["torch.*", "chatterbox.*", "numpy.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts a stub where the weights would be.
+pythonpath = ["tests"]
+timeout = 60

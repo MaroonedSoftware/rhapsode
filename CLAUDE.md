@@ -1,0 +1,65 @@
+# Working in this repository
+
+`docs/protocol.md` is the specification and it outranks the code. If the code disagrees with it, one
+of them is a bug; decide which, and fix that one. If the spec is silent on something you had to
+decide, the decision belongs in the spec before it belongs in a file.
+
+## The shape
+
+Two languages, one protocol.
+
+- `contracts/*.ck` is the source of truth for every request and response shape. It compiles to zod
+  and TypeScript for the core, Pydantic models for the Python SDK, and an OpenAPI document. Generated
+  output is **committed**, because the Python half has no Node toolchain at install time and cannot
+  generate on demand. `pnpm codegen:check` fails when it has drifted.
+- `packages/contract` depends on zod and nothing else. Keep it that way: it is the package a client
+  SDK or a shim adopts on its own, and a ServerKit dependency in it would defeat that.
+- `packages/core` is the server. It never imports torch and holds no engine knowledge. Anything that
+  needs to know what an engine can do reads a capability document.
+- `python/rhapsode-worker` is the SDK an engine author subclasses. It must never depend on torch
+  either, or an ONNX adapter cannot install it.
+
+Dependency direction is one-way: `apps/server` → `packages/core` → `packages/contract`.
+
+## Commands
+
+`pnpm test` runs both languages. That is deliberate: one repository only means "the protocol and both
+of its implementations move in one commit" if one command tests both.
+
+```bash
+pnpm install && pnpm python:sync    # first time
+pnpm build && pnpm test
+node scripts/python.mjs test        # the Python half alone
+```
+
+`pnpm python:sync` builds `python/.venv` with the three Python packages installed editable. It
+prefers `uv` and falls back to the stdlib `venv` module.
+
+If your machine intercepts TLS and pip cannot verify a certificate, set
+`RHAPSODE_PIP_TRUSTED_HOSTS=pypi.org,files.pythonhosted.org`. It is an environment variable rather
+than a checked-in `pip.conf` on purpose: weakening certificate verification is a local decision and
+must not be something anybody inherits by cloning.
+
+## Conventions
+
+These match ServerKit and deadair, and the reason to match them is that all three are read by the
+same people.
+
+- ESM only, Node >= 22, TypeScript 6. `tsup` for JS, `tsc --emitDeclarationOnly` for types.
+- Tests live in a top-level `tests/` per package, mirroring `src/`, importing `../src/...`. Never
+  colocated, and kept out of the build tsconfig so `tsc` only type-checks shippable code.
+- Python tests run one pytest invocation per package, because pytest imports `conftest` by module
+  name: pointed at several test directories at once, the first `conftest` shadows the rest. Test
+  module basenames still need to be distinct within a package.
+- Dot-separated lowercase filenames: `worker.supervisor.ts`, `residency.manager.ts`.
+- Luxon, never `new Date()` or `Date.now()`.
+- `undefined` for "not set", never `null`.
+- No em dashes in prose. Restructure instead.
+- Changesets for every user-visible change.
+
+## The house style for a comment
+
+The spec says of itself that every rule which looks arbitrary was paid for somewhere else first, and
+says where. Comments here work the same way: say what it cost, and cite the measurement. A comment
+that only restates the code is noise, and a rule with no reason attached gets deleted by the next
+person who finds it inconvenient.

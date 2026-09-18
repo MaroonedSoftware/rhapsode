@@ -1,0 +1,39 @@
+{
+    "name": "@rhapsode/contract",
+    "version": "0.0.0",
+    "description": "The rhapsode contract: generated schemas and types, plus the standard cue and delivery vocabulary as pure functions.",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "license": "MIT",
+    "files": [
+        "dist/**",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --sourcemap && tsc --emitDeclarationOnly --declaration",
+        "build:ci": "eslint --max-warnings=0 && pnpm run build",
+        "lint": "eslint --fix",
+        "format": "prettier --write . --ignore-path ../../.prettierignore",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "zod": "^4.5.4"
+    },
+    "devDependencies": {
+        "@repo/config-eslint": "workspace:*",
+        "@repo/config-typescript": "workspace:*",
+        "vitest": "^4.1.11"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
