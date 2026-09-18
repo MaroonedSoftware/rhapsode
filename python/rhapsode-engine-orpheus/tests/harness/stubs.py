@@ -15,8 +15,11 @@ weights answer that, and `rhapsode-conform` against a real install is where it g
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import enum
 import hashlib
+import importlib.machinery
 import random
 import sys
 import types
@@ -44,6 +47,7 @@ class Generation:
 @dataclass
 class Recorder:
     llamas: list[FakeLlama] = field(default_factory=list)
+    vllms: list[FakeAsyncLLM] = field(default_factory=list)
     downloads: list[dict[str, Any]] = field(default_factory=list)
     #: How many frames each generation speaks. None is "in proportion to the prompt".
     frames: int | None = None
@@ -92,6 +96,65 @@ class FakeLlama:
 
     def close(self) -> None:
         self.closed = True
+
+
+def _audio_tokens(rng: random.Random, frames: int, endless: bool) -> Iterator[int]:
+    """What the finetune writes: seven codes a frame, then end of speech, unless it will not stop."""
+    position = 0
+    while endless or position < frames * FRAME_TOKENS:
+        yield AUDIO_TOKEN_BASE + (position % FRAME_TOKENS) * CODEBOOK_SIZE + rng.randrange(CODEBOOK_SIZE)
+        position += 1
+    yield END_OF_SPEECH
+
+
+@dataclass
+class VllmRequest:
+    prompt: list[int]
+    parameters: Any
+    request_id: str
+    delivered: int = 0
+
+
+class FakeAsyncLLM:
+    """vLLM's AsyncLLM: an async generator of deltas, which includes the stop token as vLLM's does."""
+
+    def __init__(self, recorder: Recorder, arguments: Any) -> None:
+        self.recorder = recorder
+        self.arguments = arguments
+        self.requests: list[VllmRequest] = []
+        self.aborted: list[str] = []
+        self.shut_down = False
+        #: The loop it was made on, which must be the loop it is used on.
+        self.loop = asyncio.get_running_loop()
+        recorder.vllms.append(self)
+
+    async def generate(self, prompt: dict[str, Any], parameters: Any, request_id: str) -> Any:
+        assert asyncio.get_running_loop() is self.loop
+        request = VllmRequest(
+            prompt=list(prompt["prompt_token_ids"]), parameters=parameters, request_id=request_id
+        )
+        self.requests.append(request)
+        options = sorted((k, v) for k, v in vars(parameters).items() if k != "output_kind")
+        rng = random.Random(repr((request.prompt, options)))
+        frames = self.recorder.frames if self.recorder.frames is not None else 6 + len(request.prompt) // 2
+        tokens = _audio_tokens(rng, frames, self.recorder.endless)
+        while request_id not in self.aborted and request.delivered < parameters.max_tokens:
+            delta: list[int] = []
+            for token in tokens:
+                delta.append(token)
+                request.delivered += 1
+                if token == END_OF_SPEECH or len(delta) == 3 or request.delivered == parameters.max_tokens:
+                    break
+            yield types.SimpleNamespace(outputs=[types.SimpleNamespace(token_ids=delta)])
+            if delta and delta[-1] == END_OF_SPEECH:
+                return
+            await asyncio.sleep(0)
+
+    async def abort(self, request_id: str) -> None:
+        self.aborted.append(request_id)
+
+    def shutdown(self) -> None:
+        self.shut_down = True
 
 
 class _Audio(np.ndarray):
@@ -161,8 +224,57 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
     hub.hf_hub_download = hf_hub_download  # type: ignore[attr-defined]
     hub.snapshot_download = snapshot_download  # type: ignore[attr-defined]
+    errors = types.ModuleType("huggingface_hub.errors")
+    errors.GatedRepoError = GatedRepoError  # type: ignore[attr-defined]
+    hub.errors = errors  # type: ignore[attr-defined]
 
-    return {"torch": torch, "snac": snac, "llama_cpp": llama_cpp, "huggingface_hub": hub}
+    return {
+        "torch": torch,
+        "snac": snac,
+        "llama_cpp": llama_cpp,
+        "huggingface_hub": hub,
+        "huggingface_hub.errors": errors,
+        **vllm_modules(recorder),
+    }
+
+
+class GatedRepoError(Exception):
+    pass
+
+
+def vllm_modules(recorder: Recorder) -> dict[str, types.ModuleType]:
+    """vLLM and the transformers tokenizer it brings, enough for the `full` build."""
+    vllm = types.ModuleType("vllm")
+    # `importlib.util.find_spec` reads this for a module already in sys.modules, and raises on None.
+    vllm.__spec__ = importlib.machinery.ModuleSpec("vllm", None)
+
+    class AsyncEngineArgs:
+        def __init__(self, **options: Any) -> None:
+            self.options = options
+
+    class SamplingParams:
+        def __init__(self, **options: Any) -> None:
+            self.__dict__.update(options)
+
+    vllm.AsyncEngineArgs = AsyncEngineArgs  # type: ignore[attr-defined]
+    vllm.SamplingParams = SamplingParams  # type: ignore[attr-defined]
+    vllm.TokensPrompt = dict  # type: ignore[attr-defined]
+    vllm.AsyncLLMEngine = types.SimpleNamespace(  # type: ignore[attr-defined]
+        from_engine_args=lambda arguments: FakeAsyncLLM(recorder, arguments)
+    )
+
+    sampling = types.ModuleType("vllm.sampling_params")
+    sampling.RequestOutputKind = enum.Enum("RequestOutputKind", ["CUMULATIVE", "DELTA", "FINAL_ONLY"])  # type: ignore[attr-defined]
+
+    transformers = types.ModuleType("transformers")
+
+    class Tokenizer:
+        def __call__(self, text: str) -> dict[str, list[int]]:
+            return {"input_ids": [128000, *text.encode("utf-8")]}
+
+    transformers.AutoTokenizer = types.SimpleNamespace(from_pretrained=lambda path: Tokenizer())  # type: ignore[attr-defined]
+
+    return {"vllm": vllm, "vllm.sampling_params": sampling, "transformers": transformers}
 
 
 def install(recorder: Recorder | None = None) -> Recorder:

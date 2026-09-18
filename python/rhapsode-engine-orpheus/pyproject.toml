@@ -21,6 +21,11 @@ dependencies = [
     "huggingface_hub>=0.23",
 ]
 
+[project.optional-dependencies]
+# The `full` build: Canopy's own weights through vLLM, on Linux with a CUDA card. Several gigabytes,
+# and it pins its own torch, so it is asked for by name rather than installed with every engine.
+vllm = ["vllm>=0.10", "transformers>=4.45"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/rhapsode_engine_orpheus"]
 
@@ -39,7 +44,7 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "snac.*", "llama_cpp.*", "numpy.*", "huggingface_hub", "huggingface_hub.*"]
+module = ["torch.*", "snac.*", "llama_cpp.*", "vllm.*", "transformers.*", "numpy.*", "huggingface_hub", "huggingface_hub.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

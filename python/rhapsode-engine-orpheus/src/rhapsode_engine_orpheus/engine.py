@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import importlib.util
+import os
 from collections.abc import Iterator
 from typing import Any, ClassVar
 
 from rhapsode_worker import Engine, NativeFormat, SpeakRequest, UnknownVoice, Unsupported, Variant, Voice
+from rhapsode_worker.engine import Device
 
-from .backends import LlamaCppSource, Sampling, TokenSource
+from .backends import LlamaCppSource, Sampling, TokenSource, VllmSource
 from .builds import (
     DEFAULT_VOICE,
+    FULL_FILES,
+    FULL_REPOSITORY,
+    FULL_REVISION,
     GGUF_FILES,
     GGUF_REPOSITORY,
     GGUF_REVISION,
@@ -24,6 +30,15 @@ from .prompt import MAX_TOKENS, prompt, segments, translate_cues
 
 #: SNAC 24 kHz, mono.
 SAMPLE_RATE = 24_000
+
+#: What the `full` build asks vLLM for, when the operator has not said. The weights are 7.6 GB in
+#: bfloat16, half the 15.2 GB of float32 on disk; the rest is vLLM's activations, its CUDA graphs and
+#: a KV cache for one 2048-token sequence. Not measured on a card yet: `RHAPSODE_ORPHEUS_GPU_MEMORY`,
+#: a fraction of the card, overrides it, and the first CUDA run is where to put a number here.
+FULL_MEMORY_BYTES = 10 * 2**30
+
+#: vLLM's own default, and the most this engine will ask for however small the card.
+MOST_OF_A_CARD = 0.9
 
 
 def _installed(distribution: str) -> str | None:
@@ -64,15 +79,22 @@ class OrpheusEngine(Engine):
     # ------------------------------------------------------------------ what this engine can do
 
     def variants(self) -> dict[str, Variant]:
-        return variants()
+        return variants(full=self._can_run_full())
+
+    def _can_run_full(self) -> bool:
+        """A CUDA card and vLLM, which is Linux on NVIDIA only. `find_spec` rather than an import,
+        because importing vLLM takes seconds and this is asked on every `/capabilities`."""
+        return self.device.type == "cuda" and importlib.util.find_spec("vllm") is not None
 
     # ------------------------------------------------------------------ residency
 
     def load(self, variant: str) -> None:
-        if variant not in GGUF_FILES:
-            raise Unsupported(f'no build "{variant}"; this engine has {sorted(GGUF_FILES)}')
-        accelerated = self.device.type in {"cuda", "rocm", "mps"}
-        self._source = LlamaCppSource(_gguf(variant), gpu=accelerated)
+        self._check(variant)
+        if variant == "full":
+            self._source = VllmSource(_full(), memory_fraction=memory_fraction(self.device))
+        else:
+            accelerated = self.device.type in {"cuda", "rocm", "mps"}
+            self._source = LlamaCppSource(_gguf(variant), gpu=accelerated)
         self._decoder = SnacDecoder("cuda" if self.device.type in {"cuda", "rocm"} else "cpu")
 
     def fetch(self, variant: str) -> None:
@@ -81,10 +103,23 @@ class OrpheusEngine(Engine):
         The same files at the same revisions `load` asks for, so the load that follows is a cache hit.
         `q8` is 3.5 GB, which a first `/speak` would otherwise spend its whole budget downloading.
         """
-        if variant not in GGUF_FILES:
-            raise Unsupported(f'no build "{variant}"; this engine has {sorted(GGUF_FILES)}')
-        _gguf(variant)
+        self._check(variant)
+        if variant == "full":
+            _full()
+        else:
+            _gguf(variant)
         _snac()
+
+    def _check(self, variant: str) -> None:
+        declared = self.variants()
+        if variant in declared:
+            return
+        if variant == "full":
+            raise Unsupported(
+                'the "full" build runs on vLLM, which needs a CUDA card and '
+                "`pip install 'rhapsode-engine-orpheus[vllm]'` in this engine's virtualenv"
+            )
+        raise Unsupported(f'no build "{variant}"; this engine has {sorted(declared)}')
 
     def unload(self) -> None:
         """Close the Llama, drop the codec, and ask torch for the memory back.
@@ -168,6 +203,36 @@ def _gguf(variant: str) -> str:
     return _download(GGUF_REPOSITORY, GGUF_FILES[variant], GGUF_REVISION)
 
 
+def _full() -> str:
+    """Canopy's finetune, file by file, and the directory vLLM should load it from.
+
+    Gated, so a box with no token, or a token whose account has not accepted the terms, is refused
+    by the hub. That is a fact about this box's configuration, and `unsupported` with the fix in it
+    serves the operator better than the hub's 401 surfacing as `internal`.
+    """
+    from huggingface_hub.errors import GatedRepoError
+
+    try:
+        paths = [_download(FULL_REPOSITORY, filename, FULL_REVISION) for filename in FULL_FILES]
+    except GatedRepoError as error:
+        raise Unsupported(
+            f"{FULL_REPOSITORY} is gated: accept its terms at https://huggingface.co/{FULL_REPOSITORY} "
+            'and give this engine the token, as "env": { "HF_TOKEN": "..." } on its entry in '
+            "rhapsode.config.json"
+        ) from error
+    return os.path.dirname(paths[0])
+
+
+def memory_fraction(device: Device) -> float:
+    """The fraction of the card vLLM may claim: the operator's, or this engine's budget over the card."""
+    configured = os.getenv("RHAPSODE_ORPHEUS_GPU_MEMORY")
+    if configured:
+        return float(configured)
+    if not device.vram_bytes:
+        return MOST_OF_A_CARD
+    return round(min(MOST_OF_A_CARD, FULL_MEMORY_BYTES / device.vram_bytes), 3)
+
+
 def _snac() -> None:
     """The two files `SNAC.from_pretrained` reads, copied from snac 1.2.1 rather than imported, because
     importing snac imports torch and fetching has no use for it."""
@@ -176,8 +241,6 @@ def _snac() -> None:
 
 
 def _download(repository: str, filename: str, revision: str) -> str:
-    import os
-
     from huggingface_hub import hf_hub_download
 
     path: str = hf_hub_download(

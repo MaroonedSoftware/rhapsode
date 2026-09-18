@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,9 @@ from rhapsode_worker import Log, SpeakRequest, UnknownVoice, Unsupported
 from rhapsode_worker.engine import Device
 
 from rhapsode_engine_orpheus.builds import (
+    FULL_FILES,
+    FULL_REPOSITORY,
+    FULL_REVISION,
     GGUF_FILES,
     GGUF_REPOSITORY,
     GGUF_REVISION,
@@ -19,7 +23,7 @@ from rhapsode_engine_orpheus.builds import (
     VOICES,
 )
 from rhapsode_engine_orpheus.codes import SAMPLES_PER_FRAME
-from rhapsode_engine_orpheus.engine import OrpheusEngine
+from rhapsode_engine_orpheus.engine import OrpheusEngine, memory_fraction
 from rhapsode_engine_orpheus.prompt import MAX_TOKENS, SEGMENT_CHARACTERS
 
 
@@ -198,3 +202,73 @@ class TestFetching:
     def test_fetch_refuses_a_build_this_engine_does_not_have(self, orpheus: Recorder, tmp_path: Path) -> None:
         with pytest.raises(Unsupported, match="no build"):
             engine(tmp_path).fetch("q2")
+
+
+class TestFull:
+    """The `full` build, which exists only where vLLM can run it."""
+
+    def test_declared_on_a_cuda_card_with_vllm(self, orpheus: Recorder, tmp_path: Path) -> None:
+        assert "full" in engine(tmp_path, "cuda").variants()
+
+    def test_not_declared_on_a_mac(self, orpheus: Recorder, tmp_path: Path) -> None:
+        assert "full" not in engine(tmp_path, "mps").variants()
+
+    def test_not_declared_without_vllm(
+        self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delitem(sys.modules, "vllm")
+        assert "full" not in engine(tmp_path, "cuda").variants()
+
+    def test_loading_it_where_it_is_not_declared_says_what_it_needs(
+        self, orpheus: Recorder, tmp_path: Path
+    ) -> None:
+        with pytest.raises(Unsupported, match=r"CUDA card.*\[vllm\]"):
+            engine(tmp_path, "mps").load("full")
+
+    def test_it_claims_what_the_ggufs_claim(self, orpheus: Recorder, tmp_path: Path) -> None:
+        declared = engine(tmp_path, "cuda").variants()
+        assert declared["full"] == declared["q8"]
+
+    def test_it_loads_canopys_weights_file_by_file_and_never_the_training_state(
+        self, orpheus: Recorder, tmp_path: Path
+    ) -> None:
+        loaded(tmp_path, "full", device="cuda")
+        fetched = [download for download in orpheus.downloads if download.get("repo_id") == FULL_REPOSITORY]
+        assert [download["filename"] for download in fetched] == list(FULL_FILES)
+        assert {download["revision"] for download in fetched} == {FULL_REVISION}
+        assert not any("optimizer" in name or "fsdp" in name for name in FULL_FILES)
+        assert orpheus.vllms[0].arguments.options["model"] == "/models"
+
+    def test_it_speaks(self, orpheus: Recorder, tmp_path: Path) -> None:
+        orpheus.frames = 6
+        audio = spoken(loaded(tmp_path, "full", device="cuda"), text="Hi. [laugh]")
+        assert len(audio) == 6 * SAMPLES_PER_FRAME * 2
+        assert orpheus.llamas == []
+
+    def test_a_gated_refusal_says_how_to_get_in(
+        self, orpheus: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import huggingface_hub
+        from harness.stubs import GatedRepoError
+
+        def refuse(**arguments: Any) -> str:
+            raise GatedRepoError("401")
+
+        monkeypatch.setattr(huggingface_hub, "hf_hub_download", refuse)
+        with pytest.raises(Unsupported, match=r"gated.*HF_TOKEN"):
+            engine(tmp_path, "cuda").fetch("full")
+
+
+class TestMemoryFraction:
+    def test_the_budget_over_the_card(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("RHAPSODE_ORPHEUS_GPU_MEMORY", raising=False)
+        assert memory_fraction(Device("cuda", "4090", vram_bytes=24 * 2**30)) == round(10 / 24, 3)
+
+    def test_never_more_than_vllms_own_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("RHAPSODE_ORPHEUS_GPU_MEMORY", raising=False)
+        assert memory_fraction(Device("cuda", "small", vram_bytes=8 * 2**30)) == 0.9
+        assert memory_fraction(Device("cuda", "unknown")) == 0.9
+
+    def test_the_operator_overrides_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("RHAPSODE_ORPHEUS_GPU_MEMORY", "0.55")
+        assert memory_fraction(Device("cuda", "4090", vram_bytes=24 * 2**30)) == 0.55

@@ -229,6 +229,11 @@ what is loaded" and "what would I get if I asked for a different variant" as sep
 Engines with one build report a single variant and `current` mirrors it. The shape costs them
 nothing.
 
+**`variants` lists what this worker can load, not everything the engine has.** Orpheus's `full`
+build runs on vLLM, which needs a CUDA card; on a Mac, or on a box without vLLM installed, the worker
+does not list it. Listing it there would be a variant that every load fails, which a client cannot tell
+from a variant that is only slow to load, and the first sign would be an error on a real request.
+
 **`current` is absent when no model is resident**, because a worker in `up(unloaded)` has nothing to
 describe and an invented answer is worse than no answer. `variants` is always present, so the
 question "what could this engine do" is always answerable and only "what can it do right now" goes

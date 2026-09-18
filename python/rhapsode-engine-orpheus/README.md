@@ -27,4 +27,25 @@ Then in `rhapsode.config.json`:
   first or the last makes the reading faster.
 - **Voices:** the finetune's eight, `tara` first. No cloning.
 - **Variants:** `q8` (3.5 GB, the default) and `q4` (2.1 GB), the same finetune at two precisions,
-  run through llama.cpp on Metal, CUDA or the CPU.
+  run through llama.cpp on Metal, CUDA or the CPU. On a CUDA box with vLLM, also `full`: Canopy's
+  own weights, unquantised.
+
+## The `full` build
+
+```bash
+/opt/rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[vllm]'
+```
+
+Linux and a CUDA card only, and the worker lists `full` only where both are true. The weights are
+gated: accept the terms on [the model page](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft),
+then give the engine a token in its `env`:
+
+```json
+{ "engines": { "orpheus": { "venv": "/opt/rhapsode/venvs/orpheus", "env": { "HF_TOKEN": "hf_..." } } } }
+```
+
+The download is 15.2 GB of float32, named file by file: the repository itself is 56.7 GB, because it
+also holds the optimizer state from training. vLLM claims a fixed share of the card when it loads,
+10 GiB worth by default. `RHAPSODE_ORPHEUS_GPU_MEMORY` in the same `env`, as a fraction of the card,
+overrides that. Nobody has run this build on a CUDA card yet, so treat both numbers as a starting
+point.

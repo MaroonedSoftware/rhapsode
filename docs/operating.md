@@ -125,6 +125,18 @@ PIP_EXTRA_INDEX_URL=https://abetlen.github.io/llama-cpp-python/whl/cu124 node ap
 Without it the install still succeeds, with a CPU build. Real time needs about 82 tokens a second
 (seven per 85 ms frame), and whether a CPU reaches that depends on the machine.
 
+Orpheus also has a `full` build, Canopy's unquantised weights on vLLM, for a Linux box with a CUDA
+card. The catalog install does not include vLLM, which is several gigabytes and pins its own torch.
+Add it to the engine's virtualenv by hand, then restart the engine:
+
+```bash
+~/.rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[vllm]'
+```
+
+Those weights are gated, and a worker's environment is built from scratch, so the token has to be in
+the engine's `env` in your config file (`"env": { "HF_TOKEN": "hf_..." }`). Without it, a pull of
+`full` is refused as `unsupported`, with a message that says exactly this.
+
 ## The web page
 
 `apps/web` is a page for the same routes: the catalog with both licences, and install, pull and

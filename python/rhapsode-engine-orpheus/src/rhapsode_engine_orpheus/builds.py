@@ -57,17 +57,41 @@ GGUF_FILES: dict[str, str] = {
     "q4": "orpheus-3b-0.1-ft-Q4_K_M.gguf",
 }
 
+#: Canopy's own finetune, for the `full` build on vLLM. Gated: downloading it needs a Hugging Face
+#: account that has accepted the terms on the model page, and its token in `HF_TOKEN`.
+FULL_REPOSITORY = "canopylabs/orpheus-3b-0.1-ft"
+FULL_REVISION = "4206a56e5a68cf6cf96900a8a78acd3370c02eb6"
+
+#: Only what inference reads, named file by file. The repository is 56.7 GB because it also holds the
+#: optimizer and FSDP state from training, which a whole-repository download would fetch; these are
+#: 15.2 GB of float32 weights, which vLLM casts to bfloat16 as it loads them.
+FULL_FILES: tuple[str, ...] = (
+    "config.json",
+    "generation_config.json",
+    "model.safetensors.index.json",
+    "model-00001-of-00004.safetensors",
+    "model-00002-of-00004.safetensors",
+    "model-00003-of-00004.safetensors",
+    "model-00004-of-00004.safetensors",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+)
+
 #: The codec that turns the model's codes into a waveform. MIT, ungated, 80 MB.
 SNAC_REPOSITORY = "hubertsiuzdak/snac_24khz"
 SNAC_REVISION = "d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec"
 
 
-def variants() -> dict[str, Variant]:
+def variants(*, full: bool = False) -> dict[str, Variant]:
     """Every build claims the same thing, because every build is the same finetune.
 
     No deliveries: Orpheus has no whisper and no intensity control, and a word it cannot perform is
     one it must not claim. The sampling dials are real ones: upstream documents that the temperature
     and repetition penalty change the pace of the reading.
+
+    `full` is declared only where it can load, which the engine decides: a variant listed on a box
+    that cannot run it is a promise every load of it breaks. protocol.md § 4.
     """
     claimed = Variant(cues=CUES, deliveries=(), dials=dict(DIALS), languages=("en",))
-    return {name: claimed for name in GGUF_FILES}
+    return {name: claimed for name in (*GGUF_FILES, *(("full",) if full else ()))}

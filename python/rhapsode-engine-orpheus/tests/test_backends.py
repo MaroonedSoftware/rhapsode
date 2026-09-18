@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from harness.stubs import Recorder
 
-from rhapsode_engine_orpheus.backends import CONTEXT_TOKENS, LlamaCppSource, Sampling
+from rhapsode_engine_orpheus.backends import CONTEXT_TOKENS, LlamaCppSource, Sampling, VllmSource
 from rhapsode_engine_orpheus.prompt import END_OF_PROMPT, END_OF_SPEECH, START_OF_HUMAN
 
 SAMPLING = Sampling(temperature=0.6, top_p=0.8, repetition_penalty=1.3, seed=7)
@@ -86,3 +86,69 @@ def test_close_closes_the_model(orpheus: Recorder) -> None:
     built = source()
     built.close()
     assert orpheus.llamas[0].closed
+
+
+class TestVllm:
+    def source(self) -> VllmSource:
+        return VllmSource("/models/full", memory_fraction=0.4)
+
+    def test_the_engine_is_made_and_used_on_its_own_loop(self, orpheus: Recorder) -> None:
+        # vLLM's output handling runs on the loop that made the engine, and the SDK calls speak from
+        # another thread. The fake asserts every generate runs on the loop it was made on.
+        built = self.source()
+        assert list(built.tokens("x", SAMPLING))
+        built.close()
+
+    def test_it_asks_for_its_budget_of_the_card_not_vllms_default(self, orpheus: Recorder) -> None:
+        self.source()
+        options = orpheus.vllms[0].arguments.options
+        assert options["gpu_memory_utilization"] == 0.4
+        assert options["dtype"] == "bfloat16"
+        assert options["max_model_len"] == CONTEXT_TOKENS
+
+    def test_the_prompt_is_framed_as_the_finetune_was_trained(self, orpheus: Recorder) -> None:
+        list(self.source().tokens("tara: hi", SAMPLING))
+        prompt = orpheus.vllms[0].requests[0].prompt
+        assert prompt[:2] == [START_OF_HUMAN, 128000]
+        assert prompt[-len(END_OF_PROMPT) :] == list(END_OF_PROMPT)
+
+    def test_upstreams_sampling_reaches_vllm(self, orpheus: Recorder) -> None:
+        list(self.source().tokens("x", SAMPLING))
+        parameters = orpheus.vllms[0].requests[0].parameters
+        assert (parameters.temperature, parameters.top_p, parameters.repetition_penalty) == (0.6, 0.8, 1.3)
+        assert parameters.stop_token_ids == [END_OF_SPEECH]
+        assert parameters.seed == 7
+        assert parameters.detokenize is False
+        assert parameters.output_kind.name == "DELTA"
+
+    def test_the_stop_token_vllm_reports_is_not_passed_on(self, orpheus: Recorder) -> None:
+        orpheus.frames = 3
+        tokens = list(self.source().tokens("x", SAMPLING))
+        assert len(tokens) == 21
+        assert END_OF_SPEECH not in tokens
+
+    def test_max_tokens_is_vllms_to_enforce(self, orpheus: Recorder) -> None:
+        orpheus.endless = True
+        tokens = list(self.source().tokens("x", Sampling(0.6, 0.8, 1.3, seed=1, max_tokens=50)))
+        assert len(tokens) == 50
+
+    def test_a_caller_who_leaves_is_aborted_so_the_card_stops(self, orpheus: Recorder) -> None:
+        orpheus.endless = True
+        stream = self.source().tokens("x", SAMPLING)
+        next(stream)
+        stream.close()
+        engine = orpheus.vllms[0]
+        assert engine.aborted == [engine.requests[0].request_id]
+
+    def test_a_finished_request_is_not_aborted(self, orpheus: Recorder) -> None:
+        list(self.source().tokens("x", SAMPLING))
+        assert orpheus.vllms[0].aborted == []
+
+    def test_no_seed_is_vllms_fresh_one(self, orpheus: Recorder) -> None:
+        list(self.source().tokens("x", Sampling(0.6, 0.8, 1.3, seed=None)))
+        assert orpheus.vllms[0].requests[0].parameters.seed is None
+
+    def test_close_shuts_the_engine_down(self, orpheus: Recorder) -> None:
+        built = self.source()
+        built.close()
+        assert orpheus.vllms[0].shut_down
