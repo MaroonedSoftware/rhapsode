@@ -212,7 +212,7 @@ describe('GET /catalog', () => {
         const { app } = await start();
         const catalog = (await app.inject({ method: 'GET', url: '/catalog' })).json();
 
-        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['chatterbox', 'tone']);
+        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['chatterbox', 'kokoro', 'tone']);
         for (const entry of catalog) CatalogEntry.parse(entry);
         expect(catalog.find((entry: CatalogEntry) => entry.id === 'chatterbox')).toMatchObject({
             package: 'rhapsode-engine-chatterbox',
@@ -220,6 +220,11 @@ describe('GET /catalog', () => {
             installed: 'no',
             managed: false,
             license: { weights: 'MIT' },
+        });
+        // § 4: the code licence is what the worker runs. Kokoro's adapter is MIT and phonemizes
+        // through GPL code, and this is the one place an operator reads that before installing it.
+        expect(catalog.find((entry: CatalogEntry) => entry.id === 'kokoro')).toMatchObject({
+            license: { code: 'GPL-3.0-or-later', weights: 'Apache-2.0', weightsCommercialUse: true },
         });
     });
 

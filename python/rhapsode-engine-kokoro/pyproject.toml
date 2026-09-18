@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-kokoro"
+version = "0.0.0"
+description = "Kokoro for rhapsode: an ONNX engine on the CPU, with no torch."
+readme = "README.md"
+# This package's own code. What the worker process runs is GPL-3.0-or-later, through phonemizer and
+# eSpeak NG, and the capability document says so: protocol.md § 4.
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker",
+    "numpy>=1.26",
+    # 0.6 is the API this adapter is written against: `EspeakConfig` and `create(..., lang=)`. It
+    # declares requires-python <3.14, and on 3.14 pip resolves 0.4.7 instead, silently, which is why
+    # the catalog record carries a Python range the installer enforces.
+    "kokoro-onnx>=0.6.1,<0.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_kokoro"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["kokoro_onnx", "kokoro_onnx.*", "espeakng_loader", "numpy.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts a stub where the model would be.
+pythonpath = ["tests"]
+timeout = 60

@@ -40,7 +40,7 @@ describe('RhapsodeSdk against a real core', () => {
         const client = await sdk();
 
         const catalog = await client.public.catalog();
-        expect(catalog.map(entry => entry.id).sort()).toEqual(['chatterbox', 'tone']);
+        expect(catalog.map(entry => entry.id).sort()).toEqual(['chatterbox', 'kokoro', 'tone']);
         expect((await client.public.health()).status).toBe('ok');
     });
 
@@ -57,7 +57,7 @@ describe('RhapsodeSdk against a real core', () => {
         const base = `http://127.0.0.1:${(running!.app.server.address() as { port: number }).port}`;
         const foreign = new RhapsodeSdk({ baseUrl: base, headers: { origin: 'https://evil.example' } });
 
-        expect(await foreign.public.catalog()).toHaveLength(2);
+        expect(await foreign.public.catalog()).toHaveLength(3);
         expect(await foreign.public.installJobs()).toMatchObject({ status: 403, data: { error: { code: 'forbidden' } } });
         expect(await client.public.installJobs()).toMatchObject({ status: 200, data: [] });
     });

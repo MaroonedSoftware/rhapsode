@@ -23,7 +23,7 @@ const PACKAGES = ['rhapsode-worker', 'rhapsode-engine-tone', 'conformance'];
 // virtualenv, which is the whole point of the design; here we want the adapter's own logic under
 // test without pulling torch and several gigabytes of weights into a shared dev environment. The
 // tests stub the model, which is the only part that needs any of that.
-const ADAPTERS = ['rhapsode-engine-chatterbox'];
+const ADAPTERS = ['rhapsode-engine-chatterbox', 'rhapsode-engine-kokoro'];
 const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'pytest-timeout>=2.3', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11', 'numpy>=1.26'];
 
 // A sandbox or a corporate proxy that intercepts TLS makes pip's certificate check fail against a

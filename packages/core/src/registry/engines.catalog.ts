@@ -47,6 +47,24 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'https://github.com/resemble-ai/chatterbox',
         },
     },
+    kokoro: {
+        displayName: 'Kokoro',
+        module: 'rhapsode_engine_kokoro',
+        package: 'rhapsode-engine-kokoro',
+        // fp16, because it was the fastest of the three on the CPU it was measured on (9.9x realtime
+        // against fp32's 8.3x and int8's 2.5x) and half fp32's download.
+        defaultVariant: 'fp16',
+        // 3.11 for the worker SDK. Below 3.14 for kokoro-onnx, whose 0.6 declares it; on 3.14 pip
+        // installs 0.4.7 instead, without a word, and the adapter was written against 0.6.
+        python: { from: '3.11', below: '3.14' },
+        license: {
+            // What the worker process runs, not what the adapter package is. protocol.md § 4.
+            code: 'GPL-3.0-or-later',
+            weights: 'Apache-2.0',
+            weightsCommercialUse: true,
+            notes: 'GPL through phonemizer and eSpeak NG, which kokoro-onnx (MIT) phonemizes with. Weights: hexgrad/Kokoro-82M, Apache-2.0.',
+        },
+    },
     tone: {
         displayName: 'Tone',
         module: 'rhapsode_engine_tone',
