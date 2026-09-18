@@ -9,7 +9,17 @@ description = "Orpheus for rhapsode: a Llama that speaks in SNAC codes, and the 
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["rhapsode-worker"]
+dependencies = [
+    "rhapsode-worker",
+    "numpy>=1.26",
+    # The Llama. A wheel for the CPU, built from source with Metal on a Mac (which needs the Xcode
+    # command line tools), and for CUDA from its own index through PIP_EXTRA_INDEX_URL. The repository's
+    # shared dev venv installs this package with --no-deps, so none of it is needed to test the adapter.
+    "llama-cpp-python>=0.3.16",
+    # The codec, which brings torch. It is the only part of this engine that needs it.
+    "snac>=1.2.1",
+    "huggingface_hub>=0.23",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rhapsode_engine_orpheus"]
@@ -28,6 +38,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 strict = true
 files = ["src"]
 
+[[tool.mypy.overrides]]
+module = ["torch.*", "snac.*", "llama_cpp.*", "numpy.*", "huggingface_hub", "huggingface_hub.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts fakes where llama.cpp and SNAC would be.
+pythonpath = ["tests"]
 timeout = 60

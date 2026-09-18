@@ -2,6 +2,7 @@
 
 from .builds import CUE_TAGS, CUES, VOICES, variants
 from .codes import Framer, Window, code_of, layers
+from .engine import OrpheusEngine
 from .prompt import segments, translate_cues
 
 __all__ = [
@@ -9,6 +10,7 @@ __all__ = [
     "CUE_TAGS",
     "VOICES",
     "Framer",
+    "OrpheusEngine",
     "Window",
     "code_of",
     "layers",

@@ -276,8 +276,17 @@ where.
 laugh  chuckle  sigh  gasp  cough  clear throat  sniff  groan
 ```
 
-A closed set. The engine translates: `(laughs)` for Dia, `[laugh]` for Chatterbox turbo, nothing at
-all for Piper.
+A closed set. The engine translates: `(laughs)` for Dia, `[laugh]` for Chatterbox turbo, `<laugh>`
+for Orpheus, nothing at all for Piper.
+
+An engine claims the cues it performs and not the set: Orpheus has a tag for seven of these and none
+for `clear throat`, so it claims seven, and a `[clear throat]` sent to it is stripped like any other
+cue it does not claim.
+
+**The vocabulary is the only way in.** An adapter removes its engine's own tag syntax from the text
+before it translates, so `<yawn>` sent to Orpheus is dropped, not performed. The alternative is a
+client that learns an engine's private tags and is then tied to that engine, which is the thing this
+section exists to prevent. A tag worth having on two engines is a word for this list.
 
 **The core strips every cue the loaded variant does not claim, before dispatch.** This rule is worth
 more than it looks: it means an engine that implements no cues never sees one, and the failure where
