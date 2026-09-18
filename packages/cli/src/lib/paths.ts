@@ -10,7 +10,14 @@ export const CONFIG_FILE = 'rhapsode.config.json';
  * Orpheus are here without their engines: each adapter imports its engine lazily, so the module loads
  * and its tests stub the model.
  */
-export const DEV_MODULES = ['rhapsode_worker', 'rhapsode_engine_tone', 'rhapsode_conform', 'rhapsode_engine_chatterbox', 'rhapsode_engine_kokoro', 'rhapsode_engine_orpheus'];
+export const DEV_MODULES = [
+    'rhapsode_worker',
+    'rhapsode_engine_tone',
+    'rhapsode_conform',
+    'rhapsode_engine_chatterbox',
+    'rhapsode_engine_kokoro',
+    'rhapsode_engine_orpheus',
+];
 
 /** The interpreter inside a virtualenv, laid out the way `venv` and `uv` both lay it out. */
 export const venvPython = (venv: string): string =>
