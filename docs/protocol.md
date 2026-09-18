@@ -607,7 +607,7 @@ is the specific future this section exists to prevent.
 Installing an engine is part of the API rather than a set of instructions, so that a terminal
 client and a web page can both drive it and neither holds logic the other lacks. By hand it was five
 steps: a virtualenv, a pip install, an edit to the config, a restart, and a first `/speak` that
-silently downloaded 3.8 GB. The core still ships no interface of its own (§ 11). These routes are
+silently downloaded 3.8 GB. The core still ships no interface of its own (§ 12). These routes are
 what one is built on.
 
 | Route | Does |
@@ -765,14 +765,127 @@ format is ServerKit's server feed, so the same client code reads it wherever Ser
 
 ---
 
-## 11. Deliberately not in v1
+## 11. The OpenAI shim
+
+The native API is the contract, and adoption runs through other people's clients. Most of those
+speak OpenAI's `POST /v1/audio/speech`, and pointing one at this server should need a base URL and
+nothing else.
+
+```http
+POST /v1/audio/speech
+Content-Type: application/json
+```
+
+```json
+{ "model": "chatterbox:turbo", "input": "Right, that was The Verve Pipe. [laugh]", "voice": "narrator_02", "response_format": "opus" }
+```
+
+**The shim is a translation into `/speak`, not a second implementation of it.** It builds a native
+request and hands it to the same code, so the ceiling, the cue stripping, the dial check, the
+residency lease and the rules for failing after the headers (§ 6) are the ones `/speak` applies, and
+cannot drift from them. The `/v1` in the path is OpenAI's and says nothing about this contract's
+version, which is § 9's business.
+
+| Field | Becomes |
+| --- | --- |
+| `model` | Required. An engine id, or `engine:variant`. An exact engine id is tried first, so an id with a colon in it is still reachable. |
+| `input` | `text`. Cues in it are handled as `/speak` handles them. |
+| `voice` | `voice`. Absent means the engine's default, although OpenAI's own API requires it. |
+| `response_format` | `format`. Absent means `mp3`, because that is OpenAI's default. `aac` is `unsupported`. |
+| `speed` | A dial named `speed` on the effective variant. Absent or `1` sends nothing. |
+| `instructions` | `unsupported` unless absent or empty. |
+| `stream_format` | `audio` or absent. `sse` is `unsupported`. |
+
+The response always streams, as OpenAI's does. A caller that wants the duration header or the better
+error that `stream: false` gives (§ 6) wants the native API.
+
+### `model` names an engine, and `tts-1` is not one
+
+A `model` that is not an installed engine is `unknown_engine`, and the message lists the ones that
+are. There is no alias that maps `tts-1` to a default engine, for the reason § 7 gives for voices: a
+substitute is audio nobody asked for, delivered with a `200`. A client hardcoded to `tts-1` is
+misconfigured, and the refusal is what tells its operator so.
+
+`alloy` is not a voice either, and is `unknown_voice` like any other id the engine lacks. An operator
+whose client cannot be told another name can clone a voice with the id `alloy`: voice ids are theirs
+to choose.
+
+### What has no equivalent is refused, not dropped
+
+The shim could drop `instructions` and a `speed` it cannot honour and answer `200`. That is the
+silent discard § 6 refuses for dials, and for the same reason: the client believes it asked for
+something. So a non-empty `instructions` is `unsupported`, and so is a `speed` other than `1` on a
+variant with no `speed` dial. A `speed` outside the dial's range is `bad_request`, as any dial is.
+
+A field the shim does not know is `bad_request` naming it. OpenAI's own API refuses an unrecognised
+field with a `400`, so strictness holds a client to nothing it was not already held to. `delivery`,
+`params`, `seed` and `language` are not accepted: the native API takes them, and adding them here
+would make a second native API with a worse name. A multilingual variant speaks the first language
+it lists, as `/speak` does when `language` is absent.
+
+A cue in `input` is different. Stripping one the variant does not claim is § 5 making the request
+performable, not the shim discarding a field, and it happens silently here exactly as it does in
+`/speak`.
+
+### `mp3` by default needs ffmpeg
+
+Because OpenAI's default is `mp3`, a client that says nothing gets `mp3`, which needs an ffmpeg with
+`libmp3lame` on the worker's box. Without one the answer is `unsupported` saying so. The shim does
+not fall back to `wav`: a client that saves the body as `speech.mp3` never reads the `Content-Type`,
+and a WAV with the wrong extension is a bug report that arrives weeks later from somebody else.
+
+### `pcm` is the engine's rate, not OpenAI's
+
+OpenAI's `pcm` is 24 kHz, 16-bit, mono. Here it is the engine's native format, as it is in `/speak`,
+and the `Content-Type` says which: `audio/L16; rate=24000; channels=1`. The core does not resample,
+because it holds no audio knowledge. Chatterbox is 24 kHz, so it matches; an engine at 22.05 kHz
+plays about 9% fast in a client that assumes. A client that cannot read a `Content-Type` should ask
+for `wav`, whose header carries the rate.
+
+### Errors
+
+The envelope is OpenAI's, because that is what the clients parse. The status is § 6's, and the
+taxonomy survives in `code`:
+
+```json
+{
+  "error": {
+    "message": "no voice \"alloy\"",
+    "type": "invalid_request_error",
+    "param": "voice",
+    "code": "unknown_voice",
+    "retryable": false
+  }
+}
+```
+
+`type` is `invalid_request_error` when the request was wrong (not retryable, and under `500`), and
+`server_error` otherwise. `param` names the request field the failure is about, when there is one.
+
+**Every error carries `x-should-retry`, set from `retryable`.** OpenAI's SDKs retry `408`, `409`,
+`429` and every `5xx` twice by default, deciding by status, so without the header an `internal` 500,
+which § 6 says is not retryable, is sent three times. Both official SDKs read `x-should-retry`
+before the status, so with it they retry exactly what the taxonomy says to.
+
+### Who may call it
+
+Anybody who may call `/speak`, which is anybody. OpenAI's clients will not start without an API key
+and send it as `Authorization: Bearer`; the shim ignores it. The header is stripped before any
+handler runs (§ 10), so a key typed into a client is never logged.
+
+Only this route is served. `GET /v1/models` and the rest of OpenAI's API wait for a client that
+needs them.
+
+---
+
+## 12. Deliberately not in v1
 
 Named so that nobody has to guess whether they were forgotten.
 
 - **STT.** A different problem wearing a similar hat. Say no once, in the README.
 - **Multi-speaker dialogue.** Dia wants `[S1]`/`[S2]` alternation and produces a two-hander in one
   pass, with overlaps that stitching separate takes cannot make. It does not fit a `voice` field and
-  half-designing it now would put a bad shape in the contract. Open question, section 12.
+  half-designing it now would put a bad shape in the contract. Open question, section 13.
 - **Word timestamps.** Wanted, cheap enough as an optional sidecar response, and not worth blocking
   v1. Leave room: a `X-Rhapsode-Timings-Url` header or a `timings` field in a multipart response.
 - **Batching.** Adapters declare `concurrency` and that is the whole of it for now.
@@ -780,7 +893,7 @@ Named so that nobody has to guess whether they were forgotten.
   its API behind it. A web page for installing engines is a client of § 10 like any other, and gets
   no route the terminal client does not.
 
-## 12. Open questions
+## 13. Open questions
 
 1. **Dialogue.** Does `text` grow a structured form (`[{voice, text}, ...]`), or does a dialogue
    engine expose a second endpoint? The first pollutes every engine's request shape; the second
