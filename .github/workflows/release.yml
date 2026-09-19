@@ -98,7 +98,8 @@ jobs:
         environment: npm
         permissions:
             contents: read
-            # Provenance: npm records that this workflow, on this commit, built what it publishes.
+            # Trusted publishing: npm accepts this workflow's identity in place of a token, as PyPI
+            # does above, and records provenance from the same one.
             id-token: write
         steps:
             - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -113,6 +114,10 @@ jobs:
                   cache: pnpm
                   registry-url: https://registry.npmjs.org
 
+            # Trusted publishing needs npm 11.5.1 or later, and Node 22 ships npm 10. With an older
+            # npm the OIDC token is never exchanged and the publish fails as unauthenticated.
+            - run: npm install --global npm@^11.5.1
+
             - run: pnpm install --frozen-lockfile
             - run: pnpm run build
 
@@ -122,6 +127,11 @@ jobs:
             #
             # A version already on the registry is skipped rather than failed, so a run that died
             # halfway is finished by re-running it, not by cutting a new version.
+            #
+            # No token. npm tries the workflow's identity first and falls back to NODE_AUTH_TOKEN, which
+            # is empty unless NPM_TOKEN is set. A trusted publisher is registered in a package's settings
+            # on npmjs.com, so a package never published has nowhere to register one: for its first
+            # release set NPM_TOKEN on the `npm` environment, register the publisher, then delete it.
             - name: Publish
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
