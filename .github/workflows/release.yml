@@ -36,8 +36,8 @@ jobs:
         uses: ./.github/workflows/build.yml
 
     pypi:
-        # Before npm, because a published core installs its engines from PyPI at its own version
-        # (§ 9), and a core on npm whose engines are not on PyPI yet fails every install.
+        # Before npm, because a core installs its engines from PyPI at its own version (§ 9). If this
+        # fails, nothing else goes out at a version whose engines are not on the index.
         needs: [build]
         runs-on: ubuntu-latest
         environment: pypi
@@ -98,7 +98,8 @@ jobs:
         environment: npm
         permissions:
             contents: read
-            # Provenance: npm records that this workflow, on this commit, built what it publishes.
+            # Trusted publishing: npm accepts this workflow's identity in place of a token, as PyPI
+            # does above, and records provenance from the same one.
             id-token: write
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -113,6 +114,10 @@ jobs:
                   cache: pnpm
                   registry-url: https://registry.npmjs.org
 
+            # Trusted publishing needs npm 11.5.1 or later, and Node 22 ships npm 10. With an older
+            # npm the OIDC token is never exchanged and the publish fails as unauthenticated.
+            - run: npm install --global npm@^11.5.1
+
             - run: pnpm install --frozen-lockfile
             - run: pnpm run build
 
@@ -122,9 +127,10 @@ jobs:
             #
             # A version already on the registry is skipped rather than failed, so a run that died
             # halfway is finished by re-running it, not by cutting a new version.
+            #
+            # No token. A package's first version, and the trust config that lets this job publish
+            # the rest, come from `node scripts/npm.bootstrap.mjs`, run once by hand.
             - name: Publish
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
               run: |
                   version="${GITHUB_REF_NAME#v}"
                   out="$RUNNER_TEMP/npm"
