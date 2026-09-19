@@ -368,6 +368,9 @@ components:
                 cloning:
                     $ref: "#/components/schemas/Cloning"
                     description: Optional only because contract 1 shipped without it. § 4.
+                blending:
+                    $ref: "#/components/schemas/Blending"
+                    description: "Beside cloning, for the same reason: it needs no model. § 7."
                 dialogue:
                     $ref: "#/components/schemas/Dialogue"
                     description: Present only where this build answers /dialogue. § 6.
@@ -401,8 +404,17 @@ components:
                     type: array
                     items:
                         type: string
+                    description: File types a `reference` may be. § 7.
             required:
                 - supported
+        Blending:
+            type: object
+            properties:
+                supported:
+                    type: boolean
+            required:
+                - supported
+            description: Whether a create may carry a `blend` recipe instead of a `reference`. § 7.
         Streaming:
             type: object
             properties:
@@ -438,6 +450,9 @@ components:
                           type: string
                       cloning:
                           $ref: "#/components/schemas/Cloning"
+                      blending:
+                          $ref: "#/components/schemas/Blending"
+                          description: Absent means no, so a worker that predates it is read correctly.
                       streaming:
                           $ref: "#/components/schemas/Streaming"
                       nativeFormat:
@@ -561,12 +576,15 @@ components:
                 reference:
                     type: string
                     format: binary
+                    description: Exactly one of `reference` and `blend`. § 7.
+                blend:
+                    type: string
+                    description: A recipe, `name(weight)+name(weight)`, over voices the engine has.
                 transcript:
                     type: string
                     description: The words spoken in the reference. Required by an engine that continues from it.
             required:
                 - id
-                - reference
         SpeakRequest:
             type: object
             properties:

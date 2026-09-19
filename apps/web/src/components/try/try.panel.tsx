@@ -89,6 +89,8 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
     const languages = claims.languages ?? [];
     // A worker from before variants said whether they clone leaves it to `current`, when loaded. § 4.
     const cloning = claims.cloning ?? current?.cloning;
+    // The same for blending, which a worker that predates it never claims: absent is no. § 4.
+    const blending = (claims.blending ?? current?.blending)?.supported === true;
     // Offered only where the variant declares it, which is the whole of how the page knows. § 4.
     const dialogue = mode === 'dialogue' && claims.dialogue !== undefined;
     const asking = dialogue ? converse : speak;
@@ -356,7 +358,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                     </Stack>
                 </Card>
             </SimpleGrid>
-            <VoicesCard engine={engine} voices={voices} cloning={cloning} onCloned={setVoice} />
+            <VoicesCard engine={engine} voices={voices} cloning={cloning} blending={blending} onCloned={setVoice} />
         </Stack>
     );
 }

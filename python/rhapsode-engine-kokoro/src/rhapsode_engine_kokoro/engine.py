@@ -6,11 +6,16 @@ workers like any other, so this is an ordinary adapter and the core learns nothi
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any, ClassVar
 
 from rhapsode_worker import (
+    BadRequest,
+    BlendRequest,
+    CreateVoiceRequest,
     Engine,
     Internal,
     NativeFormat,
@@ -21,7 +26,7 @@ from rhapsode_worker import (
     Voice,
 )
 
-from . import weights
+from . import styles, weights
 
 #: Kokoro's rate, for every variant.
 SAMPLE_RATE = 24_000
@@ -126,7 +131,99 @@ class KokoroEngine(Engine):
 
     def voices(self) -> list[Voice]:
         variant = self.variant or self.default_variant
-        return [_voice(name, variant) for name in ENGLISH_VOICES]
+        built_in = [_voice(name, variant) for name in ENGLISH_VOICES]
+        return built_in + [self._created(path, variant) for path in self._stored()]
+
+    def reference_seconds(self) -> tuple[float, float] | None:
+        # A Kokoro reference is a style vector, not audio, so it has no length to advise on.
+        return None
+
+    def reference_formats(self) -> tuple[str, ...]:
+        return ("npy", "pt")
+
+    def create_voice(self, request: CreateVoiceRequest) -> Voice:
+        """Keep an uploaded style vector: how a voicepack outside voices-v1.0.bin arrives."""
+        self._refuse_built_in(request.id)
+        suffix = Path(request.filename).suffix.lower().lstrip(".") if request.filename else ""
+        style = styles.read_style(request.reference, suffix)
+        source = Path(request.filename or "").name
+        path = self._store(request.id, style, {"source": source, "lang": _accent_of(Path(source).stem)})
+        return self._created(path, self.variant or self.default_variant, label=request.label)
+
+    def blend_voice(self, request: BlendRequest) -> Voice:
+        """Mix the components' style vectors in their shares, now, and keep the result.
+
+        The accent is the heaviest component's. Kokoro phonemizes with one language per call, and a
+        mix of a British and an American voice has to be read in one of them.
+        """
+        self._refuse_built_in(request.id)
+        # Every part is read before anything is written, so a blend that names the voice it replaces
+        # mixes the old one rather than finding it gone.
+        parts = [(self._style_of(name), share) for name, share in request.components]
+        heaviest = max(request.components, key=lambda component: component[1])[0]
+        lang = self._language_of(heaviest)
+        path = self._store(request.id, styles.mix(parts), {"recipe": request.recipe, "lang": lang})
+        return self._created(path, self.variant or self.default_variant, label=request.label)
+
+    def delete_voice(self, voice_id: str) -> None:
+        if voice_id in ENGLISH_VOICES:
+            raise Unsupported(f'"{voice_id}" is one of Kokoro\'s own voices and cannot be deleted')
+        self._stored_path(voice_id).unlink()
+
+    def _refuse_built_in(self, voice_id: str) -> None:
+        # Refused rather than stored: `speak` resolves a built-in name first, so a created voice
+        # with one would be kept, listed twice, and never heard.
+        if voice_id in ENGLISH_VOICES:
+            raise BadRequest(f'"{voice_id}" is one of Kokoro\'s own voices; choose another id')
+
+    def _store(self, voice_id: str, style: Any, meta: dict[str, str]) -> Path:
+        self.voice_dir.mkdir(parents=True, exist_ok=True)
+        path = self.voice_dir / f"{voice_id}{styles.SUFFIX}"
+        styles.save(path, style, meta)
+        return path
+
+    def _stored(self) -> list[Path]:
+        if not self.voice_dir.is_dir():
+            return []
+        return sorted(
+            path for path in self.voice_dir.iterdir() if path.suffix == styles.SUFFIX and path.is_file()
+        )
+
+    def _stored_path(self, voice_id: str) -> Path:
+        """A created voice's file. `path_for` matches any stem, and only a `.npz` is a voice here."""
+        path = self.path_for(voice_id)
+        if path.suffix != styles.SUFFIX:
+            raise UnknownVoice(f'no voice "{voice_id}"')
+        return path
+
+    def _style_of(self, voice: str) -> Any:
+        """A voice's style vector, built in or created, without loading the model."""
+        if voice in ENGLISH_VOICES:
+            import numpy as np
+
+            with np.load(weights.ensure_voices(), allow_pickle=False) as pack:
+                return pack[voice]
+        return styles.load(self._stored_path(voice))[0]
+
+    def _language_of(self, voice: str) -> str:
+        if voice in ENGLISH_VOICES:
+            return ACCENTS[voice[0]][0]
+        return styles.load(self._stored_path(voice))[1]["lang"]
+
+    def _created(self, path: Path, variant: str, label: str | None = None) -> Voice:
+        style, meta = styles.load(path)
+        digest = hashlib.sha256(style.tobytes()).hexdigest()[:12]
+        made = "blended" if "recipe" in meta else "uploaded"
+        description = f"Blended from {meta['recipe']}" if made == "blended" else f"From {meta['source']}"
+        return Voice(
+            id=path.stem,
+            label=label or path.stem.replace("_", " ").title(),
+            description=description,
+            # The vector's hash rather than the recipe, because re-blending the same recipe after a
+            # component was re-uploaded renders differently. And the precision, as for the built-ins.
+            spec=f"{path.stem}@{digest}-{variant}",
+            tags=("en", meta["lang"], made),
+        )
 
     # ------------------------------------------------------------------ speaking
 
@@ -138,13 +235,19 @@ class KokoroEngine(Engine):
         byte, against the core's 120 s wait for headers. Speaking a group at a time makes the wait the
         length of the first group instead.
         """
-        voice = request.voice or DEFAULT_VOICE
-        if voice not in ENGLISH_VOICES:
-            raise UnknownVoice(f'no voice "{voice}"')
+        name = request.voice or DEFAULT_VOICE
+        voice: Any
+        if name in ENGLISH_VOICES:
+            voice, language = name, ACCENTS[name[0]][0]
+        else:
+            # A created voice goes to kokoro-onnx as its array, which `create` takes in place of a
+            # name. The file is read here, before the model check, so an unknown id is `unknown_voice`
+            # whatever is resident.
+            voice, meta = styles.load(self._stored_path(name))
+            language = meta["lang"]
         if self._model is None:
             raise Unsupported("no model is loaded")
 
-        language, _ = ACCENTS[voice[0]]
         speed = self.dials_for(request)["speed"]
 
         for index, group in enumerate(sentence_groups(request.text)):
@@ -179,6 +282,17 @@ def sentence_groups(text: str, limit: int = GROUP_CHARACTERS) -> Iterator[str]:
             group = f"{group} {sentence}" if group else sentence
     if group:
         yield group
+
+
+def _accent_of(stem: str) -> str:
+    """Kokoro's own naming, where an uploaded pack keeps it: `bm_` is British. American otherwise.
+
+    From the name rather than the vector, because nothing in 510 x 256 floats says which phonemizer
+    the voice was trained against, and Kokoro-FastAPI names every pack it ships this way.
+    """
+    if len(stem) > 2 and stem[0] in ACCENTS and stem[1] in SEXES and stem[2] == "_":
+        return ACCENTS[stem[0]][0]
+    return ACCENTS["a"][0]
 
 
 def _voice(name: str, variant: str) -> Voice:

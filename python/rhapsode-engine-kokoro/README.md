@@ -17,7 +17,15 @@ without it, set `install.python` to an interpreter in that range.
 Three variants, which are the same model at three precisions: `fp16` (the default), `fp32` and `int8`.
 They claim the same things: no cues, no deliveries, one dial, `speed` (0.5 to 2.0), which is also what
 the OpenAI shim's `speed` maps to. English only for now, in 28 voices; each voice's first letter is its
-accent, `a` American and `b` British. No cloning.
+accent, `a` American and `b` British.
+
+It does not clone from audio, but it makes voices two other ways (`docs/protocol.md` § 7):
+
+- **A blend**: `blend=af_bella(2)+af_sky(1)`, Kokoro-FastAPI's recipe, mixed once and stored under
+  the id you give it. It reads the 28 MB voices file and never the model.
+- **A style vector** as the `reference`: a `.npy` of shape 510 x 1 x 256, or a Kokoro-FastAPI `.pt`
+  voicepack, which is how its `v0` voices (`am_v0gurney` and the rest) come across. A `.pt` is read
+  as data and never unpickled. A pack named the Kokoro way (`bm_...`) keeps its British accent.
 
 ## Licences
 

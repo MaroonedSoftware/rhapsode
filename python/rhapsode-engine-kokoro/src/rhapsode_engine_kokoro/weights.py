@@ -84,13 +84,21 @@ def present(root: Path, asset: Asset) -> bool:
 
 def ensure(variant: str, root: Path | None = None, opener: Opener | None = None) -> tuple[Path, Path]:
     """The model and voices paths for a variant, downloading whichever is missing."""
+    model, voices = assets_for(variant)
+    return _ensure(model, root, opener), _ensure(voices, root, opener)
+
+
+def ensure_voices(root: Path | None = None, opener: Opener | None = None) -> Path:
+    """The voices file alone, for a blend: 28 MB, where the smallest graph beside it is 92 MB."""
+    return _ensure(VOICES, root, opener)
+
+
+def _ensure(asset: Asset, root: Path | None, opener: Opener | None) -> Path:
     root = root or weights_dir()
     root.mkdir(parents=True, exist_ok=True)
-    for asset in assets_for(variant):
-        if not present(root, asset):
-            download(asset, root, opener or _open)
-    model, voices = assets_for(variant)
-    return root / model.name, root / voices.name
+    if not present(root, asset):
+        download(asset, root, opener or _open)
+    return root / asset.name
 
 
 def download(asset: Asset, root: Path, opener: Opener) -> None:

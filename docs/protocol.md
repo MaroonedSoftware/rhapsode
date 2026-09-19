@@ -199,7 +199,8 @@ GET /capabilities
     "dials": {},
     "languages": ["en"],
     "maxCharacters": 4096,
-    "cloning": { "supported": true, "referenceSeconds": [5, 10], "formats": ["wav", "mp3"] },
+    "cloning": { "supported": true, "referenceSeconds": [5, 10], "formats": ["wav", "mp3", "flac", "ogg"] },
+    "blending": { "supported": false },
     "streaming": { "supported": true, "granularity": "chunk" },
     "nativeFormat": { "encoding": "pcm_s16le", "sampleRate": 24000, "channels": 1 }
   },
@@ -257,6 +258,10 @@ engine because nothing makes it engine-wide: a build that conditions on referenc
 that only knows its trained speakers can be the same engine, as Orpheus's base model and its
 finetune are. `cloning` is optional, since contract 1 shipped without it; a reader that finds it
 absent does not know, and falls back to `current`, then to offering it and letting the worker refuse.
+
+`blending` sits beside it on every variant and in `current`, for the same reason: a blend reads the
+voices it mixes and never the model (§ 7). Absent means no, because an engine blends only if its
+adapter says so, and a worker that predates the field cannot.
 
 **`dialogue` is declared per variant, and absent where it is not performed.** Dia's `1.6b` says
 `"dialogue": { "maxSpeakers": 2 }`: the variant answers `POST /dialogue` (§ 6), and one request may
@@ -547,12 +552,13 @@ an id of `*` matched whichever voice sorted first.
 back to its default voice for an id it does not know hands the caller audio in a voice they did not
 ask for, with a `200`, which is the silent discard this document exists to prevent.
 
-Cloning, where the engine supports it:
+Creating a voice, where the engine supports it:
 
 ```http
 POST /engines/{engine}/voices          (worker: POST /voices)
 Content-Type: multipart/form-data
   id=narrator_03  label="Narrator 03"  reference=@clip.wav  transcript="What the clip says."
+  id=host         label="Host"         blend="af_bella(2)+af_sky(1)"
 DELETE /engines/{engine}/voices/{id}   (worker: DELETE /voices/{id})
 ```
 
@@ -567,6 +573,36 @@ know which engine reads it.
 
 The answer to a create is the new voice, as `GET /voices` would list it. Creating an id that exists
 replaces it, which is how a voice is re-recorded; its `spec` changes, so a cached preview does too.
+
+A create carries exactly one of `reference` or `blend`, and both or neither is `bad_request`.
+
+**`reference` is whatever this engine makes a voice from**, and `current.cloning.formats` says which
+file types that is. For Chatterbox it is a clip of somebody speaking. For Kokoro it is a style
+vector, the thing a Kokoro voice actually is: a `.npy` array, or a `.pt` voicepack as Kokoro-FastAPI
+ships them, of shape 510 x 1 x 256. That is how a voicepack outside the engine's own set arrives,
+Kokoro-FastAPI's `v0` voices included. A reference whose filename names a type the engine does not
+list is `unsupported`, as any format the engine does not do is (§ 6), and one of the right type and
+the wrong contents is `bad_request`. A voicepack is read as data and
+never unpickled: a `.pt` file is a pickle, and unpickling an upload runs whatever the uploader wrote.
+
+**`blend` is a mix of voices the engine already has**, where `current.blending.supported` says so.
+The recipe is `name(weight)+name(weight)`, each weight optional and 1 when absent, positive, and
+normalised so they sum to 1. The syntax is Kokoro-FastAPI's, because that is what an operator coming
+from it already has typed into a config. Every name is a voice id (above) and must be one the
+engine lists, built in or created, else `unknown_voice`.
+
+A blend is resolved **when it is created**, into a stored voice like any other. So deleting or
+re-recording a component later does not change a blend made from it, and its `spec` is minted from
+the result rather than from the recipe. The alternative, a recipe resolved at every `speak`, is a
+voice that changes under a caller who never touched it, which is the failure `spec` exists to catch
+and would here be invisible to it.
+
+Why a created voice and not a recipe written into `voice` at `speak` time: a recipe is not a name,
+and the id rule above is what stops a voice id from being a path or a pattern. A named blend also
+gets what every other voice has, a place in `GET /voices`, a `spec`, and a preview.
+
+An engine that makes no voices answers a create with `unsupported`, and one that makes voices one
+way and not the other answers the other with `unsupported` too.
 
 **The worker owns its voice store.** The core keeps no shadow registry, because two registries is one
 more than the number that can be right. It streams the upload to the worker as it arrives and keeps
@@ -583,7 +619,9 @@ stay open, like speaking.
 the reference and returns. Work that needs the model, such as computing a speaker embedding, happens
 at the first `speak` in that voice, under the lease `speak` already holds. The alternative is a clone
 that evicts whatever another caller is using, from a route nobody would expect to touch the GPU, and
-Chatterbox, which clones from the reference on every call anyway, has nothing to do early.
+Chatterbox, which clones from the reference on every call anyway, has nothing to do early. A Kokoro
+blend holds to the same rule: it reads the voices file, 28 MB, and never the graph, which is up to
+325 MB.
 
 ---
 

@@ -84,3 +84,12 @@ def test_a_variant_it_does_not_have_is_unsupported(tmp_path: Path) -> None:
 def test_the_weights_live_where_the_operator_says(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("RHAPSODE_KOKORO_WEIGHTS", str(tmp_path))
     assert weights.weights_dir() == tmp_path
+
+
+def test_a_blend_fetches_the_voices_and_no_graph(small: dict[str, bytes], tmp_path: Path) -> None:
+    # A create takes no residency slot and should not cost a 92 MB download either. protocol.md § 7.
+    fetched: list[str] = []
+    voices = weights.ensure_voices(tmp_path, serving(small, fetched))
+
+    assert [Path(url).name for url in fetched] == ["voices-v1.0.bin"]
+    assert voices.read_bytes() == small["voices-v1.0.bin"]

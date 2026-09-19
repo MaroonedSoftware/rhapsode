@@ -84,6 +84,30 @@ describe('TryPanel', () => {
         expect(await screen.findByText('Clone a voice')).toBeInTheDocument();
     });
 
+    it('offers a blend where the variant says it blends, with nothing loaded', async () => {
+        // Kokoro's shape: a blend reads the voices file and never the model, so an idle engine still
+        // says it blends, and the page must not wait for a load to offer it. § 4.
+        api.engineCapabilities.mockResolvedValue({
+            status: 200,
+            data: {
+                ...capabilities,
+                variants: {
+                    turbo: { ...capabilities.variants.turbo!, blending: { supported: true } },
+                    original: { ...capabilities.variants.original!, blending: { supported: false } },
+                },
+            },
+        });
+        const user = setupUser();
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        expect(await screen.findByText('Blend a voice')).toBeInTheDocument();
+
+        await user.click(screen.getByRole('combobox', { name: 'Variant' }));
+        await user.click(await screen.findByRole('option', { name: 'original' }));
+
+        await waitFor(() => expect(screen.queryByText('Blend a voice')).not.toBeInTheDocument());
+    });
+
     it('trades cues for deliveries and dials when the variant changes', async () => {
         const user = setupUser();
         render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);

@@ -520,8 +520,9 @@ def a_voice_id_that_is_not_a_name_is_refused(worker: Worker, report: Report) -> 
     )
 
 
-#: An id the suite owns, so a clone it leaves behind after a crash is recognisable and harmless.
+#: Ids the suite owns, so a voice it leaves behind after a crash is recognisable and harmless.
 CLONE_ID = "rhapsode_conform_clone"
+BLEND_ID = "rhapsode_conform_blend"
 
 #: Sent with every clone. The reference is a tone and says nothing, but an engine that clones by
 #: continuing from the clip refuses a create without words, and one that does not read them ignores
@@ -534,15 +535,26 @@ def cloning_round_trips(worker: Worker, report: Report) -> None:
     """§ 7. Create, list, speak, preview, re-record, delete, and gone, on an engine that clones.
 
     Optional, so an engine that answers the create with `unsupported` conforms and the rest is not
-    asked. One that accepts it is held to all of it.
+    asked. One that accepts it is held to all of it. The suite's reference is a WAV, so an engine
+    that declares references of another kind, as Kokoro's style vectors are, is not asked either.
     """
-    _, capabilities = worker.get("/capabilities")
-    variants: dict[str, Any] = capabilities.get("variants") or {}
+    variants = _variant_claims(worker)
     claims = [
-        variant["cloning"].get("supported") is True
-        for variant in variants.values()
-        if isinstance(variant, dict) and isinstance(variant.get("cloning"), dict)
+        claim.get("supported") is True for claim in (variant.get("cloning") for variant in variants) if claim
     ]
+    # Asked of the variants, which answer while nothing is loaded. A reference that is not audio is
+    # not the suite's to make, and sending one a WAV would only be refused, so it is not asked.
+    formats = next((claim.get("formats") for claim in (v.get("cloning") for v in variants) if claim), None)
+    if formats is None:
+        formats = _current(worker).get("cloning", {}).get("formats")
+    if isinstance(formats, list) and "wav" not in formats:
+        report.record(
+            "cloning is offered, or refused as unsupported",
+            "§ 7",
+            True,
+            f"references are {', '.join(formats)}",
+        )
+        return
 
     status, created = worker.create_voice(CLONE_ID, _reference_wav(220.0), transcript=CLONE_TRANSCRIPT)
     refused = status == 422 and _error_code(created) == "unsupported"
@@ -559,57 +571,124 @@ def cloning_round_trips(worker: Worker, report: Report) -> None:
         report.record("cloning is offered, or refused as unsupported", "§ 7", True, "not offered")
         return
     try:
-        _cloning(worker, report, status, created)
+        _round_trip(
+            worker,
+            report,
+            "clone",
+            CLONE_ID,
+            status,
+            created,
+            lambda: worker.create_voice(CLONE_ID, _reference_wav(330.0), transcript=CLONE_TRANSCRIPT),
+        )
     finally:
         worker.delete(f"/voices/{CLONE_ID}")
 
 
-def _cloning(worker: Worker, report: Report, status: int, created: Any) -> None:
-    made = status == 201 and isinstance(created, dict) and created.get("id") == CLONE_ID
-    report.record("a clone answers 201 with the new voice", "§ 7", made, f"status {status}")
+@check
+def blending_round_trips(worker: Worker, report: Report) -> None:
+    """§ 7. The same round trip for a blend, and a blend's parts are voices the engine has.
+
+    Optional like cloning, and the capability document has to agree with what the create does: an
+    engine that says it blends and refuses one, or the reverse, is lying about one of them.
+    """
+    # The variants first, since a blend needs no model and they answer while nothing is loaded. § 4.
+    claimed = [variant["blending"] for variant in _variant_claims(worker) if variant.get("blending")]
+    source = claimed[0] if claimed else _current(worker).get("blending", {})
+    offered = source.get("supported") is True
+    _, voices = worker.get("/voices")
+    names = (
+        [voice.get("id") for voice in voices if isinstance(voice, dict)] if isinstance(voices, list) else []
+    )
+    if len(names) < 2:
+        report.skip("blending round trips", "§ 7", "the engine lists fewer than two voices to blend")
+        return
+    first, second = names[0], names[1]
+
+    status, created = worker.create_voice(BLEND_ID, blend=f"{first}(2)+{second}(1)")
+    refused = status == 422 and _error_code(created) == "unsupported"
+    report.record(
+        "blending is offered exactly when the capability document says so",
+        "§ 7",
+        offered != refused,
+        f"blending.supported is {offered}, and the create answered {status}",
+    )
+    if refused:
+        return
+    try:
+        _round_trip(
+            worker,
+            report,
+            "blend",
+            BLEND_ID,
+            status,
+            created,
+            lambda: worker.create_voice(BLEND_ID, blend=f"{first}(1)+{second}(2)"),
+        )
+        status, body = worker.create_voice(BLEND_ID, blend=f"{first}+rhapsode_conform_nobody")
+        report.record(
+            "a blend of a voice the engine lacks is unknown_voice",
+            "§ 7",
+            (status, _error_code(body)) == (404, "unknown_voice"),
+            f"status {status}, {_error_code(body)}",
+        )
+    finally:
+        worker.delete(f"/voices/{BLEND_ID}")
+
+
+def _round_trip(
+    worker: Worker,
+    report: Report,
+    noun: str,
+    voice_id: str,
+    status: int,
+    created: Any,
+    recreate: Callable[[], tuple[int, Any]],
+) -> None:
+    made = status == 201 and isinstance(created, dict) and created.get("id") == voice_id
+    report.record(f"a {noun} answers 201 with the new voice", "§ 7", made, f"status {status}")
     if not made:
         return
     Voice.model_validate(created)
 
     _, voices = worker.get("/voices")
-    listed = next((voice for voice in voices if voice.get("id") == CLONE_ID), None)
-    report.record("a clone is listed", "§ 7", listed is not None)
+    listed = next((voice for voice in voices if voice.get("id") == voice_id), None)
+    report.record(f"a {noun} is listed", "§ 7", listed is not None)
 
-    status, audio = worker.speak({"text": "In a voice of my own.", "voice": CLONE_ID, "stream": False})
+    status, audio = worker.speak({"text": "In a voice of my own.", "voice": voice_id, "stream": False})
     report.record(
-        "a clone speaks",
+        f"a {noun} speaks",
         "§ 7",
         status == 200 and len(audio) >= MIN_PLAUSIBLE_AUDIO_BYTES,
         f"status {status}, {len(audio)} bytes",
     )
 
-    status, preview = worker.get_bytes(f"/voices/{CLONE_ID}/preview")
+    status, preview = worker.get_bytes(f"/voices/{voice_id}/preview")
     report.record(
-        "a clone previews",
+        f"a {noun} previews",
         "§ 7",
         status == 200 and len(preview) >= MIN_PLAUSIBLE_AUDIO_BYTES,
         f"status {status}",
     )
 
-    status, again = worker.create_voice(CLONE_ID, _reference_wav(330.0), transcript=CLONE_TRANSCRIPT)
+    status, again = recreate()
     before = created.get("spec")
     after = again.get("spec") if isinstance(again, dict) else None
     report.record(
-        "re-recording a clone changes its spec",
+        f"re-making a {noun} changes its spec",
         "§ 7",
         status == 201 and after is not None and after != before,
         f"{before} -> {after}",
     )
 
-    status, _ = worker.delete(f"/voices/{CLONE_ID}")
-    report.record("a clone deletes", "§ 7", status == 204, f"status {status}")
+    status, _ = worker.delete(f"/voices/{voice_id}")
+    report.record(f"a {noun} deletes", "§ 7", status == 204, f"status {status}")
     _, voices = worker.get("/voices")
     report.record(
-        "a deleted clone is gone from the list", "§ 7", all(voice.get("id") != CLONE_ID for voice in voices)
+        f"a deleted {noun} is gone from the list", "§ 7", all(voice.get("id") != voice_id for voice in voices)
     )
-    status, body = worker.speak({"text": "Still here?", "voice": CLONE_ID, "stream": False})
+    status, body = worker.speak({"text": "Still here?", "voice": voice_id, "stream": False})
     report.record(
-        "a deleted clone no longer speaks",
+        f"a deleted {noun} no longer speaks",
         "§ 7",
         (status, _error_of(body).get("code")) == (404, "unknown_voice"),
         f"status {status}, {_error_of(body).get('code')}",
@@ -698,6 +777,25 @@ def _dialogue(worker: Worker, report: Report, variant: str, declared: dict[str, 
         report.record(
             f'a dialogue past maxCharacters in total is refused on variant "{variant}"', "§ 6", status == 400
         )
+
+
+def _variant_claims(worker: Worker) -> list[dict[str, Any]]:
+    """Every variant's entry, which is present whether or not a model is loaded."""
+    _, capabilities = worker.get("/capabilities")
+    variants = capabilities.get("variants") if isinstance(capabilities, dict) else None
+    return (
+        [variant for variant in variants.values() if isinstance(variant, dict)]
+        if isinstance(variants, dict)
+        else []
+    )
+
+
+def _current(worker: Worker) -> dict[str, Any]:
+    """The resident variant's capabilities, loading the default first so there is one."""
+    worker.post("/load", {})
+    _, capabilities = worker.get("/capabilities")
+    current = capabilities.get("current") if isinstance(capabilities, dict) else None
+    return current if isinstance(current, dict) else {}
 
 
 def _reference_wav(hz: float, seconds: float = 6.0, rate: int = 24_000) -> bytes:

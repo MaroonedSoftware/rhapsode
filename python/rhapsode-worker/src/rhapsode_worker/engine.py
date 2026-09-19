@@ -162,6 +162,21 @@ class CreateVoiceRequest:
 
 
 @dataclass(frozen=True)
+class BlendRequest:
+    """A voice made from voices the engine already has. protocol.md § 7.
+
+    The recipe arrives parsed: every name is a valid voice id, no name repeats, and the shares sum
+    to 1. Whether each name is a voice this engine HAS is the adapter's to check, as `unknown_voice`.
+    """
+
+    id: str
+    components: tuple[tuple[str, float], ...]
+    #: As the caller wrote it, for a description. Never parse it again: `components` is the answer.
+    recipe: str
+    label: str | None = None
+
+
+@dataclass(frozen=True)
 class Device:
     type: str
     name: str
@@ -246,6 +261,14 @@ class Engine:
     def create_voice(self, request: CreateVoiceRequest) -> Voice:
         raise Unsupported("this engine does not clone voices")
 
+    def blend_voice(self, request: BlendRequest) -> Voice:
+        """Store a voice mixed from `request.components`, resolved now rather than at each `speak`.
+
+        Resolved now so that re-recording or deleting a component later cannot change a blend made
+        from it: that would be a voice changing under a caller who never touched it. protocol.md § 7.
+        """
+        raise Unsupported("this engine does not blend voices")
+
     def delete_voice(self, voice_id: str) -> None:
         raise Unsupported("this engine does not clone voices")
 
@@ -281,9 +304,23 @@ class Engine:
         """Derived, so an adapter cannot advertise cloning it did not implement, or the reverse."""
         return type(self).create_voice is not Engine.create_voice
 
+    @property
+    def supports_blending(self) -> bool:
+        """Derived like `supports_cloning`, and for the same reason."""
+        return type(self).blend_voice is not Engine.blend_voice
+
     def reference_seconds(self) -> tuple[float, float] | None:
         """Usable reference audio, when this engine clones. Override alongside `create_voice`."""
         return (5.0, 10.0) if self.supports_cloning else None
+
+    def reference_formats(self) -> tuple[str, ...] | None:
+        """The file types a `reference` may be, as bare lowercase extensions, or None for any.
+
+        Declared rather than left to `create_voice` to refuse, because a client has to know before
+        it uploads: a Kokoro reference is a style vector and a Chatterbox one is a clip, and the
+        same form cannot guess which to ask for. The SDK refuses anything else as `unsupported`.
+        """
+        return None
 
     # ---------------------------------------------------------------- what the SDK provides
 

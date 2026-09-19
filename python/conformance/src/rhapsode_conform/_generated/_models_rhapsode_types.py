@@ -24,7 +24,12 @@ class Cloning(BaseModel):
     supported: bool
     # [min, max] of usable reference audio.
     reference_seconds: list[float] | None = Field(alias="referenceSeconds", default=None)
+    # File types a `reference` may be. § 7.
     formats: list[str] | None = None
+
+# Whether a create may carry a `blend` recipe instead of a `reference`. § 7.
+class Blending(BaseModel):
+    supported: bool
 
 class Streaming(BaseModel):
     supported: bool
@@ -79,7 +84,10 @@ class Voice(BaseModel):
 class CreateVoiceForm(BaseModel):
     id: str
     label: str | None = None
-    reference: bytes
+    # Exactly one of `reference` and `blend`. § 7.
+    reference: bytes | None = None
+    # A recipe, `name(weight)+name(weight)`, over voices the engine has.
+    blend: str | None = None
     # The words spoken in the reference. Required by an engine that continues from it.
     transcript: str | None = None
 
@@ -172,6 +180,8 @@ class Variant(BaseModel):
     max_characters: int | None = Field(alias="maxCharacters", default=None)
     # Optional only because contract 1 shipped without it. § 4.
     cloning: Cloning | None = None
+    # Beside cloning, for the same reason: it needs no model. § 7.
+    blending: Blending | None = None
     # Present only where this build answers /dialogue. § 6.
     dialogue: Dialogue | None = None
 
@@ -261,6 +271,8 @@ class CurrentVariant(Variant):
 
     variant: str
     cloning: Cloning
+    # Absent means no, so a worker that predates it is read correctly.
+    blending: Blending | None = None
     streaming: Streaming
     native_format: NativeFormat = Field(alias="nativeFormat")
 

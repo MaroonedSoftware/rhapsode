@@ -74,8 +74,10 @@ def test_every_cue_it_claims_changes_the_audio(stubbed: str) -> None:
     cue_checks = [result for result in report.results if result.name.startswith("cue ")]
     assert len(cue_checks) == 8
     assert all(result.passed for result in cue_checks)
-    # Every one decided, which only a seed that reproduces the audio allows.
-    assert report.skipped == []
+    # Every one decided, which only a seed that reproduces the audio allows. Other checks may skip:
+    # blending does, since Dia has no voices of its own to blend.
+    seeded = [result for result in report.results if result.name.startswith("a seed reproduces the audio")]
+    assert seeded and all(result.passed for result in seeded)
 
 
 def test_an_unknown_voice_is_a_404_before_any_audio(stubbed: str) -> None:

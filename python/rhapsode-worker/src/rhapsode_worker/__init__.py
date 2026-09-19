@@ -4,7 +4,9 @@ An adapter author installs one package, writes one class, and never learns what 
 in. See `docs/protocol.md` § 8.
 """
 
+from .blends import parse_blend
 from .engine import (
+    BlendRequest,
     CreateVoiceRequest,
     Device,
     DialogueRequest,
@@ -34,6 +36,7 @@ CONTRACT = 1
 __all__ = [
     "CONTRACT",
     "BadRequest",
+    "BlendRequest",
     "CreateVoiceRequest",
     "Device",
     "DialogueRequest",
@@ -51,5 +54,6 @@ __all__ = [
     "Variant",
     "Voice",
     "WorkerError",
+    "parse_blend",
     "serve",
 ]

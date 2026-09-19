@@ -5,6 +5,7 @@
 # worker SDK has to install for an adapter that has no HTTP client library of its own.
 
 from ._models_rhapsode_types import (
+    Blending,
     Capabilities,
     CatalogEntry,
     Cloning,
@@ -38,6 +39,7 @@ from ._models_rhapsode_types import (
 )
 
 __all__ = [
+    "Blending",
     "Capabilities",
     "CatalogEntry",
     "Cloning",

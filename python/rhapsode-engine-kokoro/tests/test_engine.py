@@ -4,11 +4,25 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import pytest
-from rhapsode_worker import Internal, SpeakRequest, UnknownVoice, Unsupported
+from harness import voicepacks
+from rhapsode_worker import (
+    BadRequest,
+    BlendRequest,
+    CreateVoiceRequest,
+    Internal,
+    SpeakRequest,
+    UnknownVoice,
+    Unsupported,
+    Voice,
+    parse_blend,
+)
 
 from rhapsode_engine_kokoro import engine as module
+from rhapsode_engine_kokoro import styles
 from rhapsode_engine_kokoro.engine import (
     ENGLISH_VOICES,
     SENTENCE_PAUSE_SAMPLES,
@@ -155,8 +169,109 @@ class TestVoices:
         full = {voice.id: voice.spec for voice in engine.voices()}
         assert quiet["af_heart"] != full["af_heart"]
 
-    def test_there_is_no_cloning(self, engine: KokoroEngine) -> None:
-        assert not engine.supports_cloning
+    def test_a_voice_is_made_from_a_style_vector_or_a_blend(self, engine: KokoroEngine) -> None:
+        assert engine.supports_cloning and engine.supports_blending
+        assert engine.reference_formats() == ("npy", "pt")
+        # A style vector has no duration to advise on, so the capability document says nothing.
+        assert engine.reference_seconds() is None
+
+
+@pytest.fixture
+def pack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """A voices file of three built-in voices, where `weights.ensure_voices` will find it."""
+    built = {name: voicepacks.style(seed) for seed, name in enumerate(("af_bella", "af_sky", "bm_george"))}
+    path = tmp_path / "voices-v1.0.bin"
+    with path.open("wb") as target:
+        np.savez(target, **built)
+    monkeypatch.setattr(module.weights, "ensure_voices", lambda: path)
+    return built
+
+
+def upload(built: KokoroEngine, voice_id: str, value: Any, filename: str = "am_x.pt") -> Voice:
+    return built.create_voice(
+        CreateVoiceRequest(id=voice_id, reference=voicepacks.at_start(value), filename=filename)
+    )
+
+
+def blend(built: KokoroEngine, voice_id: str, recipe: str) -> Voice:
+    return built.blend_voice(BlendRequest(id=voice_id, components=parse_blend(recipe), recipe=recipe))
+
+
+class TestCreatedVoices:
+    @pytest.fixture
+    def made(self, engine: KokoroEngine, tmp_path: Path) -> KokoroEngine:
+        engine.voice_dir = tmp_path / "voices"
+        return engine
+
+    def test_a_blend_is_the_weighted_mix_of_its_parts(self, made: KokoroEngine, pack: dict[str, Any]) -> None:
+        voice = blend(made, "host", "af_bella(3)+af_sky(1)")
+        assert voice.tags == ("en", "en-us", "blended")
+        assert voice.description == "Blended from af_bella(3)+af_sky(1)"
+        stored, _ = styles.load(made.voice_dir / "host.npz")
+        assert np.allclose(stored, pack["af_bella"] * 0.75 + pack["af_sky"] * 0.25)
+
+    def test_a_blend_reads_in_its_heaviest_parts_accent(
+        self, made: KokoroEngine, pack: dict[str, Any]
+    ) -> None:
+        assert blend(made, "host", "af_bella+bm_george(2)").tags[1] == "en-gb"
+
+    def test_a_blend_can_use_a_created_voice(self, made: KokoroEngine, pack: dict[str, Any]) -> None:
+        upload(made, "gurney", voicepacks.style(9))
+        stored_gurney, _ = styles.load(made.voice_dir / "gurney.npz")
+        blend(made, "mix", "gurney+af_sky")
+        mixed, _ = styles.load(made.voice_dir / "mix.npz")
+        assert np.allclose(mixed, stored_gurney * 0.5 + pack["af_sky"] * 0.5)
+
+    def test_a_part_it_does_not_have_is_unknown(self, made: KokoroEngine, pack: dict[str, Any]) -> None:
+        with pytest.raises(UnknownVoice):
+            blend(made, "host", "af_bella+nobody")
+
+    def test_the_spec_follows_the_vector_not_the_recipe(
+        self, made: KokoroEngine, pack: dict[str, Any]
+    ) -> None:
+        # The same recipe over a re-uploaded part renders differently, so it must mint a new spec.
+        upload(made, "part", voicepacks.style(10))
+        first = blend(made, "mix", "part+af_sky").spec
+        upload(made, "part", voicepacks.style(11))
+        assert blend(made, "mix", "part+af_sky").spec != first
+
+    def test_an_upload_keeps_kokoros_own_accent_naming(self, made: KokoroEngine) -> None:
+        assert upload(made, "one", voicepacks.style(), filename="bm_v0lewis.pt").tags == (
+            "en",
+            "en-gb",
+            "uploaded",
+        )
+        assert upload(made, "two", voicepacks.style(), filename="gurney.pt").tags[1] == "en-us"
+
+    def test_a_built_in_id_cannot_be_taken(self, made: KokoroEngine) -> None:
+        # speak() resolves a built-in first, so a created voice named af_heart would never be heard.
+        with pytest.raises(BadRequest, match="own voices"):
+            upload(made, "af_heart", voicepacks.style())
+
+    def test_it_is_listed_and_deleted(self, made: KokoroEngine) -> None:
+        upload(made, "gurney", voicepacks.style())
+        assert "gurney" in {voice.id for voice in made.voices()}
+        made.delete_voice("gurney")
+        assert "gurney" not in {voice.id for voice in made.voices()}
+        with pytest.raises(Unsupported):
+            made.delete_voice("af_heart")
+
+    def test_it_is_spoken_as_its_array_in_its_accent(
+        self, made: KokoroEngine, kokoro: list, weighed: list[str]
+    ) -> None:
+        value = voicepacks.style(12)
+        upload(made, "gurney", value, filename="bm_gurney.pt")
+        made.load("fp16")
+        spoken(made, voice="gurney")
+        call = made._model.calls[0]
+        assert np.array_equal(call.voice, value) and call.lang == "en-gb"
+
+    def test_a_created_voice_that_is_gone_is_unknown(
+        self, made: KokoroEngine, kokoro: list, weighed: list[str]
+    ) -> None:
+        made.load("fp16")
+        with pytest.raises(UnknownVoice):
+            spoken(made, voice="gurney")
 
 
 class TestSentenceGroups:

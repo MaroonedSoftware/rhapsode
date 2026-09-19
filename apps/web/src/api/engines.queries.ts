@@ -118,6 +118,31 @@ export function useCloneVoice(engine: string) {
     });
 }
 
+export interface BlendRequest {
+    id: string;
+    label?: string;
+    /** `name(weight)+name(weight)`, over voices the engine already has. § 7. */
+    blend: string;
+}
+
+/**
+ * A voice mixed from others, sent as the same multipart form a clone is, with a recipe where the
+ * clip would be. The worker resolves it once and keeps the result. A management route. § 7.
+ */
+export function useBlendVoice(engine: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, label, blend }: BlendRequest) => {
+            const form = new FormData();
+            form.set('id', id);
+            if (label !== undefined && label !== '') form.set('label', label);
+            form.set('blend', blend);
+            return unwrap<Voice>(await sdk.public.createVoice(engine, form));
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.engine.voices(engine) }),
+    });
+}
+
 export function useDeleteVoice(engine: string) {
     const queryClient = useQueryClient();
     return useMutation({
