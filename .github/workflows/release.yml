@@ -64,18 +64,32 @@ jobs:
 
             # The generated contract code is committed, so a plain build of each directory is the
             # whole package. --strict because PyPI renders what twine would only warn about.
+            #
+            # Two directories, because one upload goes in alphabetical order and puts rhapsode_worker
+            # last. Every engine pins the SDK at its own version exactly (§ 9), so an engine on the
+            # index before its SDK cannot be installed, for seconds normally and until a re-run if the
+            # upload fails between the two.
             - name: Build
               run: |
                   python -m pip install build twine
                   for dir in $(node scripts/release.mjs list python); do
-                      python -m build --outdir dist "$dir"
+                      out=dist/rest
+                      [ "$dir" = python/rhapsode-worker ] && out=dist/sdk
+                      python -m build --outdir "$out" "$dir"
                   done
-                  python -m twine check --strict dist/*
+                  python -m twine check --strict dist/sdk/* dist/rest/*
 
-            # skip-existing, so a run that died halfway is finished by re-running it.
-            - uses: pypa/gh-action-pypi-publish@release/v1
+            # skip-existing on both, so a run that died halfway is finished by re-running it.
+            - name: Publish the SDK
+              uses: pypa/gh-action-pypi-publish@release/v1
               with:
-                  packages-dir: dist/
+                  packages-dir: dist/sdk/
+                  skip-existing: true
+
+            - name: Publish the conformance suite and the engines
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist/rest/
                   skip-existing: true
 
     npm:
