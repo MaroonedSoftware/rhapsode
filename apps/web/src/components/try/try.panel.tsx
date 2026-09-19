@@ -84,6 +84,8 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
     const languages = claims.languages ?? [];
     // A worker from before variants said whether they clone leaves it to `current`, when loaded. § 4.
     const cloning = claims.cloning ?? current?.cloning;
+    // The same for blending, which a worker that predates it never claims: absent is no. § 4.
+    const blending = (claims.blending ?? current?.blending)?.supported === true;
 
     // The previous line's URL is released when it is replaced, and the last when the panel goes.
     useEffect(
@@ -278,7 +280,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                     </Stack>
                 </Card>
             </SimpleGrid>
-            <VoicesCard engine={engine} voices={voices} cloning={cloning} onCloned={setVoice} />
+            <VoicesCard engine={engine} voices={voices} cloning={cloning} blending={blending} onCloned={setVoice} />
         </Stack>
     );
 }
