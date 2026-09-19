@@ -5,6 +5,9 @@
 //   node scripts/release.mjs check v0.1.0    fail unless every versioned package is at that version
 //   node scripts/release.mjs notes 0.1.0     print that version's CHANGELOG section
 //   node scripts/release.mjs list npm|python  the published package directories, in publishing order
+//   node scripts/release.mjs current         the version every versioned package is at now
+//   node scripts/release.mjs pending         how many changesets are waiting for a release
+//   node scripts/release.mjs next [x.y.z]    the version to propose: that one if it is newer, or the next patch
 //
 // This rather than `changeset version`, because changesets knows only the pnpm workspace. Half of
 // what ships is Python, a changeset cannot name a Python package, and 15 of the first 37 had an
@@ -142,6 +145,36 @@ function commandVersion(version) {
     console.log(`Next: commit, then tag v${version} and push the tag, which is what publishes.`);
 }
 
+/** The one version everything is at, or a failure naming what disagrees. */
+function commandCurrent() {
+    const versions = [...new Set(current().map(entry => entry.version))];
+    if (versions.length !== 1) fail(`the versioned packages disagree: ${versions.join(', ')}`);
+    console.log(versions[0]);
+}
+
+/** Numeric, part by part, so that 0.1.10 comes after 0.1.9. */
+function newer(a, b) {
+    const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)];
+    const i = x.findIndex((part, k) => part !== y[k]);
+    return i !== -1 && x[i] > y[i];
+}
+
+/**
+ * What the release pull request proposes. A version it already proposed is kept while it is still
+ * ahead of the one released, so that rebuilding the pull request cannot turn a minor someone asked
+ * for back into a patch. Anything else is the next patch.
+ */
+function commandNext(proposed) {
+    const versions = [...new Set(current().map(entry => entry.version))];
+    if (versions.length !== 1) fail(`the versioned packages disagree: ${versions.join(', ')}`);
+    if (proposed !== undefined && SEMVER.test(proposed) && newer(proposed, versions[0])) {
+        console.log(proposed);
+        return;
+    }
+    const [major, minor, patch] = versions[0].split('.').map(Number);
+    console.log(`${major}.${minor}.${patch + 1}`);
+}
+
 function commandCheck(tag) {
     const version = (tag ?? '').replace(/^v/, '');
     if (!SEMVER.test(version)) fail(`usage: release.mjs check v<major.minor.patch>, not "${tag ?? ''}"`);
@@ -165,5 +198,8 @@ const [command, argument] = process.argv.slice(2);
 if (command === 'version') commandVersion(argument);
 else if (command === 'check') commandCheck(argument);
 else if (command === 'notes') commandNotes(argument?.replace(/^v/, ''));
+else if (command === 'current') commandCurrent();
+else if (command === 'pending') console.log(changesets().length);
+else if (command === 'next') commandNext(argument);
 else if (command === 'list' && (argument === 'npm' || argument === 'python')) console.log((argument === 'npm' ? NPM : PYPI).join('\n'));
-else fail('usage: release.mjs version <x.y.z> | check <vX.Y.Z> | notes <x.y.z> | list npm|python');
+else fail('usage: release.mjs version <x.y.z> | check <vX.Y.Z> | notes <x.y.z> | list npm|python | current | pending | next [x.y.z]');
