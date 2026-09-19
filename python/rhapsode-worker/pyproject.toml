@@ -13,7 +13,11 @@ dependencies = [
     # The response shapes are generated from contracts/rhapsode.types.ck as Pydantic models, so the
     # worker validates what it sends against the same declaration the core parses it with.
     "pydantic>=2.0",
-    "uvicorn>=0.30,<1.0",
+    # Narrow on purpose. trailers.py writes § 6's duration trailer through uvicorn's h11 request
+    # cycle, which is internals, and uvicorn is pre-1.0 and changes internals in minor releases. The
+    # worker suite, the trailer test included, passed on every release from 0.36 to 0.53; below 0.36
+    # the draining test failed intermittently. To raise the ceiling, run the suite on the new minor.
+    "uvicorn>=0.36,<0.54",
     "starlette>=0.37,<2.0",
     # Starlette parses a form with it and imports it only when asked to, so without it every
     # `POST /voices` died on an import error, reported as a 500, and nothing noticed because no test
