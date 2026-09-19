@@ -12,12 +12,13 @@ It talks HTTP and nothing else, so a worker on a socket, a worker on another mac
 written in a language this project has never heard of are all the same thing to it. The exit code is
 the verdict, which is the whole interface for wiring it into your own CI.
 
-Every check names the section of [`docs/protocol.md`](../../docs/protocol.md) it comes from. The one
-worth understanding is the pair that compare audio with and without a cue or a delivery. Section 8
-says an adapter must do exactly one thing honestly, claim only what its loaded variant can actually
-perform, and that nothing else checks it. That is still true in general, but the common shape of the
-lie is a claim wired to nothing at all, and a claim wired to nothing produces audio identical to the
-line without it. This catches that.
+Every check names the section of
+[`docs/protocol.md`](https://github.com/MaroonedSoftware/rhapsode/blob/main/docs/protocol.md) it
+comes from. The one worth understanding is the pair that compare audio with and without a cue or a
+delivery. Section 8 says an adapter must do exactly one thing honestly, claim only what its loaded
+variant can actually perform, and that nothing else checks it. That is still true in general, but
+the common shape of the lie is a claim wired to nothing at all, and a claim wired to nothing
+produces audio identical to the line without it. This catches that.
 
 Only with the seed held fixed, though. A model that samples produces different audio on every call,
 so without a seed "the audio changed" is true whether or not anything was performed, and a check that

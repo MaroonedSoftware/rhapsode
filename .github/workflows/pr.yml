@@ -4,8 +4,6 @@ on:
     pull_request:
     push:
         branches: [main]
-        # A version tag publishes the image under that version, and as `latest`.
-        tags: ['v*']
 
 concurrency:
     group: pr-${{ github.ref }}
@@ -17,55 +15,6 @@ permissions:
 jobs:
     build:
         uses: ./.github/workflows/build.yml
-
-    # The image users pull, published only once everything above has passed, the Docker smoke test
-    # included. main is `edge`, and a `v1.2.3` tag is `1.2.3`, `1.2` and `latest`. docs/operating.md
-    # § Docker.
-    image:
-        if: github.event_name == 'push'
-        needs: [build]
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: write
-        steps:
-            - uses: actions/checkout@v5
-              with:
-                  persist-credentials: false
-
-            # arm64 for Raspberry Pis and ARM servers, where Kokoro runs on the CPU as it does
-            # anywhere. Built under emulation, because the image's node_modules hold native
-            # prebuilds for the platform that installed them, so nothing can be built on amd64 and
-            # copied across.
-            - uses: docker/setup-qemu-action@v3
-            - uses: docker/setup-buildx-action@v3
-
-            - uses: docker/login-action@v3
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-
-            - id: meta
-              uses: docker/metadata-action@v5
-              with:
-                  images: ghcr.io/maroonedsoftware/rhapsode
-                  tags: |
-                      type=edge,branch=main
-                      type=semver,pattern={{version}}
-                      type=semver,pattern={{major}}.{{minor}}
-                      type=sha
-
-            - uses: docker/build-push-action@v6
-              with:
-                  context: .
-                  file: docker/Dockerfile
-                  platforms: linux/amd64,linux/arm64
-                  push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
 
     ci-ok:
         # One required check, so adding a job later does not mean editing branch protection.

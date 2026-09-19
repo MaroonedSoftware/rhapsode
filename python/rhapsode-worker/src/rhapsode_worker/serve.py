@@ -63,6 +63,13 @@ def serve(engine: Engine, *, argv: list[str] | None = None) -> None:
     try:
         server.run(sockets=[sock])
     finally:
+        # Drained, so a stop signal from here on asks for nothing that is not already happening.
+        # Ignored rather than left to the drain handler, because Python resets its own handlers to
+        # the default while it finalizes and leaves an ignore alone: a second SIGTERM that landed
+        # there killed a worker that had drained correctly, and it exited -15 instead of § 2's 0.
+        # The core sends one and then SIGKILL, but a supervisor or a hand at a terminal sends two.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         _cleanup(sock, socket_path, log)
 
 
@@ -104,8 +111,13 @@ def _prepare(engine: Engine) -> tuple[str, int, socket.socket]:
 def _server(app: Any) -> Any:
     import uvicorn
 
+    from .trailers import with_trailers
+
     config = uvicorn.Config(
-        app,
+        with_trailers(app),
+        # h11, never httptools even where it is installed, because only over h11 can the SDK send
+        # the trailer a streamed /speak ends with (§ 6). See trailers.py.
+        http="h11",
         log_config=None,
         # uvicorn's own access log would go to stdout, which is sealed, and would duplicate what the
         # core already records about every request it made.
@@ -128,7 +140,10 @@ def _install_signal_handlers(server: Any, worker: Worker, log: Log) -> None:
     """
 
     def drain(signum: int, _frame: Any) -> None:
-        log.info("draining", signal=signal.Signals(signum).name)
+        # Said once. A supervisor that repeats its signal would otherwise write a line per signal,
+        # and a flood of them filled an unread stderr pipe and hung the worker mid-exit.
+        if not worker.draining:
+            log.info("draining", signal=signal.Signals(signum).name)
         worker.draining = True
         server.should_exit = True
 

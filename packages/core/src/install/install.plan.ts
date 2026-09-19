@@ -32,7 +32,7 @@ export interface PlanInputs {
     sources: { sdk: string; adapter: string };
 }
 
-/** The worker SDK every adapter depends on. Installed alongside it because it is not yet published. */
+/** The worker SDK every adapter depends on, installed alongside it and at the same version. § 9. */
 export const SDK_PACKAGE = 'rhapsode-worker';
 
 /**

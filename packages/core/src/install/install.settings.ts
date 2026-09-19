@@ -46,10 +46,17 @@ export function checkoutPythonDir(from: string = dirname(fileURLToPath(import.me
     return undefined;
 }
 
-/** A package's directory under `sourceDir` when it has one there, otherwise its name for the index. */
-export function sourceFor(pkg: string, sourceDir: string | undefined): string {
+/**
+ * A package's directory under `sourceDir` when it has one there, otherwise its name for the index,
+ * pinned to `version`.
+ *
+ * The pin is § 9's: every package releases at one version, so the engine that goes with this core is
+ * the one at this core's version. Unpinned, pip takes the newest on the index, which may be built for
+ * a core this box does not have, and negotiation refuses it only after the install has been paid for.
+ */
+export function sourceFor(pkg: string, sourceDir: string | undefined, version: string): string {
     if (sourceDir !== undefined && existsSync(join(sourceDir, pkg, 'pyproject.toml'))) return join(sourceDir, pkg);
-    return pkg;
+    return `${pkg}==${version}`;
 }
 
 /** Whether an executable is on the server's PATH, without running it. */

@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { request, type IncomingHttpHeaders } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -127,6 +128,50 @@ describeWithSockets('speaking', () => {
         expect(body.readUInt32LE(40)).toBe(body.length - 44);
     }, 60_000);
 
+    it('says how long a buffered take is, in bytes and in time', async () => {
+        // § 6: with `stream: false` both are known before the headers go out, so both are headers.
+        // The worker sent them and the core dropped them, forwarding only the Content-Type.
+        const builder = await start();
+        const response = await speak(builder, { engine: 'tone', text: 'buffered', format: 'pcm', stream: false });
+
+        expect(response.statusCode).toBe(200);
+        expect(Number(response.headers['content-length'])).toBe(response.rawPayload.length);
+        expect(response.headers['transfer-encoding']).toBeUndefined();
+        // Tone's pcm is s16le at 24 kHz mono, so the body is the samples and nothing else.
+        expect(Number(response.headers['x-rhapsode-duration-ms'])).toBe(Math.round((response.rawPayload.length / 2 / 24_000) * 1000));
+    }, 60_000);
+
+    it('ends a streamed take with its duration in a trailer', async () => {
+        // § 6: with `stream: true` the duration is known only once the audio has finished, so it is
+        // a trailer. Over a real socket, because inject() has no trailers, and with node:http
+        // rather than fetch, because fetch has no trailer API at all.
+        const builder = await start();
+        const address = await builder.app.listen({ port: 0, host: '127.0.0.1' });
+
+        const { headers, audio, trailers } = await new Promise<{
+            headers: IncomingHttpHeaders;
+            audio: Buffer;
+            trailers: NodeJS.Dict<string>;
+        }>((fulfil, fail) => {
+            const outgoing = request(
+                `${address}/speak`,
+                { method: 'POST', headers: { 'content-type': 'application/json', te: 'trailers' } },
+                response => {
+                    const chunks: Buffer[] = [];
+                    response.on('data', (chunk: Buffer) => chunks.push(chunk));
+                    response.on('end', () => fulfil({ headers: response.headers, audio: Buffer.concat(chunks), trailers: response.trailers }));
+                    response.on('error', fail);
+                },
+            );
+            outgoing.on('error', fail);
+            outgoing.end(JSON.stringify({ engine: 'tone', text: 'a streamed line', format: 'pcm', stream: true }));
+        });
+
+        expect(headers.trailer?.toLowerCase()).toBe('x-rhapsode-duration-ms');
+        // Tone's pcm is s16le at 24 kHz mono, so the body is the samples and nothing else.
+        expect(Number(trailers['x-rhapsode-duration-ms'])).toBe(Math.round((audio.length / 2 / 24_000) * 1000));
+    }, 60_000);
+
     it('strips a cue the variant does not claim, before the worker ever sees it', async () => {
         // An engine that performs no cues never receives one, so the failure where an engine reads
         // the word "laugh" out loud cannot happen. Shorter text is shorter audio, which is how the
@@ -234,6 +279,18 @@ describeWithSockets('failing after the headers have gone', () => {
         expect(result.status).toBe(200);
         expect(result.bytes).toBeLessThan(256);
         expect(result.failure).toBeInstanceOf(TypeError);
+    }, 60_000);
+
+    it('reports a body too small to be audio as an envelope when it was buffered', async () => {
+        // § 6: "stream: false reports failures strictly better than stream: true does". The core
+        // used to write its 200 before counting, so a buffered request that was sent a click got an
+        // aborted connection exactly as a streamed one did, and no reason.
+        const builder = await start('tiny');
+        const response = await speak(builder, { engine: 'failing', text: 'x', format: 'pcm', stream: false });
+
+        expect(response.statusCode).toBe(500);
+        expect(response.json().error).toMatchObject({ code: 'internal', retryable: false });
+        expect(response.json().error.message).toContain('16 bytes');
     }, 60_000);
 
     it('reports a pre-headers failure as a clean envelope instead', async () => {

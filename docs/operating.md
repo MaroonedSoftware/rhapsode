@@ -184,18 +184,22 @@ curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/com
 docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-`RHAPSODE_VERSION` picks the tag, `latest` by default, and `docker compose pull` followed by
-`docker compose up -d` upgrades in place, keeping both volumes. From a checkout,
-`compose.build.yaml` builds the image instead, which is what the Docker smoke test runs:
+One image, `ghcr.io/maroonedsoftware/rhapsode`. Each release publishes it for amd64 and arm64,
+tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
+shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
+it installs the engines that were released with it. `docker compose pull` followed by
+`docker compose up -d` upgrades in place, keeping both volumes.
+
+From a checkout, `compose.build.yaml` builds it from `docker/Dockerfile` instead, tagged `local` so
+that a build never passes for a release. It is what the Docker smoke test runs:
 
 ```bash
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-`docker/Dockerfile` builds one image, and it is the whole install: the core, and the page behind nginx in the
-same container, proxying `/api` as above. The entrypoint starts nginx beside the server and stops it
-only once the server has drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published
-ports.
+The image is the whole install: the core, and the page behind nginx in the same container, proxying
+`/api` as above. The entrypoint starts nginx beside the server and stops it only once the server has
+drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
 
 It was two containers, and one is less to run for nothing lost: unraid needed a network and a
 second template so the page could find the server, the token crossed between them through a file in
@@ -209,18 +213,6 @@ along with the server:
 ```bash
 docker compose up -d --remove-orphans
 ```
-
-### Published images
-
-CI publishes the image to `ghcr.io/maroonedsoftware/rhapsode`, for amd64 and arm64, once the build
-and the Docker smoke test have passed:
-
-| Tag              | What                                                  |
-| ---------------- | ----------------------------------------------------- |
-| `edge`           | the tip of `main`                                     |
-| `sha-<commit>`   | one commit on `main`, for pinning a build exactly     |
-| `1.2.3`, `1.2`   | a release, from a `v1.2.3` tag                        |
-| `latest`         | the newest release                                    |
 
 ### Two volumes
 
@@ -317,9 +309,9 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 ### unraid
 
-One container, with `ghcr.io/maroonedsoftware/rhapsode:latest` as its repository: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
-`/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own `nobody:users`, ports 8080
-and 8081, and `--stop-timeout 30` in Extra Parameters.
+One container, from `ghcr.io/maroonedsoftware/rhapsode`: `/config` to `/mnt/user/appdata/rhapsode`,
+`/data` to a share such as `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own
+`nobody:users`, ports 8080 and 8081, and `--stop-timeout 30` in Extra Parameters.
 
 Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
 so add it to `management.origins`. That is also the moment the page reaches the install routes from

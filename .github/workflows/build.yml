@@ -59,6 +59,9 @@ jobs:
             - uses: actions/setup-node@v5
               with:
                   node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
 
             # Builds the image from scratch, which is also the check that the Dockerfile still
             # matches the workspace. The install it makes has to survive its container being

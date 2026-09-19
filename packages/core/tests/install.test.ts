@@ -1,12 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { CatalogEntry, InstallJob } from '@rhapsode/contract';
 
+import { CORE_VERSION } from '../src/core.version.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import type { CommandRunner } from '../src/install/command.runner.js';
 import { installEnvironment } from '../src/install/command.runner.js';
@@ -93,9 +95,30 @@ describe('install settings', () => {
 
     it('installs from a source directory when the package is there, and by name when it is not', () => {
         const python = checkoutPythonDir()!;
-        expect(sourceFor('rhapsode-engine-tone', python)).toBe(join(python, 'rhapsode-engine-tone'));
-        expect(sourceFor('rhapsode-engine-nothing', python)).toBe('rhapsode-engine-nothing');
-        expect(sourceFor('rhapsode-engine-tone', undefined)).toBe('rhapsode-engine-tone');
+        expect(sourceFor('rhapsode-engine-tone', python, '0.3.0')).toBe(join(python, 'rhapsode-engine-tone'));
+        expect(sourceFor('rhapsode-engine-nothing', python, '0.3.0')).toBe('rhapsode-engine-nothing==0.3.0');
+        expect(sourceFor('rhapsode-engine-tone', undefined, '0.3.0')).toBe('rhapsode-engine-tone==0.3.0');
+    });
+
+    it('pins what it installs by name to its own version, which is the one in its package.json', () => {
+        // § 9: unpinned, pip resolves the newest engine on the index, which may be built for a core
+        // this box does not have, and negotiation only refuses it after the install is paid for.
+        const own = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../package.json'), 'utf8')).version;
+        expect(CORE_VERSION).toBe(own);
+    });
+
+    it('ships every catalog engine at its own version, pinning the worker SDK to the same one', () => {
+        // § 9: one version across npm and PyPI. What the core installs by name is `package==its own
+        // version`, so an engine or SDK left at another number is an install that cannot resolve.
+        const python = checkoutPythonDir()!;
+        const versionOf = (pkg: string) => /^version = "([^"]+)"/m.exec(readFileSync(join(python, pkg, 'pyproject.toml'), 'utf8'))?.[1];
+
+        expect(versionOf('rhapsode-worker')).toBe(CORE_VERSION);
+        for (const record of Object.values(CATALOG)) {
+            const pyproject = readFileSync(join(python, record.package, 'pyproject.toml'), 'utf8');
+            expect(versionOf(record.package), record.package).toBe(CORE_VERSION);
+            expect(/"rhapsode-worker==([^"]+)"/.exec(pyproject)?.[1], record.package).toBe(CORE_VERSION);
+        }
     });
 
     it('reads trusted hosts from the server’s environment', () => {

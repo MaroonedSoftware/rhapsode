@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import signal
+import time
 import urllib.error
 import urllib.request
 from typing import Any
@@ -104,6 +106,23 @@ class TestTerminate:
 
 
 class TestDraining:
+    def test_a_signal_that_arrives_while_exiting_does_not_kill_it(self) -> None:
+        # § 2: SIGTERM means drain and exit 0. A second one used to land after uvicorn had put the
+        # worker's handler back and while Python was finalizing, which resets a Python handler to
+        # the default, so a worker that had drained correctly died of it with -15. The draining test
+        # below sends two, and failed that way whenever the second arrived late enough.
+        process = spawn()
+        await_handshake(process)
+        signals = 0
+        while process.poll() is None and signals < 200:
+            process.send_signal(signal.SIGTERM)
+            signals += 1
+            time.sleep(0.005)
+        # communicate rather than wait, so stderr is read while it exits and a full pipe cannot be
+        # what decides the outcome.
+        process.communicate(timeout=10)
+        assert process.returncode == 0, f"exited {process.returncode} after {signals} signals"
+
     def test_a_draining_worker_refuses_new_work_as_retryable(self, worker) -> None:
         # § 2 said 503 and the § 6 table said 429; the table wins. A request a draining worker
         # refused is one to send somewhere else or send again, not one to write off.

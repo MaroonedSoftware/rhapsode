@@ -1,13 +1,12 @@
-# The image built from this checkout, in place of the published one. docs/operating.md § Docker.
+# The image from this checkout rather than from the registry. docs/operating.md § Docker.
 #
 #   docker compose -f compose.yaml -f compose.build.yaml up -d --build
 #
-# A name of its own, so a local build never shadows a pulled ghcr.io tag, and a `docker compose
-# pull` has nothing to fetch for it.
+# Tagged `local` rather than with a version, so a build never stands in for a release of the same
+# number, and `docker compose pull` cannot replace what you built with what was published.
 services:
     server:
+        image: ghcr.io/maroonedsoftware/rhapsode:local
         build:
             context: .
             dockerfile: docker/Dockerfile
-        image: rhapsode-server
-        pull_policy: build

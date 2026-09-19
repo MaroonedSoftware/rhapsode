@@ -12,7 +12,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rhapsode-worker",
+    "rhapsode-worker==0.0.0",  # Its own version, exactly, and bumped with it. protocol.md § 9.
     "numpy>=1.26",
     # 0.6 is the API this adapter is written against: `EspeakConfig` and `create(..., lang=)`. It
     # declares requires-python <3.14, and on 3.14 pip resolves 0.4.7 instead, silently, which is why
