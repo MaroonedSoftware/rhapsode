@@ -28,12 +28,18 @@ contract mode(loose) Variant: {
     languages?: array(string)
     maxCharacters?: int                 # Overrides the engine's own ceiling for this build.
     cloning?: Cloning                   # Optional only because contract 1 shipped without it. § 4.
+    blending?: Blending                 # Beside cloning, for the same reason: it needs no model. § 7.
 }
 
 contract mode(loose) Cloning: {
     supported: boolean
     referenceSeconds?: array(number)    # [min, max] of usable reference audio.
-    formats?: array(string)
+    formats?: array(string)             # File types a `reference` may be. § 7.
+}
+
+# Whether a create may carry a `blend` recipe instead of a `reference`. § 7.
+contract mode(loose) Blending: {
+    supported: boolean
 }
 
 contract mode(loose) Streaming: {
@@ -53,6 +59,7 @@ contract mode(loose) NativeFormat: {
 contract mode(loose) CurrentVariant: Variant & {
     variant: string
     cloning: Cloning
+    blending?: Blending     # Absent means no, so a worker that predates it is read correctly.
     streaming: Streaming
     nativeFormat: NativeFormat
 }
@@ -106,7 +113,8 @@ contract mode(loose) Voice: {
 contract CreateVoiceForm: {
     id: string
     label?: string
-    reference: binary
+    reference?: binary      # Exactly one of `reference` and `blend`. § 7.
+    blend?: string          # A recipe, `name(weight)+name(weight)`, over voices the engine has.
 }
 
 ############################################################################################

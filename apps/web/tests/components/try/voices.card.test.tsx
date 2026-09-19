@@ -117,4 +117,69 @@ describe('VoicesCard', () => {
         const alert = await screen.findByRole('alert');
         expect(within(alert).getByText('management routes answer loopback callers')).toBeInTheDocument();
     });
+
+    it('offers delete for a blend and an uploaded voice, which were made here too', () => {
+        const blended: Voice = { id: 'host', label: 'Host', spec: 'host@a1-fp16', tags: ['en', 'en-us', 'blended'] };
+        const uploaded: Voice = { id: 'gurney', label: 'Gurney', spec: 'gurney@b2-fp16', tags: ['en', 'en-us', 'uploaded'] };
+        render(<VoicesCard engine="kokoro" voices={[blended, uploaded]} onCloned={() => {}} />);
+        expect(screen.getByRole('button', { name: 'Delete Host' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete Gurney' })).toBeInTheDocument();
+        expect(screen.getByText('blended')).toBeInTheDocument();
+    });
+
+    it('asks for the files the engine declares, and does not call a style vector a recording', () => {
+        render(<VoicesCard engine="kokoro" voices={[]} cloning={{ supported: true, formats: ['npy', 'pt'] }} onCloned={() => {}} />);
+        expect(screen.getByText('Add a voice from a file')).toBeInTheDocument();
+        expect(screen.getByText(/not a recording: NPY, PT/)).toBeInTheDocument();
+        expect(fileInput()).toHaveAttribute('accept', '.npy,.pt');
+        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+        expect(screen.queryByText(/seconds of one person speaking/)).not.toBeInTheDocument();
+    });
+
+    it('offers no file form to an engine that says it makes no voices from one', () => {
+        render(<VoicesCard engine="tone" voices={[sine]} cloning={{ supported: false }} onCloned={() => {}} />);
+        expect(screen.queryByRole('button', { name: 'Clone' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+    });
+
+    it('offers a blend only where the engine says it blends', () => {
+        render(<VoicesCard engine="chatterbox" voices={[narrator]} onCloned={() => {}} />);
+        expect(screen.queryByText('Blend a voice')).not.toBeInTheDocument();
+    });
+
+    it('sends a blend as its recipe with the id and label, and hands the new id back', async () => {
+        const user = setupUser();
+        const onCloned = vi.fn();
+        api.createVoice.mockResolvedValue({ status: 201, data: { id: 'host', label: 'Host', spec: 'host@a1-fp16' } });
+        render(<VoicesCard engine="kokoro" voices={[]} cloning={{ supported: false }} blending onCloned={onCloned} />);
+
+        await user.type(screen.getByRole('textbox', { name: 'Recipe' }), 'af_bella(2)+af_sky(1)');
+        await user.type(screen.getByRole('textbox', { name: 'Id' }), 'host');
+        await user.type(screen.getByRole('textbox', { name: 'Label' }), 'Host');
+        await user.click(screen.getByRole('button', { name: 'Blend' }));
+
+        await waitFor(() => expect(onCloned).toHaveBeenCalledWith('host'));
+        const [engine, form] = api.createVoice.mock.calls[0]! as [string, FormData];
+        expect(engine).toBe('kokoro');
+        expect(form.get('blend')).toBe('af_bella(2)+af_sky(1)');
+        expect(form.get('id')).toBe('host');
+        expect(form.get('label')).toBe('Host');
+        expect(form.get('reference')).toBeNull();
+    });
+
+    it('shows the core’s reason when a blend is refused', async () => {
+        const user = setupUser();
+        api.createVoice.mockResolvedValue({
+            status: 404,
+            data: { error: { code: 'unknown_voice', message: 'no voice "nobody"', retryable: false } },
+        });
+        render(<VoicesCard engine="kokoro" voices={[]} cloning={{ supported: false }} blending onCloned={() => {}} />);
+
+        await user.type(screen.getByRole('textbox', { name: 'Recipe' }), 'af_bella+nobody');
+        await user.type(screen.getByRole('textbox', { name: 'Id' }), 'host');
+        await user.click(screen.getByRole('button', { name: 'Blend' }));
+
+        const alert = await screen.findByRole('alert');
+        expect(within(alert).getByText('no voice "nobody"')).toBeInTheDocument();
+    });
 });

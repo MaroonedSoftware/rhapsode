@@ -60,13 +60,25 @@ class Worker:
         return response.status_code, _decode(response)
 
     def create_voice(
-        self, voice_id: str, reference: bytes, filename: str = "reference.wav"
+        self,
+        voice_id: str,
+        reference: bytes | None = None,
+        filename: str = "reference.wav",
+        *,
+        blend: str | None = None,
     ) -> tuple[int, Any]:
-        response = self._client.post(
-            "/voices",
-            data={"id": voice_id},
-            files={"reference": (filename, reference, "audio/wav")},
-        )
+        """A clone from `reference`, or a mix from a `blend` recipe. protocol.md § 7."""
+        if blend is not None:
+            # httpx only sends multipart when there is a file, and a blend has none, so the form is
+            # built as one explicitly rather than falling back to urlencoded, which § 7 does not take.
+            fields = {"id": (None, voice_id), "blend": (None, blend)}
+            response = self._client.post("/voices", files=fields)
+        else:
+            response = self._client.post(
+                "/voices",
+                data={"id": voice_id},
+                files={"reference": (filename, reference or b"", "audio/wav")},
+            )
         return response.status_code, _decode(response)
 
     def delete(self, path: str) -> tuple[int, Any]:

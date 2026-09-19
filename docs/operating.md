@@ -334,6 +334,24 @@ no copy and no list of its own. Back that directory up if the voices matter; del
 deletes the voice. Cloning and deleting answer this machine only, like installing, and a clip is
 limited to 25 MB. `docs/protocol.md` § 7 has the rules.
 
+Kokoro keeps a created voice as `<id>.npz` in the same store, the style vector itself, whether it
+came from a blend or an upload. A blend is resolved when it is made, so deleting a voice it was mixed
+from leaves it as it was. To bring a Kokoro-FastAPI voice across, one it ships that Kokoro's own file
+lacks such as `am_v0gurney`, upload its `.pt` from Kokoro-FastAPI's `api/src/voices/v1_0/` as the
+reference:
+
+```bash
+curl -F id=gurney -F label=Gurney -F reference=@am_v0gurney.pt localhost:8080/engines/kokoro/voices
+```
+
+The id is yours to choose, and `am_v0gurney` itself is a legal one, so a client that already names it
+needs no change. Only Kokoro's built-in names are refused, because the built-in voice would be heard
+instead. A mix is the same route with a recipe where the file was:
+
+```bash
+curl -F id=host -F 'blend=af_bella(2)+af_sky(1)' localhost:8080/engines/kokoro/voices
+```
+
 ## OpenAI clients
 
 `POST /v1/audio/speech` takes OpenAI's speech request, so a client written for OpenAI works once it

@@ -951,6 +951,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "cloning": {
                         "$ref": "#/components/schemas/Cloning",
                         "description": "Optional only because contract 1 shipped without it. § 4."
+                    },
+                    "blending": {
+                        "$ref": "#/components/schemas/Blending",
+                        "description": "Beside cloning, for the same reason: it needs no model. § 7."
                     }
                 },
                 "required": [
@@ -977,12 +981,25 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "type": "array",
                         "items": {
                             "type": "string"
-                        }
+                        },
+                        "description": "File types a `reference` may be. § 7."
                     }
                 },
                 "required": [
                     "supported"
                 ]
+            },
+            "Blending": {
+                "type": "object",
+                "properties": {
+                    "supported": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "supported"
+                ],
+                "description": "Whether a create may carry a `blend` recipe instead of a `reference`. § 7."
             },
             "Streaming": {
                 "type": "object",
@@ -1035,6 +1052,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                             },
                             "cloning": {
                                 "$ref": "#/components/schemas/Cloning"
+                            },
+                            "blending": {
+                                "$ref": "#/components/schemas/Blending",
+                                "description": "Absent means no, so a worker that predates it is read correctly."
                             },
                             "streaming": {
                                 "$ref": "#/components/schemas/Streaming"
@@ -1207,12 +1228,16 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     },
                     "reference": {
                         "type": "string",
-                        "format": "binary"
+                        "format": "binary",
+                        "description": "Exactly one of `reference` and `blend`. § 7."
+                    },
+                    "blend": {
+                        "type": "string",
+                        "description": "A recipe, `name(weight)+name(weight)`, over voices the engine has."
                     }
                 },
                 "required": [
-                    "id",
-                    "reference"
+                    "id"
                 ]
             },
             "SpeakRequest": {
