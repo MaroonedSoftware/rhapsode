@@ -11,6 +11,12 @@ dials and never both, and which one is a fact about the weights that are residen
 class. It claims exactly what turbo claims. It is in no upstream release yet, which is why this package
 installs upstream from a pinned commit on its master rather than from PyPI.
 
+Its cues are performed, not only accepted. Its tokenizer has turbo's tags as the same tokens, and in
+September 2026 each of the eight lengthened the same cloned line on every one of three seeds, by
+more than on turbo (`[chuckle]` 1.0 s against 0.6 s). A level measure cannot tell a soft chuckle
+from a breath, so `[chuckle]` and `[laugh]` were checked by ear against turbo's, and both are there.
+One listen through the core alone had missed the chuckle, which is why it was checked twice.
+
 ```bash
 python -m venv /opt/rhapsode/venvs/chatterbox
 /opt/rhapsode/venvs/chatterbox/bin/pip install rhapsode-engine-chatterbox
