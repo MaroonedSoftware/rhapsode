@@ -1,0 +1,26 @@
+name: Protocol or feature change
+description: Something the server, the SDK or the protocol should do and does not.
+labels: [enhancement]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              `docs/protocol.md` is the specification. A change that alters it is argued out here,
+              in the issue, before anybody writes code for it.
+    - type: textarea
+      id: problem
+      attributes:
+          label: The problem
+          description: What you are trying to do and what stops you. Not yet the solution.
+      validations:
+          required: true
+    - type: textarea
+      id: proposal
+      attributes:
+          label: What you propose
+          description: If it changes the protocol, which section, and what the new text would say.
+    - type: textarea
+      id: engines
+      attributes:
+          label: Effect on engines
+          description: Does an existing engine have to change? Does the capability document grow?

@@ -1,0 +1,29 @@
+name: Engine
+description: Propose an engine for the catalog, or report a problem with one.
+labels: [engine]
+body:
+    - type: input
+      id: model
+      attributes:
+          label: Model
+          description: Its name and where its weights are published.
+      validations:
+          required: true
+    - type: input
+      id: licences
+      attributes:
+          label: Licences
+          description: The code's licence and the weights' licence. The catalog records both.
+      validations:
+          required: true
+    - type: textarea
+      id: details
+      attributes:
+          label: Details
+          description: |
+              For a new engine: what it can do in capability-document terms (cues, deliveries,
+              languages, streaming, cloning), and whether you mean to write the adapter.
+              For a problem: the engine, variant and version, what happened, and the
+              `rhapsode-conform` output if you have it.
+      validations:
+          required: true
