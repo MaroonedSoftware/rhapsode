@@ -15,6 +15,7 @@ weights can, and `rhapsode-conform` against a real install is where that gets as
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import types
 from typing import Any
@@ -27,7 +28,14 @@ class _Build:
         self.name = name
 
     def generate(self, text: str, **arguments: Any) -> Any:
-        digest = abs(hash((text, tuple(sorted(map(str, arguments.items())))))) % 997
+        # hashlib, never hash(): a str's hash() is salted per process, so two requests that differ
+        # collided mod 997 on roughly one hash seed in 600, and conformance, which compares a couple of
+        # dozen such pairs, failed a CI run on 'delivery "frantic" changes the audio'. A stable digest
+        # passes or fails the same way on every run.
+        digest = (
+            int(hashlib.sha256(repr((text, sorted(map(str, arguments.items())))).encode()).hexdigest(), 16)
+            % 997
+        )
         samples = max(4_800, len(text) * 1_200)
         ramp = np.linspace(-0.5, 0.5, samples, dtype="float32")
         return (ramp * (1.0 - digest / 2_000.0)).reshape(1, -1)
