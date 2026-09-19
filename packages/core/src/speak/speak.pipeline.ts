@@ -146,7 +146,10 @@ export async function speakThrough(
     });
 
     try {
-        await pipeline(upstream.body, audioFloor(), raw);
+        // end: false, because trailers go out with the terminating chunk and addTrailers after an
+        // end() writes nothing. Left to pipeline, raw ended as the body did, and every duration a
+        // worker sent was dropped here without an error.
+        await pipeline(upstream.body, audioFloor(), raw, { end: false });
         const trailers = upstream.trailers();
         if (upstream.trailer !== undefined && Object.keys(trailers).length > 0) {
             raw.addTrailers(trailers as Record<string, string>);

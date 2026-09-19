@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { request, type IncomingHttpHeaders } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -138,6 +139,37 @@ describeWithSockets('speaking', () => {
         expect(response.headers['transfer-encoding']).toBeUndefined();
         // Tone's pcm is s16le at 24 kHz mono, so the body is the samples and nothing else.
         expect(Number(response.headers['x-rhapsode-duration-ms'])).toBe(Math.round((response.rawPayload.length / 2 / 24_000) * 1000));
+    }, 60_000);
+
+    it('ends a streamed take with its duration in a trailer', async () => {
+        // § 6: with `stream: true` the duration is known only once the audio has finished, so it is
+        // a trailer. Over a real socket, because inject() has no trailers, and with node:http
+        // rather than fetch, because fetch has no trailer API at all.
+        const builder = await start();
+        const address = await builder.app.listen({ port: 0, host: '127.0.0.1' });
+
+        const { headers, audio, trailers } = await new Promise<{
+            headers: IncomingHttpHeaders;
+            audio: Buffer;
+            trailers: NodeJS.Dict<string>;
+        }>((fulfil, fail) => {
+            const outgoing = request(
+                `${address}/speak`,
+                { method: 'POST', headers: { 'content-type': 'application/json', te: 'trailers' } },
+                response => {
+                    const chunks: Buffer[] = [];
+                    response.on('data', (chunk: Buffer) => chunks.push(chunk));
+                    response.on('end', () => fulfil({ headers: response.headers, audio: Buffer.concat(chunks), trailers: response.trailers }));
+                    response.on('error', fail);
+                },
+            );
+            outgoing.on('error', fail);
+            outgoing.end(JSON.stringify({ engine: 'tone', text: 'a streamed line', format: 'pcm', stream: true }));
+        });
+
+        expect(headers.trailer?.toLowerCase()).toBe('x-rhapsode-duration-ms');
+        // Tone's pcm is s16le at 24 kHz mono, so the body is the samples and nothing else.
+        expect(Number(trailers['x-rhapsode-duration-ms'])).toBe(Math.round((audio.length / 2 / 24_000) * 1000));
     }, 60_000);
 
     it('strips a cue the variant does not claim, before the worker ever sees it', async () => {
