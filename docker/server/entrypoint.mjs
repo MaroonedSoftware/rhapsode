@@ -6,8 +6,7 @@
  * operator's, as docs/operating.md promises of the config everywhere else.
  *
  * Then it starts nginx beside the server, serving the page and proxying /api to the core with the
- * management token. The token is also left where a separate web container can read it, for anyone
- * still running one. docs/operating.md § Docker.
+ * management token. docs/operating.md § Docker.
  */
 
 import { spawn } from 'node:child_process';
@@ -18,7 +17,9 @@ import { dirname, join } from 'node:path';
 import { DEFAULTS, loadSettings } from '@rhapsode/core';
 
 const configPath = process.env.RHAPSODE_CONFIG ?? '/config/rhapsode.config.json';
-const tokenPath = join(dirname(configPath), 'management.token');
+// Where a separate web container once read the token. Removed, so no second copy of it lingers in
+// the volume that gets backed up.
+const staleTokenPath = join(dirname(configPath), 'management.token');
 
 const seed = {
     install: {
@@ -33,8 +34,8 @@ const seed = {
     // Cloned voices are the one thing on /data that cannot be downloaded again, so they live in
     // /config with the rest of what is worth backing up.
     workers: { voiceDir: join(dirname(configPath), 'voices') },
-    // The page has no sign-in and a published port is never loopback to the core, so the web
-    // container presents this for it. Ports are published on 127.0.0.1 for the same reason.
+    // The page has no sign-in and a published port is never loopback to the core, so the page's
+    // proxy presents this for it. Ports are published on 127.0.0.1 for the same reason.
     management: { token: randomBytes(32).toString('base64url') },
 };
 
@@ -51,8 +52,7 @@ try {
 // accept, including after an operator edits it or removes it.
 const { settings } = await loadSettings(configPath);
 const token = settings.management?.token;
-if (typeof token === 'string' && token !== '') await writeFile(tokenPath, token, { mode: 0o600 });
-else await rm(tokenPath, { force: true });
+await rm(staleTokenPath, { force: true });
 
 // RFC 6750's b64token, which is every valid bearer token. Anything else would be pasted into
 // nginx's config as it stands, where a `$` reads as a variable and a `"` ends the string.

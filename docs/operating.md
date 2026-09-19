@@ -188,8 +188,7 @@ It was two containers, and one is less to run for nothing lost: unraid needed a 
 second template so the page could find the server, the token crossed between them through a file in
 `/config`, and nginx had to re-ask Docker's DNS or lose the core whenever its container was
 recreated. The core still serves no page of its own (protocol.md § 12). nginx is a second process
-beside it, reaching it over loopback like any other proxy on the same machine. The `web` target, the
-page alone, is still built for anyone running it in front of a separate server.
+beside it, reaching it over loopback like any other proxy on the same machine.
 
 Coming from the two-container compose, the old page container still holds port 8081, so replace it
 along with the server:
@@ -203,7 +202,6 @@ docker compose up -d --build --remove-orphans
 | Mount     | What                                                        | Where in it                            |
 | --------- | ----------------------------------------------------------- | -------------------------------------- |
 | `/config` | the config, and `rhapsode.engines.json` beside it           | `rhapsode.config.json`                 |
-|           | the management token the page presents                      | `management.token`                     |
 |           | cloned voices                                               | `voices/<engine>`                      |
 | `/data`   | each engine's virtualenv                                    | `.rhapsode/venvs/<engine>`             |
 |           | the Python interpreters those virtualenvs run on            | `.local/share/uv/python`               |

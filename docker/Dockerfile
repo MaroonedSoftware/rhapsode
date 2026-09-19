@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# `--target server` is the whole install: the core, and the page behind nginx in the same container.
-# `--target web` is the page alone, for anyone still running it in front of a separate server.
-# docs/operating.md § Docker says why each choice here is made.
+# One image, `server`, and the whole install: the core, and the page behind nginx in the same
+# container. docs/operating.md § Docker says why each choice here is made.
 
 ARG NODE_VERSION=22
 ARG PNPM_VERSION=11.23.0
@@ -25,17 +24,6 @@ RUN --mount=type=cache,id=rhapsode-pnpm,target=/root/.local/share/pnpm/store \
 
 FROM build AS web-build
 RUN pnpm exec turbo run build --filter=./apps/web...
-
-# The page is static, and nginx serves it and proxies /api to the core with the management token.
-FROM nginx:stable-alpine AS web
-ENV RHAPSODE_UPSTREAM=server:8080 \
-    RHAPSODE_RESOLVER=127.0.0.11
-COPY --from=web-build /src/apps/web/dist /usr/share/nginx/html
-COPY docker/web/default.conf.template /etc/nginx/templates/default.conf.template
-COPY --chmod=0755 docker/web/15-rhapsode-token.envsh /docker-entrypoint.d/15-rhapsode-token.envsh
-# Through the proxy, so healthy means the core is reachable from here and not only that nginx is up.
-HEALTHCHECK --interval=10s --timeout=3s --start-period=5s \
-    CMD ["wget", "--quiet", "--spider", "http://127.0.0.1/api/health"]
 
 # Debian rather than Alpine: cbor-extract, under ServerKit's authentication package, has no musl
 # prebuild, and would need a compiler in the image to build one.
