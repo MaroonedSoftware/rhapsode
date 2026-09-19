@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Capabilities, CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -13,6 +14,14 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/api/client', () => ({ BASE_URL: '/api', sdk: { public: api } }));
+// The "as code" snippet links to the API reference, and these tests render with no router around it.
+vi.mock('@tanstack/react-router', () => ({
+    Link: ({ to, children, ...props }: { to: string; children?: ReactNode }) => (
+        <a href={to} {...props}>
+            {children}
+        </a>
+    ),
+}));
 
 /** Chatterbox's document, trimmed: turbo performs cues and has no dials; original is the other way round. */
 const capabilities: Capabilities = {
@@ -91,6 +100,21 @@ describe('TryPanel', () => {
             stream: false,
         });
         expect(await screen.findByLabelText('Spoken line')).toHaveAttribute('src', 'blob:spoken');
+    });
+
+    it('shows as code the same request Speak sends', async () => {
+        const user = setupUser();
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await user.click(await screen.findByRole('combobox', { name: 'Voice' }));
+        await user.click(await screen.findByRole('option', { name: 'Narrator' }));
+        await user.click(screen.getByRole('button', { name: 'As code' }));
+        await user.click(screen.getByRole('button', { name: 'Speak' }));
+        await waitFor(() => expect(api.speak).toHaveBeenCalled());
+
+        const shown = (await screen.findByText(/curl -X POST/)).textContent!;
+        const sent = JSON.stringify(api.speak.mock.calls[0]![0]);
+        expect(shown).toContain(`-d '${sent}'`);
     });
 
     it('shows the core’s reason when a line is refused', async () => {
