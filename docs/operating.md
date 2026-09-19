@@ -97,7 +97,9 @@ your file.
 
 If pip cannot verify a certificate because something on your network intercepts TLS, start the
 server with `RHAPSODE_PIP_TRUSTED_HOSTS=pypi.org,files.pythonhosted.org`. It is deliberately not
-something a client can ask for.
+something a client can ask for. Installing Chatterbox also needs `github.com,codeload.github.com` in
+that list, because it installs upstream from a pinned commit rather than from PyPI until upstream
+releases a version with Nano in it.
 
 An engine's weights normally arrive on its first load, which for Chatterbox's `turbo` means a first
 `/speak` that waits about 75 seconds on a 3.8 GB download, and for Kokoro's `fp16` 205 MB. `POST /engines/{id}/pull` (or the wizard's

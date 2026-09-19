@@ -17,7 +17,13 @@ dependencies = [
     # Brings torch and several gigabytes of weights with it, which is exactly why every engine gets
     # its own virtualenv. The repository's shared dev venv installs this package with --no-deps, so
     # the adapter's own logic is under test without any of that.
-    "chatterbox-tts>=0.1.7",
+    #
+    # A commit on upstream's master rather than a release, because Nano (resemble-ai/chatterbox#542,
+    # 2026-07-21) is in no release: PyPI's newest is 0.1.7 from March, and master still calls itself
+    # 0.1.7 too, so no version floor can tell the two apart. An archive rather than git+https, so the
+    # server image needs no git. Back to a plain version floor once upstream publishes one with Nano,
+    # and until then this adapter cannot go to PyPI, which refuses a direct reference.
+    "chatterbox-tts @ https://github.com/resemble-ai/chatterbox/archive/5de7a54aa4e5e2baadb0182dde554908b48b85c2.zip",
     # Upstream's watermarker (resemble-perth 1.0.1) imports pkg_resources, which setuptools 81
     # removed. The import failure is swallowed, the watermarker becomes None, and every build then
     # fails to load with "'NoneType' object is not callable". A fresh venv got setuptools 84.
