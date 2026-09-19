@@ -175,11 +175,24 @@ page's requests as coming from a site it does not know.
 
 ## Docker
 
+No checkout, no Node and no build: `compose.yaml` is the whole install, and pulls the published
+image.
+
 ```bash
-docker compose up -d --build     # the server on 127.0.0.1:8080, the page on http://localhost:8081
+mkdir rhapsode && cd rhapsode
+curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.yaml
+docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-`docker/Dockerfile`'s `server` target is the whole install: the core, and the page behind nginx in the
+`RHAPSODE_VERSION` picks the tag, `latest` by default, and `docker compose pull` followed by
+`docker compose up -d` upgrades in place, keeping both volumes. From a checkout,
+`compose.build.yaml` builds the image instead, which is what the Docker smoke test runs:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+`docker/Dockerfile` builds one image, and it is the whole install: the core, and the page behind nginx in the
 same container, proxying `/api` as above. The entrypoint starts nginx beside the server and stops it
 only once the server has drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published
 ports.
@@ -194,7 +207,7 @@ Coming from the two-container compose, the old page container still holds port 8
 along with the server:
 
 ```bash
-docker compose up -d --build --remove-orphans
+docker compose up -d --remove-orphans
 ```
 
 ### Published images
@@ -271,6 +284,7 @@ environment is constructed rather than inherited.
 ### GPUs
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.gpu.yaml
 docker compose -f compose.yaml -f compose.gpu.yaml up -d
 ```
 
@@ -303,13 +317,7 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 ### unraid
 
-No image is published yet, so build it on the box from a checkout:
-
-```bash
-docker build -f docker/Dockerfile --target server -t rhapsode-server .
-```
-
-Then one container: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
+One container, with `ghcr.io/maroonedsoftware/rhapsode:latest` as its repository: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
 `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own `nobody:users`, ports 8080
 and 8081, and `--stop-timeout 30` in Extra Parameters.
 

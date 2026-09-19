@@ -39,7 +39,7 @@ pnpm build && pnpm test
 node scripts/python.mjs test        # the Python half alone
 pnpm wizard doctor                  # what is wrong with this checkout, and --fix for what it can mend
 pnpm wizard install kokoro          # with the server running: install an engine through its API
-node scripts/docker.smoke.mjs       # build the images, install through them, and restart them on their volumes
+node scripts/docker.smoke.mjs       # build the image, install through it, and replace the container on its volumes
 ```
 
 `pnpm wizard` is `packages/cli`, a johnny5 CLI like the ones in signet and kanban. It runs from

@@ -1,0 +1,13 @@
+# The image built from this checkout, in place of the published one. docs/operating.md § Docker.
+#
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+#
+# A name of its own, so a local build never shadows a pulled ghcr.io tag, and a `docker compose
+# pull` has nothing to fetch for it.
+services:
+    server:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+        image: rhapsode-server
+        pull_policy: build

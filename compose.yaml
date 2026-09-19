@@ -1,14 +1,14 @@
 # The server and the web page in one container, with config in one volume and every download in
-# another. docs/operating.md § Docker.
+# another. The published image, so this file is the whole install and needs no checkout; from a
+# checkout, add compose.build.yaml to build it instead. docs/operating.md § Docker.
+#
+#   docker compose up -d
 name: rhapsode
 
 services:
     server:
-        build:
-            context: .
-            dockerfile: docker/Dockerfile
-            target: server
-        image: rhapsode-server
+        # `edge` for the tip of main, or a version to stay on one.
+        image: ghcr.io/maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-latest}
         # 99:100 on unraid, to match its shares.
         user: '${PUID:-10001}:${PGID:-10001}'
         environment:
