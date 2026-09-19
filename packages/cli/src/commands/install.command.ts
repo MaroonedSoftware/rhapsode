@@ -119,25 +119,32 @@ async function install(engine: string, opts: InstallOptions, ctx: CliContext, cl
             return 1;
         }
 
-        if (entry.installed === 'yes') {
-            ui.info(`${entry.displayName} is already installed.`);
-        } else {
+        const variant = entry.defaultVariant;
+        const wantsWeights = async () =>
+            variant !== undefined &&
+            (opts.pull === true ||
+                (ctx.isInteractive() &&
+                    (await ui.confirm(`Download the ${variant} weights now, so the first request does not wait on them?`, true))));
+
+        if (entry.installed !== 'yes') {
             ui.info(`${entry.displayName} (${entry.package}): ${client.describeLicense(entry.license)}`);
             if (entry.license.notes !== undefined) ui.info(entry.license.notes);
             if (!(await ui.confirm(`Install ${entry.displayName} under these licences?`, true))) {
                 ui.warn(ctx.isInteractive() ? 'Not installed.' : 'Not installed: pass --yes to accept the licences from a script.');
                 return 1;
             }
-            const job = await follow(api, await api.install(engine), `Installing ${entry.displayName}`, ui);
-            if (job.state !== 'succeeded') return 1;
+            // Asked before the install starts, and done by the same job: a wizard stopped between an
+            // install and a separate pull left an engine whose first request waited on the download.
+            const pull = (await wantsWeights()) ? variant : undefined;
+            const job = await follow(api, await api.install(engine, pull), `Installing ${entry.displayName}`, ui);
+            if (job.state === 'failed' && job.step === 'weights') {
+                ui.warn(`${entry.displayName} is installed, but its weights did not download. Run this again with --pull to retry.`);
+            }
+            return job.state === 'succeeded' ? 0 : 1;
         }
 
-        const variant = entry.defaultVariant;
-        if (variant === undefined) return 0;
-        const wanted =
-            opts.pull === true ||
-            (ctx.isInteractive() && (await ui.confirm(`Download the ${variant} weights now, so the first request does not wait on them?`, true)));
-        if (!wanted) return 0;
+        ui.info(`${entry.displayName} is already installed.`);
+        if (!(await wantsWeights()) || variant === undefined) return 0;
 
         const pulled = await follow(api, await api.pull(engine, variant), `Downloading ${entry.displayName} ${variant}`, ui);
         if (pulled.state === 'failed' && pulled.error?.code === 'unsupported') {
