@@ -197,6 +197,18 @@ along with the server:
 docker compose up -d --build --remove-orphans
 ```
 
+### Published images
+
+CI publishes the image to `ghcr.io/maroonedsoftware/rhapsode`, for amd64 and arm64, once the build
+and the Docker smoke test have passed:
+
+| Tag              | What                                                  |
+| ---------------- | ----------------------------------------------------- |
+| `edge`           | the tip of `main`                                     |
+| `sha-<commit>`   | one commit on `main`, for pinning a build exactly     |
+| `1.2.3`, `1.2`   | a release, from a `v1.2.3` tag                        |
+| `latest`         | the newest release                                    |
+
 ### Two volumes
 
 | Mount     | What                                                        | Where in it                            |
