@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from starlette.applications import Starlette
@@ -202,30 +202,63 @@ def create_app(worker: Worker) -> Starlette:
             duration_ms=lambda: _duration_ms(counted.bytes, native.sample_rate, native.channels),
         )
 
-    async def on_worker_error(_: Request, error: Exception) -> Response:
+    def refusal(error: Exception) -> Response:
         failure = classify(error)
         if failure.status >= 500:
+            # The error as the adapter raised it, so the log names the ValueError and its traceback
+            # rather than the Internal it was classified as.
             worker.log.error("request failed", code=failure.code, error=error)
         else:
             worker.log.debug("request refused", code=failure.code, message=str(failure))
         return JSONResponse(failure.envelope(), status_code=failure.status)
 
+    async def on_worker_error(_: Request, error: Exception) -> Response:
+        return refusal(error)
+
+    def answered(endpoint: Endpoint) -> Endpoint:
+        """Every exception an endpoint raises becomes its answer here, inside the route.
+
+        Starlette gives a handler keyed on `Exception` to its outermost middleware, which sends the
+        handler's response and then raises again, and uvicorn closes the socket. So a plain
+        ValueError out of an adapter answered a correct 500 and the next request on that keep-alive
+        connection was reset: a conformance check "raised: Connection reset by peer" on 2026-09-19,
+        and the core pools its connections to a worker. A WorkerError never did this, because its
+        handler runs in the inner middleware that does not raise again, so the fix is to classify
+        everything before it can get that far.
+
+        Only the endpoint is wrapped, not the response it returns. A streamed `/speak` fails after
+        its headers inside the response, and that one must still abort the connection (§ 6).
+        """
+
+        async def wrapped(request: Request) -> Response:
+            try:
+                return await endpoint(request)
+            except Exception as error:
+                return refusal(error)
+
+        return wrapped
+
     return Starlette(
         routes=[
-            Route("/health", health, methods=["GET"]),
-            Route("/capabilities", capabilities, methods=["GET"]),
-            Route("/voices", voices, methods=["GET"]),
-            Route("/voices", create_voice, methods=["POST"]),
-            Route("/voices/{voice}", delete_voice, methods=["DELETE"]),
-            Route("/voices/{voice}/preview", preview, methods=["GET"]),
-            Route("/load", load, methods=["POST"]),
-            Route("/unload", unload, methods=["POST"]),
-            Route("/terminate", terminate, methods=["POST"]),
-            Route("/fetch", fetch, methods=["POST"]),
-            Route("/speak", speak, methods=["POST"]),
+            Route("/health", answered(health), methods=["GET"]),
+            Route("/capabilities", answered(capabilities), methods=["GET"]),
+            Route("/voices", answered(voices), methods=["GET"]),
+            Route("/voices", answered(create_voice), methods=["POST"]),
+            Route("/voices/{voice}", answered(delete_voice), methods=["DELETE"]),
+            Route("/voices/{voice}/preview", answered(preview), methods=["GET"]),
+            Route("/load", answered(load), methods=["POST"]),
+            Route("/unload", answered(unload), methods=["POST"]),
+            Route("/terminate", answered(terminate), methods=["POST"]),
+            Route("/fetch", answered(fetch), methods=["POST"]),
+            Route("/speak", answered(speak), methods=["POST"]),
         ],
+        # Behind `answered`, for anything raised outside an endpoint. Starlette's own 404 and 405
+        # are HTTPExceptions and never reach either.
         exception_handlers={Exception: on_worker_error, WorkerError: on_worker_error},
     )
+
+
+Endpoint = Callable[[Request], Awaitable[Response]]
 
 
 async def _json_body(request: Request) -> dict[str, Any]:
