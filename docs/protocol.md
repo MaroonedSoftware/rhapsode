@@ -514,8 +514,9 @@ A create carries exactly one of `reference` or `blend`, and both or neither is `
 file types that is. For Chatterbox it is a clip of somebody speaking. For Kokoro it is a style
 vector, the thing a Kokoro voice actually is: a `.npy` array, or a `.pt` voicepack as Kokoro-FastAPI
 ships them, of shape 510 x 1 x 256. That is how a voicepack outside the engine's own set arrives,
-Kokoro-FastAPI's `v0` voices included. A reference of a type the engine does not list is
-`bad_request`, and so is one of the right type and the wrong shape. A voicepack is read as data and
+Kokoro-FastAPI's `v0` voices included. A reference whose filename names a type the engine does not
+list is `unsupported`, as any format the engine does not do is (§ 6), and one of the right type and
+the wrong contents is `bad_request`. A voicepack is read as data and
 never unpickled: a `.pt` file is a pickle, and unpickling an upload runs whatever the uploader wrote.
 
 **`blend` is a mix of voices the engine already has**, where `current.blending.supported` says so.

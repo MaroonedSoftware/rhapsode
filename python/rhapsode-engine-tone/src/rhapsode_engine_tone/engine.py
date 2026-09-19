@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import struct
 from collections.abc import Iterator
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from rhapsode_worker import (
+    BlendRequest,
     CreateVoiceRequest,
     Engine,
     NativeFormat,
@@ -97,7 +99,11 @@ class ToneEngine(Engine):
             )
             for name, (frequency, description) in VOICES.items()
         ]
-        return built_in + [self._cloned(path, variant) for path in self._references()]
+        return (
+            built_in
+            + [self._cloned(path, variant) for path in self._references()]
+            + [self._blended(path, variant) for path in self._blends()]
+        )
 
     # ---------------------------------------------------------------- cloning
 
@@ -107,14 +113,29 @@ class ToneEngine(Engine):
             raise Unsupported(f'"{request.id}" is a built-in voice and cannot be replaced')
         if not request.reference:
             raise Unsupported("the reference audio is empty")
-        self.voice_dir.mkdir(parents=True, exist_ok=True)
-        # One file per id, whatever the upload was called, so a re-record replaces rather than adds.
-        for stale in self._references():
-            if stale.stem == request.id:
-                stale.unlink()
+        self._clear(request.id)
         target = self.voice_dir / f"{request.id}.ref"
         target.write_bytes(request.reference)
         return self._cloned(target, self.effective_variant(None), label=request.label)
+
+    def blend_voice(self, request: BlendRequest) -> Voice:
+        """A pitch mixed from the components' pitches, in their shares, resolved and stored now."""
+        if request.id in VOICES:
+            raise Unsupported(f'"{request.id}" is a built-in voice and cannot be replaced')
+        # Resolved before anything is cleared, so a blend that names the voice it replaces reads the
+        # old one rather than finding it gone.
+        frequency = sum(self._frequency(name) * share for name, share in request.components)
+        self._clear(request.id)
+        target = self.voice_dir / f"{request.id}.blend"
+        target.write_text(json.dumps({"recipe": request.recipe, "hz": frequency}))
+        return self._blended(target, self.effective_variant(None), label=request.label)
+
+    def _clear(self, voice_id: str) -> None:
+        """One file per id, whatever made it, so a re-record replaces rather than adds."""
+        self.voice_dir.mkdir(parents=True, exist_ok=True)
+        for stale in self._references() + self._blends():
+            if stale.stem == voice_id:
+                stale.unlink()
 
     def delete_voice(self, voice_id: str) -> None:
         if voice_id in VOICES:
@@ -125,6 +146,23 @@ class ToneEngine(Engine):
         if not self.voice_dir.is_dir():
             return []
         return sorted(path for path in self.voice_dir.iterdir() if path.suffix == ".ref" and path.is_file())
+
+    def _blends(self) -> list[Path]:
+        if not self.voice_dir.is_dir():
+            return []
+        return sorted(path for path in self.voice_dir.iterdir() if path.suffix == ".blend" and path.is_file())
+
+    def _blended(self, path: Path, variant: str, label: str | None = None) -> Voice:
+        stored = json.loads(path.read_text())
+        return Voice(
+            id=path.stem,
+            label=label or path.stem.replace("_", " ").title(),
+            description=f"Blended from {stored['recipe']}: {stored['hz']:.0f} Hz",
+            # The resolved pitch, not the recipe: the same recipe over a re-recorded component
+            # renders differently, and the spec follows the rendering.
+            spec=f"{path.stem}@{variant}:{stored['hz']:.3f}",
+            tags=("blended",),
+        )
 
     def _cloned(self, path: Path, variant: str, label: str | None = None) -> Voice:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -144,7 +182,10 @@ class ToneEngine(Engine):
             return VOICES["sine"][0]
         if voice in VOICES:
             return VOICES[voice][0]
-        return _cloned_hz(hashlib.sha256(self.path_for(voice).read_bytes()).hexdigest())
+        path = self.path_for(voice)
+        if path.suffix == ".blend":
+            return float(json.loads(path.read_text())["hz"])
+        return _cloned_hz(hashlib.sha256(path.read_bytes()).hexdigest())
 
     def apply_delivery(self, delivery: str | None, dials: dict[str, float]) -> dict[str, float]:
         # Relative to the voice rather than to a fixed point, which is the rule § 5 states and the

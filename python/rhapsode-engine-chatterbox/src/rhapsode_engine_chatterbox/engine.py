@@ -172,6 +172,9 @@ class ChatterboxEngine(Engine):
         found = sorted(path for path in self.voice_dir.iterdir() if path.suffix.lower() in VOICE_SUFFIXES)
         return [self._voice(path) for path in found]
 
+    def reference_formats(self) -> tuple[str, ...]:
+        return tuple(suffix.lstrip(".") for suffix in VOICE_SUFFIXES)
+
     def create_voice(self, request: CreateVoiceRequest) -> Voice:
         """Store the reference audio. Cloning here is zero-shot, so there is nothing to train."""
         self.voice_dir.mkdir(parents=True, exist_ok=True)

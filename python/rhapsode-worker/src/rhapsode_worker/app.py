@@ -41,18 +41,28 @@ def create_app(worker: Worker) -> Starlette:
     async def create_voice(request: Request) -> Response:
         worker.reject_if_draining()
         form = await request.form()
-        reference = form.get("reference")
-        if reference is None or isinstance(reference, str):
-            raise BadRequest("`reference` must be an uploaded file")
         voice_id = form.get("id")
         if not isinstance(voice_id, str) or not voice_id:
             raise BadRequest("`id` is required")
         label = form.get("label")
+        label = label if isinstance(label, str) and label else None
+        reference = form.get("reference")
+        blend = form.get("blend")
+
+        # Exactly one, protocol.md § 7. Both is a caller who does not know which they meant.
+        if reference is not None and blend is not None:
+            raise BadRequest("send `reference` or `blend`, not both")
+        if blend is not None:
+            if not isinstance(blend, str):
+                raise BadRequest("`blend` must be a recipe, not a file")
+            return JSONResponse(await worker.blend_voice(voice_id, blend, label), status_code=201)
+        if reference is None or isinstance(reference, str):
+            raise BadRequest("`reference` must be an uploaded file, or send a `blend` recipe")
         document = await worker.create_voice(
             CreateVoiceRequest(
                 id=voice_id,
                 reference=await reference.read(),
-                label=label if isinstance(label, str) else None,
+                label=label,
                 filename=reference.filename,
             )
         )

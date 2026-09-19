@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from . import encoding
-from .engine import CreateVoiceRequest, Engine, SpeakRequest, Voice, check_voice_id
+from .blends import parse_blend
+from .engine import BlendRequest, CreateVoiceRequest, Engine, SpeakRequest, Voice, check_voice_id
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
@@ -54,10 +55,13 @@ class Worker:
         engine = self.engine
         variants = engine.variants()
         reference = engine.reference_seconds()
+        formats = engine.reference_formats()
         cloning = {
             "supported": engine.supports_cloning,
             **({} if reference is None else {"referenceSeconds": list(reference)}),
+            **({} if formats is None else {"formats": list(formats)}),
         }
+        blending = {"supported": engine.supports_blending}
 
         document: dict[str, Any] = {
             "contract": self.contract,
@@ -69,10 +73,11 @@ class Worker:
             },
             "license": _license_document(engine.license),
             "device": engine.device.document(),
-            # On every variant as well as `current`, because cloning needs no model and a client
-            # must be able to tell an engine that cannot clone from one that is idle. protocol.md § 4.
+            # On every variant as well as `current`, because cloning and blending need no model and a
+            # client must be able to tell an engine that cannot from one that is idle. protocol.md § 4.
             "variants": {
-                name: {**variant.document(), "cloning": cloning} for name, variant in variants.items()
+                name: {**variant.document(), "cloning": cloning, "blending": blending}
+                for name, variant in variants.items()
             },
             "formats": encoding.available_formats(),
         }
@@ -86,6 +91,7 @@ class Worker:
                 "variant": engine.variant,
                 "maxCharacters": resident.max_characters or engine.max_characters,
                 "cloning": cloning,
+                "blending": blending,
                 "streaming": {"supported": True, "granularity": "chunk"},
                 "nativeFormat": {
                     "encoding": engine.native_format.encoding,
@@ -200,13 +206,42 @@ class Worker:
 
     async def create_voice(self, request: CreateVoiceRequest) -> dict[str, Any]:
         check_voice_id(request.id)
+        self._check_reference_type(request.filename)
         voice: Voice = await asyncio.to_thread(self.engine.create_voice, request)
+        return self._remember_label(request.id, request.label, voice)
+
+    async def blend_voice(self, voice_id: str, recipe: str, label: str | None) -> dict[str, Any]:
+        check_voice_id(voice_id)
+        # Asked before the recipe is parsed, so an engine that cannot blend says so rather than
+        # reporting a syntax error in a recipe it would never have read.
+        if not self.engine.supports_blending:
+            raise Unsupported("this engine does not blend voices")
+        request = BlendRequest(
+            id=voice_id, components=parse_blend(recipe), recipe=recipe.strip(), label=label
+        )
+        voice: Voice = await asyncio.to_thread(self.engine.blend_voice, request)
+        return self._remember_label(voice_id, label, voice)
+
+    def _check_reference_type(self, filename: str | None) -> None:
+        """Refuse an upload whose type the engine did not declare. protocol.md § 7.
+
+        Only when the upload names a type. A reference with no filename is the adapter's to judge,
+        because Chatterbox has always taken an unnamed one as WAV and a client relying on that
+        should not start failing here.
+        """
+        formats = self.engine.reference_formats()
+        suffix = Path(filename).suffix.lower().lstrip(".") if filename else ""
+        if formats is None or not suffix or suffix in formats:
+            return
+        raise Unsupported(f'a reference must be one of {", ".join(formats)}, not "{suffix}"')
+
+    def _remember_label(self, voice_id: str, label: str | None, voice: Voice) -> dict[str, Any]:
         labels = self._labels()
-        if request.label:
-            labels.set(request.id, request.label)
+        if label:
+            labels.set(voice_id, label)
         else:
             # A re-record with no label keeps no stale one from the recording it replaced.
-            labels.forget(request.id)
+            labels.forget(voice_id)
         return _labelled(voice.document(), labels.read())
 
     async def delete_voice(self, voice_id: str) -> None:
