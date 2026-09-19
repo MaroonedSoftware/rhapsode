@@ -175,9 +175,20 @@ function commandNext(proposed) {
     console.log(`${major}.${minor}.${patch + 1}`);
 }
 
+/**
+ * npm checks a provenance statement against the package's own `repository.url` and refuses the
+ * upload when they differ. The SDK had none, and v0.1.2 failed at the npm job with "repository.url
+ * is \"\"", after the build and the image had already run. Checked here, it fails in the first job.
+ */
+const REPOSITORY_URL = /^(git\+)?https:\/\/github\.com\/MaroonedSoftware\/rhapsode(\.git)?$/;
+
 function commandCheck(tag) {
     const version = (tag ?? '').replace(/^v/, '');
     if (!SEMVER.test(version)) fail(`usage: release.mjs check v<major.minor.patch>, not "${tag ?? ''}"`);
+
+    const unlinked = NPM.filter(dir => !REPOSITORY_URL.test(JSON.parse(read(`${dir}/package.json`)).repository?.url ?? ''));
+    if (unlinked.length > 0)
+        fail(`npm refuses provenance without repository.url naming this repository:\n${unlinked.map(dir => `  ${dir}/package.json`).join('\n')}`);
 
     const wrong = current().filter(entry => entry.version !== version);
     if (wrong.length > 0)

@@ -13,6 +13,11 @@
         }
     },
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/MaroonedSoftware/rhapsode.git",
+        "directory": "packages/sdk"
+    },
     "files": [
         "dist/**",
         "LICENSE"
