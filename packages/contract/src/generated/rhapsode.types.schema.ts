@@ -295,7 +295,7 @@ export const InstallJob = z.looseObject({
     id: z.string(),
     engine: z.string(),
     kind: z.enum(['install', 'pull']),
-    variant: z.string().optional().describe('For a pull: the variant being fetched.'),
+    variant: z.string().optional().describe('What a pull fetches, or an install fetches in step 5.'),
     state: z.enum(['queued', 'running', 'succeeded', 'failed']),
     step: z.enum(['venv', 'packages', 'verify', 'register', 'weights']).optional(),
     createdAt: z.string().describe('ISO 8601, UTC.'),
