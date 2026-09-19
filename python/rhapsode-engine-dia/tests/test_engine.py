@@ -12,6 +12,14 @@ from rhapsode_worker import Log, SpeakRequest, UnknownVoice, Unsupported
 from rhapsode_worker.engine import Device
 
 from rhapsode_engine_dia.backends import MAX_POSITIONS
+from rhapsode_engine_dia.builds import (
+    CODEC_FILES,
+    CODEC_REPOSITORY,
+    CODEC_REVISION,
+    FILES,
+    REPOSITORY,
+    REVISION,
+)
 from rhapsode_engine_dia.engine import CHUNK_SAMPLES, DiaEngine, chunked_pcm
 from rhapsode_engine_dia.prompt import SEGMENT_CHARACTERS
 
@@ -67,6 +75,38 @@ class TestLoading:
         built.unload()
         with pytest.raises(Unsupported):
             spoken(built)
+
+
+class TestFetching:
+    def test_fetches_the_checkpoint_and_its_codec_at_the_revisions_the_load_reads(
+        self, dia: Recorder, tmp_path: Path
+    ) -> None:
+        engine(tmp_path).fetch("1.6b")
+        assert [(fetched["repo_id"], fetched["revision"]) for fetched in dia.downloads] == [
+            (CODEC_REPOSITORY, CODEC_REVISION),
+            (REPOSITORY, REVISION),
+        ]
+        loaded(tmp_path)
+        fetched = {(fetched["repo_id"], fetched["revision"]) for fetched in dia.downloads}
+        parts = ("codec", "features", "tokenizer", "model")
+        read = {(load[kind], load["revision"]) for load in dia.loads for kind in parts if kind in load}
+        assert read == fetched
+
+    def test_asks_for_the_files_the_load_reads_and_no_more(self, dia: Recorder, tmp_path: Path) -> None:
+        engine(tmp_path).fetch("1.6b")
+        assert [sorted(fetched["allow_patterns"]) for fetched in dia.downloads] == [
+            sorted(CODEC_FILES),
+            sorted(FILES),
+        ]
+
+    def test_fetching_loads_nothing(self, dia: Recorder, tmp_path: Path) -> None:
+        engine(tmp_path).fetch("1.6b")
+        assert dia.loads == []
+
+    def test_a_build_this_engine_does_not_have_is_refused(self, dia: Recorder, tmp_path: Path) -> None:
+        with pytest.raises(Unsupported, match="no build"):
+            engine(tmp_path).fetch("dia2-2b")
+        assert dia.downloads == []
 
 
 class TestText:

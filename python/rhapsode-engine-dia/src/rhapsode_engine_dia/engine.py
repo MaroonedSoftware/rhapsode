@@ -9,7 +9,19 @@ from rhapsode_worker import Engine, NativeFormat, SpeakRequest, UnknownVoice, Un
 from rhapsode_worker.engine import Device
 
 from .backends import Generator, Prompt, Sampling, TransformersDia
-from .builds import CFG_SCALE_RANGE, DEFAULT_VARIANT, TEMPERATURE_RANGE, TOP_P_RANGE, variants
+from .builds import (
+    CFG_SCALE_RANGE,
+    CODEC_FILES,
+    CODEC_REPOSITORY,
+    CODEC_REVISION,
+    DEFAULT_VARIANT,
+    FILES,
+    REPOSITORY,
+    REVISION,
+    TEMPERATURE_RANGE,
+    TOP_P_RANGE,
+    variants,
+)
 from .prompt import line, segments, translate_cues
 
 #: The Descript codec's rate. Every generation is 44.1 kHz mono.
@@ -72,6 +84,25 @@ class DiaEngine(Engine):
         if variant not in variants():
             raise Unsupported(f'no build "{variant}"; this engine has {sorted(variants())}')
         self._generator = TransformersDia(_torch_device(self.device))
+
+    def fetch(self, variant: str) -> None:
+        """Download the checkpoint and its codec into the Hugging Face cache, where the load finds them.
+
+        The same repositories, revisions and files the load asks for, so the load that follows is a
+        cache hit. They are 6.4 GB and 0.3 GB, which a first `/speak` caller could not tell from a
+        hang. The import is here so the adapter is importable without the hub.
+        """
+        import os
+
+        from huggingface_hub import snapshot_download
+
+        if variant not in variants():
+            raise Unsupported(f'no build "{variant}"; this engine has {sorted(variants())}')
+        token = os.getenv("HF_TOKEN") or None
+        snapshot_download(
+            repo_id=CODEC_REPOSITORY, revision=CODEC_REVISION, allow_patterns=list(CODEC_FILES), token=token
+        )
+        snapshot_download(repo_id=REPOSITORY, revision=REVISION, allow_patterns=list(FILES), token=token)
 
     def unload(self) -> None:
         """Drop the model, then ask the runtime for the memory back, which it will not all give."""
