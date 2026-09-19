@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+    # Every action is pinned to a commit, not a tag, because a tag can be moved to new code by
+    # whoever controls that repository, and the release workflow runs with publish rights on npm and
+    # PyPI. This is what keeps the pins from going stale.
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly
+      cooldown:
+          default-days: 7
+      groups:
+          actions:
+              patterns: ['*']
+
+    # One pull request a week for the workspace, rather than one per package. The week's cooldown is
+    # for the same reason pnpm has a minimum release age: a hijacked release is usually caught and
+    # pulled within days, and nothing here needs a dependency on the day it ships.
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: weekly
+      cooldown:
+          default-days: 7
+      open-pull-requests-limit: 5
+      groups:
+          minor-and-patch:
+              update-types: [minor, patch]

@@ -199,6 +199,8 @@ does not reproduce, those are reported as undecided rather than passed.
 See [`docs/protocol.md`](docs/protocol.md) § 8, and
 [`python/rhapsode-worker/`](python/rhapsode-worker/) for the SDK.
 
+For changes to the core, the SDK or the protocol itself, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Licence
 
 MIT. Engines are separate packages under their own licences, which is deliberate: a GPL engine or one

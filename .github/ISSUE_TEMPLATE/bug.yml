@@ -1,0 +1,51 @@
+name: Bug
+description: Something does not do what docs/protocol.md or the README says it does.
+labels: [bug]
+body:
+    - type: textarea
+      id: what
+      attributes:
+          label: What happened
+          description: What you did, what you expected, and what happened instead.
+      validations:
+          required: true
+    - type: textarea
+      id: reproduce
+      attributes:
+          label: How to reproduce it
+          description: The smallest request, command or config that shows it.
+          render: shell
+      validations:
+          required: true
+    - type: input
+      id: version
+      attributes:
+          label: Version
+          description: Every package carries one version. The npm or PyPI version, the image tag, or the commit if from source.
+      validations:
+          required: true
+    - type: dropdown
+      id: where
+      attributes:
+          label: Where it runs
+          options:
+              - Docker image
+              - npm install
+              - From source
+      validations:
+          required: true
+    - type: input
+      id: engine
+      attributes:
+          label: Engine and variant
+          description: If an engine is involved, which one, e.g. `kokoro` / `v1`.
+    - type: input
+      id: platform
+      attributes:
+          label: Platform
+          description: OS, CPU or GPU, and Python version if it is the worker side.
+    - type: textarea
+      id: logs
+      attributes:
+          label: Logs
+          render: shell
