@@ -16,7 +16,7 @@ from typing import Any
 @dataclass
 class Call:
     text: str
-    voice: str
+    voice: Any  # A name, or a created voice's style vector.
     speed: float
     lang: str
 
@@ -28,7 +28,7 @@ class StubKokoro:
     espeak_config: Any = None
     calls: list[Call] = field(default_factory=list)
 
-    def create(self, text: str, voice: str, speed: float = 1.0, lang: str = "en-us") -> tuple[Any, int]:
+    def create(self, text: str, voice: Any, speed: float = 1.0, lang: str = "en-us") -> tuple[Any, int]:
         import numpy as np
 
         self.calls.append(Call(text=text, voice=voice, speed=speed, lang=lang))
