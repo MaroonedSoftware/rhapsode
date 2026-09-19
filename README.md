@@ -177,9 +177,10 @@ which answer the machine the server runs on and nobody else unless `management.t
 With a GPU, `pnpm wizard install chatterbox` is the next one to try: it clones voices and performs
 cues such as `[laugh]`, and its `turbo` weights are 3.8 GB.
 [`rhapsode-engine-chatterbox`](python/rhapsode-engine-chatterbox/) is the engine the capability
-document was designed around, and the reason that document has two levels: `turbo` performs the cues
-and has no dials, `original` and `multilingual` have the dials and perform no cues, and which you get
-is a fact about the weights resident right now.
+document was designed around, and the reason that document has two levels: `turbo` and `nano` perform
+the cues and have no dials, `original` and `multilingual` have the dials and perform no cues, and which
+you get is a fact about the weights resident right now. `nano` is turbo at 110M parameters, and on a
+Mac it speaks about twice as fast.
 
 [`rhapsode-engine-orpheus`](python/rhapsode-engine-orpheus/) is the second engine that performs
 cues, seven of the eight, and the first that streams audio while the model is still generating.

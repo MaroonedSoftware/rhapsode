@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections import OrderedDict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, ClassVar
@@ -31,6 +32,11 @@ CHUNK_SAMPLES = SAMPLE_RATE // 10
 REFERENCE_SECONDS = (5.0, 20.0)
 
 VOICE_SUFFIXES = (".wav", ".mp3", ".flac", ".ogg")
+
+#: How many cloned voices keep their analysed reference on the device. The analysis is a second or more
+#: of every cloned request (turbo on MPS: 4.9 s against the stock voice's 2.2 s), and an entry is small:
+#: 1.3 MB on nano and 0.8 MB on original, measured, so all 32 are about 42 MB beside gigabytes of weights.
+CONDITIONALS_KEPT = 32
 
 
 def _installed_chatterbox() -> str | None:
@@ -72,6 +78,13 @@ class ChatterboxEngine(Engine):
     upstream_version = _installed_chatterbox()
 
     _model: Any = None
+    #: The build's own voice, as upstream loaded it from `conds.pt`. Upstream keeps one `conds` per
+    #: model and a clone overwrites it, so without this copy every request that named no voice after
+    #: the first clone spoke as that clone.
+    _stock: Any = None
+    #: Each cloned voice's analysed reference, keyed by the file it came from as it is now, so a
+    #: re-recording is a miss. Tensors on the resident model's device, so a load or unload empties it.
+    _conditionals: OrderedDict[tuple[str, int, int], Any]
 
     # ------------------------------------------------------------------ what this engine can do
 
@@ -83,27 +96,32 @@ class ChatterboxEngine(Engine):
     def load(self, variant: str) -> None:
         """Bring one build onto the device.
 
-        Each build is its own class upstream rather than an argument to one, which is a fact about
-        this engine and not about the protocol. The import is here rather than at module scope so
-        that the adapter is importable, and testable, without torch.
+        Upstream mostly gives each build its own class rather than an argument to one, which is a
+        fact about this engine and not about the protocol. Nano is the exception: turbo's class with
+        `nano=True`. The import is here rather than at module scope so that the adapter is
+        importable, and testable, without torch.
         """
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
         from chatterbox.tts import ChatterboxTTS
         from chatterbox.tts_turbo import ChatterboxTurboTTS
 
-        builds = {
-            "turbo": ChatterboxTurboTTS,
-            "original": ChatterboxTTS,
-            "multilingual": ChatterboxMultilingualTTS,
+        builds: dict[str, tuple[Any, dict[str, Any]]] = {
+            "turbo": (ChatterboxTurboTTS, {}),
+            "nano": (ChatterboxTurboTTS, {"nano": True}),
+            "original": (ChatterboxTTS, {}),
+            "multilingual": (ChatterboxMultilingualTTS, {}),
         }
         build = builds.get(variant)
         if build is None:
             raise Unsupported(f'no build "{variant}"; this engine has {sorted(builds)}')
+        upstream, options = build
 
         # A string, never a torch.device. Upstream decides whether to map a CUDA-saved checkpoint
         # onto the CPU with `device in ["cpu", "mps"]`, which a torch.device never satisfies, so on
         # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
-        self._model = build.from_pretrained(device=self._torch_device())
+        self._model = upstream.from_pretrained(device=self._torch_device(), **options)
+        self._stock = getattr(self._model, "conds", None)
+        self._conditionals = OrderedDict()
         _float32_loudness(self._model)
 
     def fetch(self, variant: str) -> None:
@@ -129,6 +147,8 @@ class ChatterboxEngine(Engine):
         `terminate` as well and why a residency manager with only this verb slowly loses a card.
         """
         self._model = None
+        self._stock = None
+        self._conditionals = OrderedDict()
         try:
             import torch
 
@@ -167,6 +187,7 @@ class ChatterboxEngine(Engine):
             if stale.stem == request.id and stale.suffix.lower() in VOICE_SUFFIXES:
                 stale.unlink()
         target = self.voice_dir / f"{request.id}{suffix}"
+        self._forget(request.id)
         target.write_bytes(request.reference)
         return self._voice(target, label=request.label)
 
@@ -186,7 +207,17 @@ class ChatterboxEngine(Engine):
 
     def delete_voice(self, voice_id: str) -> None:
         path = self.path_for(voice_id)
+        self._forget(voice_id)
         path.unlink()
+
+    def _forget(self, voice_id: str) -> None:
+        """Drop a voice's analysed reference. The key would miss anyway once the file changes; this
+        is for a re-recording that lands with the same size inside one tick of the file clock."""
+        cached = getattr(self, "_conditionals", None)
+        if not cached:
+            return
+        for key in [key for key in cached if Path(key[0]).stem == voice_id]:
+            del cached[key]
 
     def reference_seconds(self) -> tuple[float, float] | None:
         return REFERENCE_SECONDS
@@ -232,6 +263,12 @@ class ChatterboxEngine(Engine):
 
         variant = self.effective_variant(request.variant)
         arguments = self._arguments(request, variant)
+        self._model.conds = self._stock if request.voice is None else self._cloned(request.voice, arguments)
+
+        # After conditioning rather than before, so a seeded request is the same audio whether its
+        # voice was analysed just now or came from the cache.
+        if request.seed is not None:
+            self._seed(request.seed)
         waveform = self._model.generate(request.text, **arguments)
 
         yield from chunked_pcm(waveform, CHUNK_SAMPLES)
@@ -240,16 +277,10 @@ class ChatterboxEngine(Engine):
         """Exactly what this build accepts, and nothing it would only warn about."""
         arguments: dict[str, Any] = {}
 
-        if request.voice is not None:
-            arguments["audio_prompt_path"] = str(self.path_for(request.voice))
-
-        if request.seed is not None:
-            self._seed(request.seed)
-
-        if variant == "turbo":
+        if variant in {"turbo", "nano"}:
             # Zero on purpose. Anything above it makes upstream log that CFG, min_p and exaggeration
-            # are unsupported and ignore them, and the capability document already says this build
-            # has no dials, so a non-zero value here could only have come from the SDK ignoring it.
+            # are unsupported and ignore them, and the capability document already says these builds
+            # have no dials, so a non-zero value here could only have come from the SDK ignoring it.
             return {**arguments, "exaggeration": 0.0, "cfg_weight": 0.0, "min_p": 0.0}
 
         dials = self.dials_for(request)
@@ -260,6 +291,32 @@ class ChatterboxEngine(Engine):
             arguments["language_id"] = request.language
 
         return arguments
+
+    def _cloned(self, voice: str, arguments: dict[str, Any]) -> Any:
+        """A cloned voice's analysed reference, from the cache or made now.
+
+        Upstream analyses the reference inside `generate` whenever it is handed a path, which is on
+        every request: turbo on MPS spent 4.9 s on a cloned line against 2.2 s for the stock voice. So
+        this calls upstream's own `prepare_conditionals` once per voice and hands `generate` no path.
+        Only `exaggeration` reaches the analysis, and every dialled build re-applies it to the
+        conditionals on each `generate`, so a cached entry cannot carry one request's dials into the
+        next.
+        """
+        path = self.path_for(voice)
+        status = path.stat()
+        key = (str(path), status.st_mtime_ns, status.st_size)
+
+        cached = self._conditionals.get(key)
+        if cached is not None:
+            self._conditionals.move_to_end(key)
+            return cached
+
+        self._forget(voice)
+        self._model.prepare_conditionals(str(path), exaggeration=arguments["exaggeration"])
+        self._conditionals[key] = self._model.conds
+        while len(self._conditionals) > CONDITIONALS_KEPT:
+            self._conditionals.popitem(last=False)
+        return self._model.conds
 
     def _seed(self, seed: int) -> None:
         """Reproducibility where the engine can manage it, which is every generator it touches."""
@@ -279,8 +336,8 @@ def _float32_loudness(model: Any) -> None:
     Turbo normalises a reference clip with pyloudnorm, which returns float64, and the array goes to
     the device as it is. MPS has no float64, so on Apple Silicon every clone failed at its first
     `speak` with "Cannot convert a MPS Tensor to float64 dtype" (measured, turbo, chatterbox-tts
-    0.1.7). The other builds have no such step. Wrapped per instance rather than patched on the
-    class, so nothing outside this adapter is changed.
+    0.1.7). Nano is turbo's class and has the same step; the other builds have none. Wrapped per
+    instance rather than patched on the class, so nothing outside this adapter is changed.
     """
     original = getattr(model, "norm_loudness", None)
     if original is None:

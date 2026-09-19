@@ -30,12 +30,18 @@ def spoken(built: ChatterboxEngine, **overrides: Any) -> list[bytes]:
 
 class TestLoading:
     def test_each_variant_loads_its_own_upstream_class(self, chatterbox, tmp_path: Path) -> None:
-        # Upstream ships three classes rather than one class with a variant argument, which is a fact
-        # about this engine and not about the protocol.
+        # Upstream ships a class per build rather than one class with a variant argument, which is a
+        # fact about this engine and not about the protocol. Nano is the one exception, below.
         built = engine(tmp_path)
-        for name in ("turbo", "original", "multilingual"):
+        for name in ("turbo", "nano", "original", "multilingual"):
             built.load(name)
             assert chatterbox[name].name == name
+
+    def test_nano_is_turbo_s_class_asked_for_nano(self, chatterbox, tmp_path: Path) -> None:
+        # Without the flag upstream loads turbo's 3.8 GB, and nothing downstream could tell.
+        engine(tmp_path).load("nano")
+        assert "nano" in chatterbox
+        assert "turbo" not in chatterbox
 
     def test_the_device_reaches_upstream_as_a_string(self, chatterbox, tmp_path: Path) -> None:
         # Upstream picks its checkpoint map_location with `device in ["cpu", "mps"]`. A torch.device
@@ -73,6 +79,16 @@ class TestWhatReachesGenerate:
         assert arguments["cfg_weight"] == 0.0
         assert arguments["min_p"] == 0.0
 
+    def test_nano_is_sent_zeroes_too(self, chatterbox, tmp_path: Path) -> None:
+        # Nano generates with turbo's method, which warns about the same three arguments by name.
+        built = engine(tmp_path)
+        built.load("nano")
+        built.variant = "nano"
+        spoken(built, variant="nano")
+
+        arguments = chatterbox["nano"].calls[-1].arguments
+        assert (arguments["exaggeration"], arguments["cfg_weight"], arguments["min_p"]) == (0.0, 0.0, 0.0)
+
     def test_the_dialled_build_is_sent_the_dials_it_declares(self, chatterbox, tmp_path: Path) -> None:
         built = engine(tmp_path)
         built.load("original")
@@ -109,14 +125,30 @@ class TestWhatReachesGenerate:
         spoken(built, variant="original", language="en")
         assert "language_id" not in chatterbox["original"].calls[-1].arguments
 
-    def test_a_voice_becomes_a_reference_audio_path(self, chatterbox, tmp_path: Path) -> None:
+    def test_a_voice_is_analysed_from_its_reference_audio(self, chatterbox, tmp_path: Path) -> None:
         (tmp_path / "narrator.wav").write_bytes(b"RIFF" + b"\0" * 64)
         built = engine(tmp_path)
         built.load("turbo")
         built.variant = "turbo"
         spoken(built, variant="turbo", voice="narrator")
 
-        assert chatterbox["turbo"].calls[-1].arguments["audio_prompt_path"].endswith("narrator.wav")
+        assert chatterbox["turbo"].prepared[-1].endswith("narrator.wav")
+        assert chatterbox["turbo"].calls[-1].conds == "cloned:narrator.wav"
+        # Handed a path, upstream would analyse the reference again, which is the cost being saved.
+        assert "audio_prompt_path" not in chatterbox["turbo"].calls[-1].arguments
+
+    def test_no_voice_speaks_as_the_build_after_a_clone_has(self, chatterbox, tmp_path: Path) -> None:
+        # Upstream keeps one `conds` per model and a clone overwrites it, so every request without a
+        # voice after the first clone spoke as that clone. Measured on nano with seed 7: the stock
+        # line reproduced exactly until a clone ran, and never again after it.
+        (tmp_path / "narrator.wav").write_bytes(b"RIFF" + b"\0" * 64)
+        built = engine(tmp_path)
+        for name in ("turbo", "original"):
+            built.load(name)
+            built.variant = name
+            spoken(built, variant=name, voice="narrator")
+            spoken(built, variant=name)
+            assert chatterbox[name].calls[-1].conds == "stock"
 
     def test_a_voice_that_does_not_exist_is_refused_before_anything_is_generated(
         self, chatterbox, tmp_path: Path
@@ -127,6 +159,89 @@ class TestWhatReachesGenerate:
         with pytest.raises(Exception, match="narrator_99"):
             spoken(built, variant="turbo", voice="narrator_99")
         assert chatterbox["turbo"].calls == []
+
+
+class TestConditionalsCache:
+    def clones(self, tmp_path: Path, *names: str) -> ChatterboxEngine:
+        for name in names:
+            (tmp_path / f"{name}.wav").write_bytes(b"RIFF" + b"\0" * 64)
+        built = engine(tmp_path)
+        built.load("turbo")
+        built.variant = "turbo"
+        return built
+
+    def test_a_voice_is_analysed_once_and_then_reused(self, chatterbox, tmp_path: Path) -> None:
+        built = self.clones(tmp_path, "narrator")
+        for _ in range(3):
+            spoken(built, variant="turbo", voice="narrator")
+        assert len(chatterbox["turbo"].prepared) == 1
+        assert [call.conds for call in chatterbox["turbo"].calls] == ["cloned:narrator.wav"] * 3
+
+    def test_voices_that_alternate_each_speak_as_themselves(self, chatterbox, tmp_path: Path) -> None:
+        # The model holds one voice at a time, so a hit has to put its entry back, not just skip work.
+        built = self.clones(tmp_path, "narrator", "host")
+        for voice in ("narrator", "host", "narrator", None, "host"):
+            spoken(built, variant="turbo", voice=voice)
+        assert [call.conds for call in chatterbox["turbo"].calls] == [
+            "cloned:narrator.wav",
+            "cloned:host.wav",
+            "cloned:narrator.wav",
+            "stock",
+            "cloned:host.wav",
+        ]
+        assert len(chatterbox["turbo"].prepared) == 2
+
+    def test_a_re_recorded_voice_is_analysed_again(self, chatterbox, tmp_path: Path) -> None:
+        built = self.clones(tmp_path, "narrator")
+        spoken(built, variant="turbo", voice="narrator")
+        built.create_voice(
+            CreateVoiceRequest(id="narrator", reference=b"RIFF" + b"\1" * 99, filename="a.wav")
+        )
+        spoken(built, variant="turbo", voice="narrator")
+        assert len(chatterbox["turbo"].prepared) == 2
+
+    def test_a_voice_changed_on_disk_is_analysed_again(self, chatterbox, tmp_path: Path) -> None:
+        built = self.clones(tmp_path, "narrator")
+        spoken(built, variant="turbo", voice="narrator")
+        (tmp_path / "narrator.wav").write_bytes(b"RIFF" + b"\2" * 128)
+        spoken(built, variant="turbo", voice="narrator")
+        assert len(chatterbox["turbo"].prepared) == 2
+
+    def test_another_build_analyses_for_itself(self, chatterbox, tmp_path: Path) -> None:
+        # An entry is tensors on the model that made it. Handing it to the next build is at best the
+        # wrong voice and at worst a device mismatch.
+        built = self.clones(tmp_path, "narrator")
+        spoken(built, variant="turbo", voice="narrator")
+        built.load("original")
+        built.variant = "original"
+        spoken(built, variant="original", voice="narrator")
+        assert len(chatterbox["original"].prepared) == 1
+
+    def test_the_cache_keeps_the_most_recently_used(
+        self, chatterbox, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("rhapsode_engine_chatterbox.engine.CONDITIONALS_KEPT", 2)
+        built = self.clones(tmp_path, "a", "b", "c")
+        for voice in ("a", "b", "a", "c", "a", "b"):
+            spoken(built, variant="turbo", voice=voice)
+        # b was the least recently used when c arrived, so b alone is analysed twice.
+        assert [Path(path).stem for path in chatterbox["turbo"].prepared] == ["a", "b", "c", "b"]
+
+    def test_the_seed_is_set_after_the_analysis(self, chatterbox, tmp_path: Path) -> None:
+        # Otherwise anything random in the analysis would make a seeded clone sound different on its
+        # first request from every later one.
+        built = self.clones(tmp_path, "narrator")
+        order: list[str] = []
+        stub_prepare = chatterbox["turbo"].prepare_conditionals
+        chatterbox["turbo"].prepare_conditionals = lambda *a, **k: (
+            order.append("prepare"),
+            stub_prepare(*a, **k),
+        )  # type: ignore[method-assign]
+        import sys
+
+        sys.modules["torch"].manual_seed = lambda seed: order.append("seed")  # type: ignore[attr-defined]
+        spoken(built, variant="turbo", voice="narrator", seed=7)
+        assert order == ["prepare", "seed"]
 
 
 class TestDeliveries:
@@ -281,6 +396,23 @@ class TestFetching:
                 "token": None,
             }
         ]
+
+    def test_nano_fetches_from_its_own_repository(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Same class and patterns as turbo, different weights. Fetching turbo's repository here would
+        # succeed, download 3.8 GB, and leave the load that follows to download nano all over again.
+        import sys
+        import types
+
+        asked: list[dict[str, Any]] = []
+        hub = types.ModuleType("huggingface_hub")
+        hub.snapshot_download = lambda **arguments: asked.append(arguments) or str(tmp_path)  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+
+        engine(tmp_path).fetch("nano")
+
+        assert asked[0]["repo_id"] == "ResembleAI/chatterbox-nano"
 
     def test_does_not_load_anything(
         self, chatterbox, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

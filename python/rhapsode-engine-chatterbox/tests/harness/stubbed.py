@@ -1,13 +1,13 @@
 """The Chatterbox adapter, served for real, against a model that is not real.
 
 Everything here is the actual adapter and the actual SDK: the socket, the handshake, the capability
-document, the encoder, the error taxonomy and the residency verbs. Only the three upstream classes
-are stubs, because the real ones bring torch and several gigabytes of weights.
+document, the encoder, the error taxonomy and the residency verbs. Only upstream's classes are stubs,
+because the real ones bring torch and several gigabytes of weights.
 
 What running `rhapsode-conform` against this proves is that the adapter's protocol surface is
-correct: that the two-level capability document is well formed, that turbo declares cues and no
-dials while the dialled builds declare the reverse, that a request's text and dials reach the model,
-and that every refusal is the right code with the right retryable flag.
+correct: that the two-level capability document is well formed, that turbo and nano declare cues and
+no dials while the dialled builds declare the reverse, that a request's text and dials reach the
+model, and that every refusal is the right code with the right retryable flag.
 
 What it cannot prove is that the turbo weights actually perform a laugh. Nothing short of the real
 weights can, and `rhapsode-conform` against a real install is where that gets asked.
@@ -15,8 +15,10 @@ weights can, and `rhapsode-conform` against a real install is where that gets as
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import types
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -25,9 +27,26 @@ import numpy as np
 class _Build:
     def __init__(self, name: str) -> None:
         self.name = name
+        # Upstream's `conds`, which a clone overwrites and `generate` speaks from when handed no
+        # reference. A file name rather than a path, so the audio does not depend on a temp dir.
+        self.conds = "stock"
 
-    def generate(self, text: str, **arguments: Any) -> Any:
-        digest = abs(hash((text, tuple(sorted(map(str, arguments.items())))))) % 997
+    def prepare_conditionals(self, wav_fpath: str, exaggeration: float = 0.5, **options: Any) -> None:
+        del exaggeration, options
+        self.conds = f"cloned:{Path(wav_fpath).name}"
+
+    def generate(self, text: str, audio_prompt_path: str | None = None, **arguments: Any) -> Any:
+        if audio_prompt_path:
+            self.prepare_conditionals(audio_prompt_path)
+        arguments = {**arguments, "conds": self.conds}
+        # hashlib, never hash(): a str's hash() is salted per process, so two requests that differ
+        # collided mod 997 on roughly one hash seed in 600, and conformance, which compares a couple of
+        # dozen such pairs, failed a CI run on 'delivery "frantic" changes the audio'. A stable digest
+        # passes or fails the same way on every run.
+        digest = (
+            int(hashlib.sha256(repr((text, sorted(map(str, arguments.items())))).encode()).hexdigest(), 16)
+            % 997
+        )
         samples = max(4_800, len(text) * 1_200)
         ramp = np.linspace(-0.5, 0.5, samples, dtype="float32")
         return (ramp * (1.0 - digest / 2_000.0)).reshape(1, -1)
@@ -37,9 +56,9 @@ class _Factory:
     def __init__(self, name: str) -> None:
         self._name = name
 
-    def from_pretrained(self, device: Any) -> _Build:
+    def from_pretrained(self, device: Any, nano: bool = False) -> _Build:
         del device
-        return _Build(self._name)
+        return _Build("nano" if nano else self._name)
 
 
 def install() -> None:

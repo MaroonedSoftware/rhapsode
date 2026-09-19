@@ -12,10 +12,12 @@ Only real weights answer that, and `rhapsode-conform` against a real install is 
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import types
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -27,11 +29,13 @@ class Recorded:
 
     text: str
     arguments: dict[str, Any]
+    #: Whose voice the build was holding when it spoke: "stock", or "cloned:<file>".
+    conds: str = "stock"
 
 
 @dataclass
 class StubBuild:
-    """Stands in for one of upstream's three classes."""
+    """Stands in for one of upstream's builds."""
 
     name: str
     calls: list[Recorded] = field(default_factory=list)
@@ -40,14 +44,37 @@ class StubBuild:
     #: varies with its input, because "did this cue reach the model" is only visible that way.
     fixed_length: bool = True
 
-    def generate(self, text: str, **arguments: Any) -> Any:
+    #: Upstream's `conds`: what the build speaks as when `generate` is handed no reference. It
+    #: starts as the build's own voice and a clone overwrites it, exactly as upstream's does.
+    conds: str = "stock"
+    #: Every reference upstream would have analysed, in order.
+    prepared: list[str] = field(default_factory=list)
+
+    def prepare_conditionals(self, wav_fpath: str, exaggeration: float = 0.5, **options: Any) -> None:
+        del exaggeration, options
+        self.prepared.append(wav_fpath)
+        self.conds = f"cloned:{Path(wav_fpath).name}"
+
+    def generate(self, text: str, audio_prompt_path: str | None = None, **arguments: Any) -> Any:
         import numpy as np
 
-        self.calls.append(Recorded(text=text, arguments=arguments))
+        if audio_prompt_path:
+            self.prepare_conditionals(audio_prompt_path)
+            arguments = {**arguments, "audio_prompt_path": audio_prompt_path}
+        self.calls.append(Recorded(text=text, arguments=arguments, conds=self.conds))
+        arguments = {**arguments, "conds": self.conds}
+        arguments.pop("audio_prompt_path", None)
         # Varies with everything it was given, which is what a real model does and what the
         # conformance suite needs in order to see that a cue reached it at all. It is not pretending
         # to be a model: the audio is a ramp, and only its length and pitch depend on the input.
-        digest = abs(hash((text, tuple(sorted(map(str, arguments.items())))))) % 997
+        # hashlib, never hash(): a str's hash() is salted per process, so two requests that differ
+        # collided mod 997 on roughly one hash seed in 600, and conformance, which compares a couple of
+        # dozen such pairs, failed a CI run on 'delivery "frantic" changes the audio'. A stable digest
+        # passes or fails the same way on every run.
+        digest = (
+            int(hashlib.sha256(repr((text, sorted(map(str, arguments.items())))).encode()).hexdigest(), 16)
+            % 997
+        )
         samples = self.samples if self.fixed_length else max(2400, len(text) * 1200)
         ramp = np.linspace(-0.5, 0.5, samples, dtype="float32")
         return (ramp * (1.0 - digest / 2000.0)).reshape(1, -1)
@@ -58,10 +85,12 @@ class StubFactory:
         self._name = name
         self._registry = registry
 
-    def from_pretrained(self, device: Any) -> StubBuild:
-        build = StubBuild(name=self._name)
+    def from_pretrained(self, device: Any, nano: bool = False) -> StubBuild:
+        # Upstream's turbo class loads nano too, when asked; `nano` is its argument and only its.
+        name = "nano" if nano else self._name
+        build = StubBuild(name=name)
         build.device = device  # type: ignore[attr-defined]
-        self._registry[self._name] = build
+        self._registry[name] = build
         return build
 
 

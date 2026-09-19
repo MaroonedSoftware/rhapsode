@@ -1,9 +1,9 @@
 """What each Chatterbox build can actually do, and why they differ.
 
-This file is the reason the capability document has two levels. Upstream ships three builds that are
-not three sizes of one thing: `turbo` performs the paralinguistic tags and IGNORES the expressiveness
-dials, while `original` and `multilingual` honour the dials and perform no tags. On this engine you
-get cues or dials and never both, and which one is a fact about the weights resident right now.
+This file is the reason the capability document has two levels. Upstream's builds are not sizes of
+one thing: `turbo` and `nano` perform the paralinguistic tags and IGNORE the expressiveness dials,
+while `original` and `multilingual` honour the dials and perform no tags. On this engine you get cues
+or dials and never both, and which one is a fact about the weights resident right now.
 
 The evidence is upstream's own source. `ChatterboxTurboTTS.generate` defaults `exaggeration` and
 `cfg_weight` to 0.0 and logs "CFG, min_p and exaggeration are not supported by Turbo version and will
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from rhapsode_worker import Variant
 
-#: The standard vocabulary, all of which the turbo weights perform as bracketed tags in the text.
+#: The standard vocabulary, all of which the turbo and nano weights perform as bracketed tags.
 CUES: tuple[str, ...] = (
     "laugh",
     "chuckle",
@@ -78,7 +78,7 @@ MULTILINGUAL_LANGUAGES: tuple[str, ...] = (
 
 
 def variants() -> dict[str, Variant]:
-    """The three builds, each claiming only what its weights actually perform.
+    """The four builds, each claiming only what its weights actually perform.
 
     Claiming a cue this engine cannot perform is the one way to break the guarantee that an engine
     never reads the word "laugh" out loud, and it would be trivially easy here: the cues and the
@@ -91,6 +91,15 @@ def variants() -> dict[str, Variant]:
             # Empty, and not as an oversight. Passing either dial to this build produces a warning
             # upstream and changes nothing, which is precisely the silent discard the capability
             # document exists to make impossible.
+            dials={},
+            languages=("en",),
+        ),
+        # Turbo's architecture with a GPT-2 small backbone in place of medium (110M parameters), and
+        # loaded through turbo's own class: upstream's `ChatterboxTurboTTS.from_pretrained(nano=True)`.
+        # Its `generate` is turbo's method, so everything it claims is turbo's claim, dials included.
+        "nano": Variant(
+            cues=CUES,
+            deliveries=(),
             dials={},
             languages=("en",),
         ),
@@ -114,13 +123,18 @@ def clamp(value: float, low: float, high: float) -> float:
     return round(max(low, min(high, value)), 4)
 
 
-#: Where each build's weights live, and which files its `from_pretrained` actually reads. Copied from
-#: upstream 0.1.7 (`tts_turbo.py`, `tts.py`, `mtl_tts.py`) rather than imported, because importing any
-#: of those modules imports torch, and fetching has no use for it. A repository downloaded whole would
-#: be every build at once: `original` and `multilingual` share one, and together they are most of the
-#: 9.7 GB that all three came to. Keep in step with upstream when it moves.
+#: Where each build's weights live, and which files its `from_pretrained` asks for. Copied from upstream
+#: at the pinned commit (`tts_turbo.py`, `tts.py`, `mtl_tts.py`) rather than imported, because importing
+#: any of those modules imports torch, and fetching has no use for it. A repository downloaded whole
+#: would be every build at once: `original` and `multilingual` share one, and together they are most of
+#: the 9.7 GB that the first three came to. Keep in step with upstream when it moves.
+#:
+#: `nano` asks for turbo's patterns because upstream's load does, and a narrower fetch would only move
+#: the download to the first `/speak`. That includes a 1.06 GB `s3gen.safetensors` nano never reads (it
+#: loads `s3gen_meanflow.safetensors`), which is 3.0 GB fetched for 1.9 GB used.
 WEIGHTS: dict[str, tuple[str, tuple[str, ...]]] = {
     "turbo": ("ResembleAI/chatterbox-turbo", ("*.safetensors", "*.json", "*.txt", "*.pt", "*.model")),
+    "nano": ("ResembleAI/chatterbox-nano", ("*.safetensors", "*.json", "*.txt", "*.pt", "*.model")),
     "original": (
         "ResembleAI/chatterbox",
         ("ve.safetensors", "t3_cfg.safetensors", "s3gen.safetensors", "tokenizer.json", "conds.pt"),
