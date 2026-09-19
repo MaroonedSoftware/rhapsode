@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Capabilities, EngineSpeakRequest, Voice } from '@maroonedsoftware/rhapsode-sdk';
+import type { Capabilities, DialogueRequest, EngineSpeakRequest, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { sdk } from './client';
 import { queryKeys } from './query.keys';
@@ -52,6 +52,30 @@ export function useSpeak() {
             return { url: URL.createObjectURL(audio), bytes: audio.size, milliseconds: Math.round(performance.now() - started) };
         },
         // A speak may have loaded a model or changed the variant, which is what `current` reports.
+        onSettled: (_data, _error, request) => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.engine.capabilities(request.engine) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.engines() });
+        },
+    });
+}
+
+/** A conversation, and the engine to have it on. § 6. */
+export interface DialogueAsk extends Omit<DialogueRequest, 'format' | 'stream'> {
+    engine: string;
+}
+
+/**
+ * A conversation in one take, as a playable URL. Buffered for the reason `useSpeak` is, and it
+ * invalidates the same documents, since it loads a model the same way.
+ */
+export function useDialogue() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ engine, ...request }: DialogueAsk): Promise<Spoken> => {
+            const started = performance.now();
+            const audio = unwrap<Blob>(await sdk.public.dialogue(engine, { ...request, format: 'wav', stream: false }));
+            return { url: URL.createObjectURL(audio), bytes: audio.size, milliseconds: Math.round(performance.now() - started) };
+        },
         onSettled: (_data, _error, request) => {
             void queryClient.invalidateQueries({ queryKey: queryKeys.engine.capabilities(request.engine) });
             void queryClient.invalidateQueries({ queryKey: queryKeys.engines() });

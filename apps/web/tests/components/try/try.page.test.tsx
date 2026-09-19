@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
     engineCapabilities: vi.fn(),
     engineVoices: vi.fn(),
     speak: vi.fn(),
+    dialogue: vi.fn(),
     catalog: vi.fn<() => Promise<CatalogEntry[]>>(),
     engines: vi.fn(),
 }));
@@ -102,5 +103,81 @@ describe('TryPanel', () => {
 
         const alert = await screen.findByRole('alert');
         expect(within(alert).getByText('no voice "narrator"')).toBeInTheDocument();
+    });
+});
+
+/** Dia's document, trimmed: one build, which performs a conversation of two. */
+const dia: Capabilities = {
+    contract: 1,
+    engine: { id: 'dia', displayName: 'Dia', adapterVersion: '0.0.0' },
+    license: { code: 'Apache-2.0', weights: 'Apache-2.0', weightsCommercialUse: true },
+    device: { type: 'cuda', name: 'card' },
+    variants: { '1.6b': { cues: ['laugh', 'gasp'], deliveries: [], dials: {}, dialogue: { maxSpeakers: 2 } } },
+    formats: ['wav'],
+};
+
+describe('TryPanel, where a variant declares dialogue', () => {
+    beforeEach(() => {
+        for (const mock of Object.values(api)) mock.mockReset();
+        api.engineCapabilities.mockResolvedValue({ status: 200, data: dia });
+        api.engineVoices.mockResolvedValue({ status: 200, data: [{ id: 'narrator', label: 'Narrator', spec: 'narrator@1.6b:ab' }] });
+        api.dialogue.mockResolvedValue({ status: 200, contentType: 'audio/wav', data: new Blob([new Uint8Array(2048)], { type: 'audio/wav' }) });
+        globalThis.URL.createObjectURL = vi.fn(() => 'blob:spoken');
+        globalThis.URL.revokeObjectURL = vi.fn();
+    });
+
+    it('offers a conversation of as many speakers as the variant takes, and no switch elsewhere', async () => {
+        render(<TryPanel engine="dia" />);
+        expect(await screen.findByRole('radio', { name: 'A conversation, up to 2' })).toBeInTheDocument();
+
+        api.engineCapabilities.mockResolvedValue({ status: 200, data: capabilities });
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+        await screen.findAllByRole('button', { name: 'laugh' });
+        expect(screen.getAllByRole('radio', { name: /A conversation/ })).toHaveLength(1);
+    });
+
+    it('sends the turns under a label per speaker, and a voice only for a speaker who speaks', async () => {
+        const user = setupUser();
+        render(<TryPanel engine="dia" />);
+
+        await user.click(await screen.findByRole('radio', { name: 'A conversation, up to 2' }));
+        expect(await screen.findByRole('heading', { name: 'Conversation' })).toBeInTheDocument();
+        await user.click(screen.getByRole('combobox', { name: "Speaker 1's voice" }));
+        await user.click(await screen.findByRole('option', { name: 'Narrator' }));
+        await user.click(screen.getByRole('button', { name: 'Speak' }));
+
+        await waitFor(() => expect(api.dialogue).toHaveBeenCalled());
+        const [engine, body] = api.dialogue.mock.calls[0]!;
+        expect(engine).toBe('dia');
+        expect(body).toMatchObject({
+            variant: '1.6b',
+            format: 'wav',
+            stream: false,
+            voices: { speaker1: 'narrator' },
+            turns: [
+                { speaker: 'speaker1', text: 'Did you hear that? [gasp]' },
+                { speaker: 'speaker2', text: '[laugh] It is only the cat.' },
+                { speaker: 'speaker1', text: 'It is never only the cat.' },
+            ],
+        });
+        expect(body).not.toHaveProperty('delivery');
+        expect(await screen.findByLabelText('Spoken conversation')).toBeInTheDocument();
+        expect(api.speak).not.toHaveBeenCalled();
+    });
+
+    it('leaves out an empty turn, and a voice for a speaker left with none', async () => {
+        const user = setupUser();
+        render(<TryPanel engine="dia" />);
+
+        await user.click(await screen.findByRole('radio', { name: 'A conversation, up to 2' }));
+        await user.click(await screen.findByRole('combobox', { name: "Speaker 2's voice" }));
+        await user.click(await screen.findByRole('option', { name: 'Narrator' }));
+        await user.clear(screen.getByRole('textbox', { name: 'Turn 2' }));
+        await user.click(screen.getByRole('button', { name: 'Speak' }));
+
+        await waitFor(() => expect(api.dialogue).toHaveBeenCalled());
+        const [, body] = api.dialogue.mock.calls[0]!;
+        expect(body.turns).toHaveLength(2);
+        expect(body).not.toHaveProperty('voices');
     });
 });
