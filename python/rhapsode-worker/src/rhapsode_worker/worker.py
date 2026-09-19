@@ -68,6 +68,11 @@ class Worker:
     def capabilities(self) -> dict[str, Any]:
         engine = self.engine
         variants = engine.variants()
+        reference = engine.reference_seconds()
+        cloning = {
+            "supported": engine.supports_cloning,
+            **({} if reference is None else {"referenceSeconds": list(reference)}),
+        }
 
         document: dict[str, Any] = {
             "contract": self.contract,
@@ -79,7 +84,12 @@ class Worker:
             },
             "license": _license_document(engine.license),
             "device": engine.device.document(),
-            "variants": {name: self._variant_document(variant) for name, variant in variants.items()},
+            # On every variant as well as `current`, because cloning needs no model and a client
+            # must be able to tell an engine that cannot clone from one that is idle. protocol.md § 4.
+            "variants": {
+                name: {**self._variant_document(variant), "cloning": cloning}
+                for name, variant in variants.items()
+            },
             "formats": encoding.available_formats(),
         }
 
@@ -87,15 +97,11 @@ class Worker:
         # nothing to describe and an invented answer is worse than no answer. protocol.md § 4.
         if self.model == "loaded" and engine.variant is not None:
             resident = variants[engine.variant]
-            reference = engine.reference_seconds()
             document["current"] = {
                 **self._variant_document(resident),
                 "variant": engine.variant,
                 "maxCharacters": resident.max_characters or engine.max_characters,
-                "cloning": {
-                    "supported": engine.supports_cloning,
-                    **({} if reference is None else {"referenceSeconds": list(reference)}),
-                },
+                "cloning": cloning,
                 "streaming": {"supported": True, "granularity": "chunk"},
                 "nativeFormat": {
                     "encoding": engine.native_format.encoding,

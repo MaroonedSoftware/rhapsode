@@ -37,6 +37,14 @@ export interface Spoken {
 }
 
 /**
+ * The body the page sends to `/speak` for a request, and the one its "as code" snippet shows, so the
+ * copied call is exactly what was heard.
+ */
+export function speakBody(request: EngineSpeakRequest): EngineSpeakRequest {
+    return { ...request, format: 'wav', stream: false };
+}
+
+/**
  * One line, spoken, as a playable URL.
  *
  * `stream: false`, because the page plays a finished file and § 6 says a buffered request reports a
@@ -48,7 +56,7 @@ export function useSpeak() {
     return useMutation({
         mutationFn: async (request: EngineSpeakRequest): Promise<Spoken> => {
             const started = performance.now();
-            const audio = unwrap<Blob>(await sdk.public.speak({ ...request, format: 'wav', stream: false }));
+            const audio = unwrap<Blob>(await sdk.public.speak(speakBody(request)));
             return { url: URL.createObjectURL(audio), bytes: audio.size, milliseconds: Math.round(performance.now() - started) };
         },
         // A speak may have loaded a model or changed the variant, which is what `current` reports.

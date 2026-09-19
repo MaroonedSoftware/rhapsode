@@ -27,6 +27,7 @@ contract mode(loose) Variant: {
     dials: record(string, Dial)         # Engine-specific numbers, named by the adapter.
     languages?: array(string)
     maxCharacters?: int                 # Overrides the engine's own ceiling for this build.
+    cloning?: Cloning                   # Optional only because contract 1 shipped without it. § 4.
     dialogue?: Dialogue                 # Present only where this build answers /dialogue. § 6.
 }
 
@@ -243,7 +244,7 @@ contract mode(loose) InstallJob: {
     id: string
     engine: string
     kind: enum(install, pull)
-    variant?: string                            # For a pull: the variant being fetched.
+    variant?: string                            # What a pull fetches, or an install fetches in step 5.
     state: enum(queued, running, succeeded, failed)
     step?: enum(venv, packages, verify, register, weights)
     createdAt: string                           # ISO 8601, UTC.

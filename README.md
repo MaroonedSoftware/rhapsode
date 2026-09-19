@@ -170,8 +170,8 @@ download the `fp16` weights (205 MB) so the first request does not wait on them.
 CPU, brings no torch, and on an Apple Silicon laptop speaks at about nine times realtime, so it works
 on whatever machine you are reading this on. Or do the same from the web page `pnpm dev` serves at
 http://localhost:8081. The wizard and the page are both only clients: the same thing is
-`POST /engines/kokoro/install` and `POST /engines/kokoro/pull`,
-which answer the machine the server runs on and nobody else unless `management.token` is set. See
+`POST /engines/kokoro/install?pull=fp16`, one job that installs the engine and downloads its
+weights, which answers the machine the server runs on and nobody else unless `management.token` is set. See
 [`docs/protocol.md`](docs/protocol.md) § 10 and [`docs/operating.md`](docs/operating.md).
 
 With a GPU, `pnpm wizard install chatterbox` is the next one to try: it clones voices and performs
@@ -205,7 +205,7 @@ rhapsode-conform unix:/run/rhapsode/workers/your-engine.sock
 Point it at your worker and it says whether that worker is one. Each check names the section of the
 protocol it comes from, and the exit code is the verdict you wire into your own CI. How many run
 depends on the worker: one check per variant and per format it declares, so the reference engine gets
-48 on a machine without ffmpeg and 51 on one with it. Some of them compare audio with and without a cue, with the seed held fixed, which is the
+49 on a machine without ffmpeg and 52 on one with it. Some of them compare audio with and without a cue, with the seed held fixed, which is the
 closest a machine can get to the one thing an adapter has to get right by hand. On an engine a seed
 does not reproduce, those are reported as undecided rather than passed.
 

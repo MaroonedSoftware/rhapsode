@@ -170,6 +170,8 @@ class Variant(BaseModel):
     languages: list[str] | None = None
     # Overrides the engine's own ceiling for this build.
     max_characters: int | None = Field(alias="maxCharacters", default=None)
+    # Optional only because contract 1 shipped without it. § 4.
+    cloning: Cloning | None = None
     # Present only where this build answers /dialogue. § 6.
     dialogue: Dialogue | None = None
 
@@ -225,7 +227,7 @@ class InstallJob(BaseModel):
     id: str
     engine: str
     kind: Literal["install", "pull"]
-    # For a pull: the variant being fetched.
+    # What a pull fetches, or an install fetches in step 5.
     variant: str | None = None
     state: Literal["queued", "running", "succeeded", "failed"]
     step: Literal["venv", "packages", "verify", "register", "weights"] | None = None

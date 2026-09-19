@@ -2,10 +2,16 @@
 from __future__ import annotations
 
 from urllib.parse import quote
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
+from ._models_rhapsode_public import OpenApiDocument
 from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, DialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
+
+
+InstallEngineQuery = TypedDict("InstallEngineQuery", {
+    "pull": NotRequired[str],
+})
 
 
 class EngineCapabilities200Response(TypedDict):
@@ -313,6 +319,13 @@ class RhapsodePublicClient(BaseClient):
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
 
+    async def openapi(self) -> OpenApiDocument:
+        """
+        Open to every caller, like /health. The public API only: never a worker route.
+        """
+        result = await self._fetch("/openapi.json", method="GET")
+        return OpenApiDocument.model_validate(result)
+
     async def engines(self) -> list[EngineSummary]:
         """
         Every declared engine, whether or not it is running. Never spawns one: this is the list an
@@ -437,8 +450,8 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 204 }
 
-    async def install_engine(self, engine: str) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409))
+    async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:

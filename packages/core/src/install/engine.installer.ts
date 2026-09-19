@@ -28,8 +28,12 @@ export class EngineInstaller {
         private readonly runner: CommandRunner,
     ) {}
 
-    /** Queue an install. Everything that can be refused is refused here, before a job exists. */
-    install(id: string): InstallJob {
+    /**
+     * Queue an install. Everything that can be refused is refused here, before a job exists.
+     *
+     * With `pull`, a variant, the job fetches it once the engine is registered. § 10.
+     */
+    install(id: string, pull?: string): InstallJob {
         const record = catalogued(id);
         this.refuseIfBusy(id);
         if (this.managed.isOperatorOwned(id)) {
@@ -40,7 +44,10 @@ export class EngineInstaller {
             throw new RhapsodeError('unsupported', 'this server was started without a managed engines file, so it has nowhere to record an install');
         }
 
-        return this.jobs.submit('install', id, undefined, context => this.run(id, record, context));
+        return this.jobs.submit('install', id, pull, async context => {
+            await this.run(id, record, context);
+            if (pull !== undefined) await this.installWeights(id, pull, context);
+        });
     }
 
     /**
@@ -56,12 +63,7 @@ export class EngineInstaller {
         const chosen = variant ?? this.engines.entry(id)?.defaultVariant;
         if (chosen === undefined) throw new RhapsodeError('bad_request', `"${id}" has no default variant, so name the one to pull`);
 
-        return this.jobs.submit('pull', id, chosen, async context => {
-            context.step('weights');
-            context.line(`fetching ${id} ${chosen}`);
-            const client = await this.workers.client(id);
-            await client.fetch(chosen, context.signal);
-        });
+        return this.jobs.submit('pull', id, chosen, context => this.fetch(id, chosen, context));
     }
 
     /**
@@ -84,6 +86,27 @@ export class EngineInstaller {
         });
         await this.managed.forget(id);
         if (venv !== undefined && inside(venv, this.settings.venvDir)) await rm(venv, { recursive: true, force: true });
+    }
+
+    private async fetch(id: string, variant: string, context: JobContext): Promise<void> {
+        context.step('weights');
+        context.line(`fetching ${id} ${variant}`);
+        const client = await this.workers.client(id);
+        await client.fetch(variant, context.signal);
+    }
+
+    /**
+     * An install's step 5. The engine is registered by now, so a failure here fails the job and
+     * leaves the engine installed, for a pull to finish. An adapter that cannot fetch is not a
+     * failure of the install: its weights arrive on first load, as they would have without asking.
+     */
+    private async installWeights(id: string, variant: string, context: JobContext): Promise<void> {
+        try {
+            await this.fetch(id, variant, context);
+        } catch (error) {
+            if (!(error instanceof RhapsodeError) || error.code !== 'unsupported') throw error;
+            context.line(`${id} does not download ahead of time; its weights arrive on its first load`);
+        }
     }
 
     private refuseIfBusy(id: string): void {

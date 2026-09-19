@@ -1,0 +1,738 @@
+openapi: 3.1.0
+info:
+    title: Rhapsode worker protocol
+    version: 0.1.3
+paths:
+    /health:
+        get:
+            operationId: workerHealth
+            description: Answers while unloaded, and while draining.
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/WorkerHealth"
+    /capabilities:
+        get:
+            operationId: workerCapabilities
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Capabilities"
+    /voices:
+        get:
+            operationId: workerVoices
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/Voice"
+        post:
+            operationId: workerCreateVoice
+            description: Cloning, where the variant supports it.
+            requestBody:
+                required: true
+                content:
+                    multipart/form-data:
+                        schema:
+                            $ref: "#/components/schemas/CreateVoiceForm"
+            responses:
+                "201":
+                    description: Created
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Voice"
+                "400":
+                    description: Bad request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "422":
+                    description: Unprocessable entity
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+    /voices/{voice}:
+        delete:
+            operationId: workerDeleteVoice
+            parameters:
+                - name: voice
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "204":
+                    description: No content
+                "400":
+                    description: Bad request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "404":
+                    description: Not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "422":
+                    description: Unprocessable entity
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+    /voices/{voice}/preview:
+        get:
+            operationId: workerVoicePreview
+            parameters:
+                - name: voice
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        audio/wav:
+                            schema:
+                                type: string
+                                format: binary
+                "404":
+                    description: Not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+    /load:
+        post:
+            operationId: workerLoad
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/LoadRequest"
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/WorkerHealth"
+                "503":
+                    description: Response 503
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+    /unload:
+        post:
+            operationId: workerUnload
+            description: Idempotent, and never fatal. Unloading nothing is a success.
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/WorkerHealth"
+    /terminate:
+        post:
+            operationId: workerTerminate
+            description: "Drain and exit 0. The answer goes out before the process does, so 202 rather than 200:"
+            responses:
+                "202":
+                    description: Response 202
+    /fetch:
+        post:
+            operationId: workerFetch
+            description: Download a variant's weights without loading them, so a first /speak does not sit through
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/FetchRequest"
+            responses:
+                "204":
+                    description: No content
+                "400":
+                    description: Bad request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "422":
+                    description: Unprocessable entity
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "429":
+                    description: Response 429
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+    /speak:
+        post:
+            operationId: workerSpeak
+            description: Loads on demand. It does not fail with "no model loaded" and does not require /load first.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/SpeakRequest"
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        audio/wav:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/mpeg:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/opus:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/flac:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/l16:
+                            schema:
+                                type: string
+                                format: binary
+                "400":
+                    description: Bad request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "404":
+                    description: Not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "422":
+                    description: Unprocessable entity
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "429":
+                    description: Response 429
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "503":
+                    description: Response 503
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+    /dialogue:
+        post:
+            operationId: workerDialogue
+            description: A conversation in one take, where the effective variant declares `dialogue`. Loads on
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/DialogueRequest"
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        audio/wav:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/mpeg:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/opus:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/flac:
+                            schema:
+                                type: string
+                                format: binary
+                        audio/l16:
+                            schema:
+                                type: string
+                                format: binary
+                "400":
+                    description: Bad request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "404":
+                    description: Not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "422":
+                    description: Unprocessable entity
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "429":
+                    description: Response 429
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "503":
+                    description: Response 503
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+components:
+    schemas:
+        Dial:
+            type: object
+            properties:
+                min:
+                    type: number
+                    description: Inclusive.
+                max:
+                    type: number
+                    description: Inclusive.
+                default:
+                    type: number
+                    description: What the engine uses when the request says nothing.
+            required:
+                - min
+                - max
+                - default
+        Variant:
+            type: object
+            properties:
+                cues:
+                    type: array
+                    items:
+                        type: string
+                    description: A subset of the standard vocabulary, § 5.
+                deliveries:
+                    type: array
+                    items:
+                        type: string
+                    description: "Ditto. Not an enum: § 9 forbids failing on an unknown one."
+                dials:
+                    type: object
+                    additionalProperties:
+                        $ref: "#/components/schemas/Dial"
+                    description: Engine-specific numbers, named by the adapter.
+                languages:
+                    type: array
+                    items:
+                        type: string
+                maxCharacters:
+                    type: integer
+                    description: Overrides the engine's own ceiling for this build.
+                cloning:
+                    $ref: "#/components/schemas/Cloning"
+                    description: Optional only because contract 1 shipped without it. § 4.
+                dialogue:
+                    $ref: "#/components/schemas/Dialogue"
+                    description: Present only where this build answers /dialogue. § 6.
+            required:
+                - cues
+                - deliveries
+                - dials
+            description: |-
+                What one build of an engine can perform. Capabilities depend on which build is loaded, which is
+                the whole reason this document has two levels: chatterbox `turbo` performs the paralinguistic
+                tags and discards the dials, while `original` is the other way round.
+        Dialogue:
+            type: object
+            properties:
+                maxSpeakers:
+                    type: integer
+            required:
+                - maxSpeakers
+            description: A build that speaks a conversation in one pass. protocol.md § 6.
+        Cloning:
+            type: object
+            properties:
+                supported:
+                    type: boolean
+                referenceSeconds:
+                    type: array
+                    items:
+                        type: number
+                    description: "[min, max] of usable reference audio."
+                formats:
+                    type: array
+                    items:
+                        type: string
+            required:
+                - supported
+        Streaming:
+            type: object
+            properties:
+                supported:
+                    type: boolean
+                granularity:
+                    type: string
+                    enum:
+                        - chunk
+                        - sentence
+            required:
+                - supported
+        NativeFormat:
+            type: object
+            properties:
+                encoding:
+                    type: string
+                    description: v1 accepts pcm_s16le and nothing else.
+                sampleRate:
+                    type: integer
+                channels:
+                    type: integer
+            required:
+                - encoding
+                - sampleRate
+                - channels
+        CurrentVariant:
+            allOf:
+                - $ref: "#/components/schemas/Variant"
+                - type: object
+                  properties:
+                      variant:
+                          type: string
+                      cloning:
+                          $ref: "#/components/schemas/Cloning"
+                      streaming:
+                          $ref: "#/components/schemas/Streaming"
+                      nativeFormat:
+                          $ref: "#/components/schemas/NativeFormat"
+                  required:
+                      - variant
+                      - cloning
+                      - streaming
+                      - nativeFormat
+        EngineIdentity:
+            type: object
+            properties:
+                id:
+                    type: string
+                displayName:
+                    type: string
+                adapterVersion:
+                    type: string
+                upstreamVersion:
+                    type: string
+            required:
+                - id
+                - displayName
+                - adapterVersion
+        License:
+            type: object
+            properties:
+                code:
+                    type: string
+                weights:
+                    type: string
+                weightsCommercialUse:
+                    type: boolean
+                notes:
+                    type: string
+            required:
+                - code
+                - weights
+                - weightsCommercialUse
+            description: |-
+                Code and weights separately, because the weights licence is the one package metadata never reveals
+                and the one that decides whether a commercial user may ship. A scanner reads the package, reports
+                the code licence, and is wrong in the way that matters.
+        Device:
+            type: object
+            properties:
+                type:
+                    type: string
+                    enum:
+                        - cuda
+                        - rocm
+                        - mps
+                        - cpu
+                name:
+                    type: string
+                vramBytes:
+                    type: integer
+            required:
+                - type
+                - name
+        Capabilities:
+            type: object
+            properties:
+                contract:
+                    type: integer
+                    description: The contract major this worker settled on. § 9.
+                engine:
+                    $ref: "#/components/schemas/EngineIdentity"
+                license:
+                    $ref: "#/components/schemas/License"
+                device:
+                    $ref: "#/components/schemas/Device"
+                current:
+                    $ref: "#/components/schemas/CurrentVariant"
+                variants:
+                    type: object
+                    additionalProperties:
+                        $ref: "#/components/schemas/Variant"
+                formats:
+                    type: array
+                    items:
+                        type: string
+                    description: What this worker can actually encode, here and now.
+            required:
+                - contract
+                - engine
+                - license
+                - device
+                - variants
+                - formats
+        Voice:
+            type: object
+            properties:
+                id:
+                    type: string
+                label:
+                    type: string
+                description:
+                    type: string
+                spec:
+                    type: string
+                    description: Opaque. Changes whenever the rendering would. Never parse it.
+                tags:
+                    type: array
+                    items:
+                        type: string
+                previewUrl:
+                    type: string
+                    description: Worker-scoped; the core rewrites it on the way out.
+            required:
+                - id
+                - label
+                - spec
+        CreateVoiceForm:
+            type: object
+            properties:
+                id:
+                    type: string
+                label:
+                    type: string
+                reference:
+                    type: string
+                    format: binary
+                transcript:
+                    type: string
+                    description: The words spoken in the reference. Required by an engine that continues from it.
+            required:
+                - id
+                - reference
+        SpeakRequest:
+            type: object
+            properties:
+                text:
+                    type: string
+                    minLength: 1
+                voice:
+                    type: string
+                variant:
+                    type: string
+                    description: Absent means whatever is loaded.
+                format:
+                    type: string
+                    enum:
+                        - wav
+                        - mp3
+                        - opus
+                        - flac
+                        - pcm
+                language:
+                    type: string
+                    description: From the effective variant's `languages`.
+                delivery:
+                    type: string
+                    enum:
+                        - hushed
+                        - frantic
+                    description: Closed, and deliberately has no word for "ordinary".
+                params:
+                    type: object
+                    additionalProperties:
+                        type: number
+                    description: Validated against the effective variant's dials.
+                seed:
+                    type: integer
+                stream:
+                    type: boolean
+            required:
+                - text
+        DialogueTurn:
+            type: object
+            properties:
+                speaker:
+                    type: string
+                    minLength: 1
+                text:
+                    type: string
+                    minLength: 1
+            required:
+                - speaker
+                - text
+            description: One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
+        DialogueRequest:
+            type: object
+            properties:
+                turns:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/DialogueTurn"
+                voices:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Speaker label to voice id.
+                variant:
+                    type: string
+                format:
+                    type: string
+                    enum:
+                        - wav
+                        - mp3
+                        - opus
+                        - flac
+                        - pcm
+                language:
+                    type: string
+                params:
+                    type: object
+                    additionalProperties:
+                        type: number
+                seed:
+                    type: integer
+                stream:
+                    type: boolean
+            required:
+                - turns
+            description: |-
+                A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
+                `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
+        LoadRequest:
+            type: object
+            properties:
+                variant:
+                    type: string
+        FetchRequest:
+            type: object
+            properties:
+                variant:
+                    type: string
+            required:
+                - variant
+            description: |-
+                Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
+                not loaded yet. protocol.md § 8.
+        ErrorDetail:
+            type: object
+            properties:
+                code:
+                    type: string
+                    enum:
+                        - bad_request
+                        - unknown_engine
+                        - unknown_voice
+                        - unsupported
+                        - model_unavailable
+                        - oom
+                        - overloaded
+                        - internal
+                        - forbidden
+                        - conflict
+                    description: |-
+                        A closed set that § 9 grows at the end. A reader that meets a code from a newer contract must
+                        not lose the envelope over it: `message` and `retryable` are the two fields that decide what
+                        the caller does next, and they parse fine. The core falls back to `internal` for the code and
+                        keeps the rest, rather than reporting a parse failure in place of the real error.
+                message:
+                    type: string
+                retryable:
+                    type: boolean
+            required:
+                - code
+                - message
+                - retryable
+            description: |-
+                `retryable` is a field rather than something the client infers from the status, because the
+                distinction that matters is between "this request was wrong" and "this request was fine and the
+                server was not". A caller that conflates them either retries a permanent failure forever or
+                discards work that would have succeeded on the next pass.
+        ErrorBody:
+            type: object
+            properties:
+                error:
+                    $ref: "#/components/schemas/ErrorDetail"
+            required:
+                - error
+        WorkerHealth:
+            type: object
+            properties:
+                process:
+                    type: string
+                    enum:
+                        - up
+                        - draining
+                model:
+                    type: string
+                    enum:
+                        - unloaded
+                        - loading
+                        - loaded
+                        - unloading
+                variant:
+                    type: string
+                device:
+                    type: string
+                vramBytes:
+                    type: integer
+            required:
+                - process
+                - model

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconMicrophone, IconPlayerPlay, IconTrash, IconUpload } from '@tabler/icons-react';
-import type { Voice } from '@maroonedsoftware/rhapsode-sdk';
+import type { Cloning, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { BASE_URL } from '../../api/client';
 import { useCloneVoice, useDeleteVoice } from '../../api/engines.queries';
@@ -18,14 +18,17 @@ const MAX_BYTES = 25 * 1024 * 1024;
 export interface VoicesCardProps {
     engine: string;
     voices: Voice[];
-    /** Usable reference length, when the loaded variant says. */
-    referenceSeconds?: number[];
+    /**
+     * The chosen variant's cloning claim. The form is offered unless it says no: absent means a
+     * worker too old to say, and the worker refuses a clone it cannot make anyway. § 4.
+     */
+    cloning?: Cloning;
     /** Called with a new clone's id, so the page can select it. */
     onCloned: (id: string) => void;
 }
 
-/** This engine's voices: hear each, clone a new one from a clip, delete a clone. */
-export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: VoicesCardProps) {
+/** This engine's voices: hear each, clone a new one from a clip where it can, delete a clone. */
+export function VoicesCard({ engine, voices, cloning, onCloned }: VoicesCardProps) {
     const clone = useCloneVoice(engine);
     const remove = useDeleteVoice(engine);
     const [id, setId] = useState('');
@@ -37,7 +40,8 @@ export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: Voice
 
     const idError = id !== '' && !VOICE_ID.test(id) ? 'Letters, digits, - and _, starting with a letter or digit' : undefined;
     const fileError = file !== null && file.size > MAX_BYTES ? 'Clips are limited to 25 MB' : undefined;
-    const [low, high] = referenceSeconds ?? [5, 20];
+    const clones = cloning?.supported !== false;
+    const [low, high] = cloning?.referenceSeconds ?? [5, 20];
 
     const submit = () => {
         if (file === null || idError || fileError || id === '') return;
@@ -65,7 +69,9 @@ export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: Voice
                 <Stack gap={6}>
                     {voices.length === 0 ? (
                         <Text size="sm" c="dimmed">
-                            This engine has no voices yet. Clone one from a clip below, or speak in its default.
+                            {clones
+                                ? 'This engine has no voices yet. Clone one from a clip below, or speak in its default.'
+                                : 'This engine has no voices to list. It speaks in its default.'}
                         </Text>
                     ) : undefined}
                     {voices.map(voice => (
@@ -121,60 +127,67 @@ export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: Voice
                         : undefined}
                 </Stack>
 
-                <Stack gap="xs">
-                    <Group gap="xs">
-                        <IconMicrophone size={16} />
-                        <Text size="sm" fw={600}>
-                            Clone a voice
+                {clones ? (
+                    <Stack gap="xs">
+                        <Group gap="xs">
+                            <IconMicrophone size={16} />
+                            <Text size="sm" fw={600}>
+                                Clone a voice
+                            </Text>
+                        </Group>
+                        <Text size="xs" c="dimmed">
+                            {low} to {high} seconds of one person speaking, with nothing else in the recording. WAV, MP3, FLAC or OGG.
                         </Text>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                        {low} to {high} seconds of one person speaking, with nothing else in the recording. WAV, MP3, FLAC or OGG.
-                    </Text>
-                    <FileInput
-                        aria-label="Reference clip"
-                        placeholder="Choose a clip"
-                        accept="audio/wav,audio/x-wav,audio/mpeg,audio/flac,audio/ogg,.wav,.mp3,.flac,.ogg"
-                        leftSection={<IconUpload size={14} />}
-                        value={file}
-                        onChange={setFile}
-                        error={fileError}
-                        clearable
-                    />
-                    <Group grow align="flex-start">
-                        <TextInput
-                            label="Id"
-                            placeholder="narrator_03"
-                            value={id}
-                            onChange={event => setId(event.currentTarget.value)}
-                            error={idError}
+                        <FileInput
+                            aria-label="Reference clip"
+                            placeholder="Choose a clip"
+                            accept="audio/wav,audio/x-wav,audio/mpeg,audio/flac,audio/ogg,.wav,.mp3,.flac,.ogg"
+                            leftSection={<IconUpload size={14} />}
+                            value={file}
+                            onChange={setFile}
+                            error={fileError}
+                            clearable
                         />
-                        <TextInput label="Label" placeholder="Narrator 03" value={label} onChange={event => setLabel(event.currentTarget.value)} />
-                    </Group>
-                    {/* Always offered, since the capability document cannot say which engines need it,
-                        and sent to every engine, since one that does not read it ignores it. § 7. */}
-                    <Textarea
-                        label="Transcript"
-                        description="What is said in the clip, word for word. Some engines need it to clone."
-                        placeholder="Hello, this is how I sound."
-                        autosize
-                        minRows={2}
-                        value={transcript}
-                        onChange={event => setTranscript(event.currentTarget.value)}
-                    />
-                    {clone.isError ? (
-                        <ErrorAlert title="That voice was not cloned" error={clone.error} fallback="The server did not answer." />
-                    ) : undefined}
-                    <Group>
-                        <Button
-                            onClick={submit}
-                            loading={clone.isPending}
-                            disabled={file === null || id === '' || idError !== undefined || fileError !== undefined}
-                        >
-                            Clone
-                        </Button>
-                    </Group>
-                </Stack>
+                        <Group grow align="flex-start">
+                            <TextInput
+                                label="Id"
+                                placeholder="narrator_03"
+                                value={id}
+                                onChange={event => setId(event.currentTarget.value)}
+                                error={idError}
+                            />
+                            <TextInput
+                                label="Label"
+                                placeholder="Narrator 03"
+                                value={label}
+                                onChange={event => setLabel(event.currentTarget.value)}
+                            />
+                        </Group>
+                        {/* Always offered, since the capability document cannot say which engines need it,
+                            and sent to every engine, since one that does not read it ignores it. § 7. */}
+                        <Textarea
+                            label="Transcript"
+                            description="What is said in the clip, word for word. Some engines need it to clone."
+                            placeholder="Hello, this is how I sound."
+                            autosize
+                            minRows={2}
+                            value={transcript}
+                            onChange={event => setTranscript(event.currentTarget.value)}
+                        />
+                        {clone.isError ? (
+                            <ErrorAlert title="That voice was not cloned" error={clone.error} fallback="The server did not answer." />
+                        ) : undefined}
+                        <Group>
+                            <Button
+                                onClick={submit}
+                                loading={clone.isPending}
+                                disabled={file === null || id === '' || idError !== undefined || fileError !== undefined}
+                            >
+                                Clone
+                            </Button>
+                        </Group>
+                    </Stack>
+                ) : undefined}
             </Stack>
 
             <ConfirmModal

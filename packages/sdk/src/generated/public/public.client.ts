@@ -1,5 +1,5 @@
 import type { SdkFetch } from '../sdk-options.js';
-import { bigIntReplacer, parseJson, readContentType } from '../sdk-options.js';
+import { bigIntReplacer, parseJson, buildQueryString, readContentType } from '../sdk-options.js';
 import type {
     Capabilities,
     CatalogEntry,
@@ -12,6 +12,7 @@ import type {
     PullRequest,
     Voice,
 } from '../rhapsode/types/rhapsode.types.js';
+import type { OpenApiDocument } from './types/rhapsode.public.js';
 
 export class PublicClient {
     constructor(private fetch: SdkFetch) {}
@@ -20,6 +21,12 @@ export class PublicClient {
     async health(): Promise<CoreHealth> {
         const result = await this.fetch(`/health`, { method: 'GET' });
         return await parseJson<CoreHealth>(result);
+    }
+
+    /** @description Open to every caller, like /health. The public API only: never a worker route. */
+    async openapi(): Promise<OpenApiDocument> {
+        const result = await this.fetch(`/openapi.json`, { method: 'GET' });
+        return await parseJson<OpenApiDocument>(result);
     }
 
     /** @description Every declared engine, whether or not it is running. Never spawns one: this is the list an */
@@ -246,13 +253,15 @@ export class PublicClient {
 
     async installEngine(
         engine: string,
+        query?: { pull?: string },
     ): Promise<
         | { status: 202; contentType: 'application/json'; data: InstallJob }
         | { status: 403; contentType: 'application/json'; data: ErrorBody }
         | { status: 404; contentType: 'application/json'; data: ErrorBody }
         | { status: 409; contentType: 'application/json'; data: ErrorBody }
     > {
-        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/install`, {
+        const qs = buildQueryString(query);
+        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/install${qs}`, {
             method: 'POST',
             expectStatuses: [403, 404, 409],
         });

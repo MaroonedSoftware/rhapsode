@@ -14,6 +14,7 @@ const GENERATED = [
     'python/rhapsode-worker/src/rhapsode_worker/_contract',
     'python/conformance/src/rhapsode_conform/_generated',
     'docs/openapi.yaml',
+    'docs/openapi.worker.yaml',
 ];
 
 const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' }).stdout.trim();

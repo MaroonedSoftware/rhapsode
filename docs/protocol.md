@@ -204,7 +204,8 @@ GET /capabilities
     "nativeFormat": { "encoding": "pcm_s16le", "sampleRate": 24000, "channels": 1 }
   },
   "variants": {
-    "turbo":        { "cues": ["laugh", "..."], "deliveries": [], "dials": {} },
+    "turbo":        { "cues": ["laugh", "..."], "deliveries": [], "dials": {},
+                      "cloning": { "supported": true, "referenceSeconds": [5, 10] } },
     "original":     { "cues": [], "deliveries": ["hushed", "frantic"],
                       "dials": { "exaggeration": {"min":0,"max":2,"default":0.5},
                                  "cfgWeight":    {"min":0,"max":1,"default":0.5} } },
@@ -247,6 +248,15 @@ engine's default otherwise, then reads `variants[effective]`. That rule is total
 same answer as `current` in every case where `current` means anything. It also covers the case the
 two-level document exists for: a request that names a variant which is not the one loaded, where
 `current` describes weights that are about to be evicted.
+
+**Each variant says whether it clones**, as `cloning`, the same shape `current` carries. Cloning
+needs no model (§ 7), so whether it is offered cannot wait on one being resident: a client reading
+only `current` could not tell an engine that cannot clone from one that is idle, and offering a clone
+form that every submission fails is the first sign it would get. It is per variant rather than per
+engine because nothing makes it engine-wide: a build that conditions on reference audio and a build
+that only knows its trained speakers can be the same engine, as Orpheus's base model and its
+finetune are. `cloning` is optional, since contract 1 shipped without it; a reader that finds it
+absent does not know, and falls back to `current`, then to offering it and letting the worker refuse.
 
 **`dialogue` is declared per variant, and absent where it is not performed.** Dia's `1.6b` says
 `"dialogue": { "maxSpeakers": 2 }`: the variant answers `POST /dialogue` (§ 6), and one request may
@@ -759,6 +769,27 @@ None of this narrows what the rest of this section allows. A remote worker, or a
 operator configured by hand, is whatever version it is, and negotiation is still what decides
 whether the core will speak to it.
 
+### The core describes its own API
+
+`GET /openapi.json` answers with the public API as an OpenAPI 3.1 document, generated from
+`contracts/` like every other shape. It is open to every caller, like `/health` and `/catalog`: it
+says nothing a caller could not learn by trying, and withholding it only sends people to a copy on
+the web that describes some other version.
+
+- **Public routes only**: § 6 and § 7, the management routes of § 10, and the OpenAI shim of § 11.
+  Never a worker route. A client author should not learn that workers exist, and one document for
+  both cannot even be written, because `/health` and `/speak` are different operations on the same
+  paths. The first combined document had the worker's in both places and described a `/speak`
+  that takes no `engine`.
+- **`info.version` is the running core's package version**, set when the document is served, so it
+  describes this box rather than whichever build published the docs. It is still not the contract.
+  A client reads `contract` from `/health` to decide what it may send, and reads this document to
+  learn the shapes, whether it is a person or a generator building a client. Nothing negotiates
+  from it.
+- **The worker protocol is described by `docs/openapi.worker.yaml`**, committed and served by
+  nobody. An engine author reads it next to `rhapsode.worker.ck`, and a worker is not required to
+  describe itself: `rhapsode-conform` is what says whether it speaks the protocol.
+
 ---
 
 ## 10. Managing engines
@@ -772,7 +803,7 @@ what one is built on.
 | Route | Does |
 | --- | --- |
 | `GET /catalog` | Every engine that exists, installed or not, with both licences |
-| `POST /engines/{id}/install` | Starts an install job; `202` with the job |
+| `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too |
 | `DELETE /engines/{id}` | Stops and removes an engine this API installed |
 | `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
 | `GET /installs` | Every job this process knows about, newest first |
@@ -852,6 +883,25 @@ An install is four steps, and a job reports which one it is on:
    although its `bin/python` runs perfectly well.
 4. **`register`**: record the engine in the managed file and add it to the running registry. No
    restart: the next `/speak` for it spawns a worker.
+5. **`weights`**, only when asked: fetch a variant, exactly as a pull does (below).
+
+**An install can fetch its weights.** `POST /engines/chatterbox/install?pull=turbo` adds step 5 for
+the variant named; a client that wants the default reads it from the catalog's `defaultVariant`.
+Without it an install stops at `register`, as it always has. A `pull` that is empty or repeated is
+`bad_request`. It is one job rather than a client queueing a pull behind its install, because a
+client that goes away between the two (a closed browser tab, a terminal that lost its connection)
+leaves an engine whose first `/speak` sits through the whole download: 3.8 GB for Chatterbox's
+`turbo`.
+
+It is a query parameter rather than a body so that a bare `POST`, which is every install so far,
+stays one. ServerKit refuses a request without a body on a route that declares one, with a `411`,
+so a body here could not have been optional. And it names a variant rather than being a flag,
+because the contract's booleans are coerced and `?pull=false` would have read as true.
+
+The engine is registered before step 5 starts, so **a failed download leaves it installed**: the
+job fails at `weights`, and the way on is a pull, not another install. An engine whose worker does
+not implement `fetch` has nothing to do in step 5; the job says so in its output and succeeds, and
+the weights arrive on first load as they would have.
 
 `RHAPSODE_PIP_TRUSTED_HOSTS` is honoured from the server's own environment and cannot be set
 through the API. Weakening certificate verification stays a decision made on the box.
@@ -905,7 +955,8 @@ does not implement `fetch` answers `unsupported`, and its weights arrive on firs
 }
 ```
 
-`kind` is `install` or `pull`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
+`kind` is `install` or `pull`. `variant` is the variant a pull fetches, or an install fetches in
+step 5; an install without it stops at `register`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
 carries `error`, an ordinary error envelope body. Its message names the command and the line of
 its output that says why it failed, not the line it printed last: pip ends a failed build with a
 footer naming the package, and an Orpheus install whose error was `╰─> llama-cpp-python` had its
@@ -1062,7 +1113,8 @@ Named so that nobody has to guess whether they were forgotten.
 - **Engines inside the core.** Every engine is a worker, ONNX ones included. § 8 says why.
 - **A UI in the core.** The gap this project fills is that everything else has one, and has put
   its API behind it. A web page for installing engines is a client of § 10 like any other, and gets
-  no route the terminal client does not.
+  no route the terminal client does not. Its API reference renders `GET /openapi.json` (§ 9), the
+  document every other client can read, rather than a copy of its own.
 
 ## 13. Open questions
 

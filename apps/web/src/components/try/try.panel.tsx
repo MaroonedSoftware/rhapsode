@@ -1,12 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Group, NumberInput, SegmentedControl, Select, SimpleGrid, Slider, Stack, Text, Textarea, Title } from '@mantine/core';
+import {
+    Accordion,
+    Alert,
+    Button,
+    Card,
+    Group,
+    NumberInput,
+    SegmentedControl,
+    Select,
+    SimpleGrid,
+    Slider,
+    Stack,
+    Text,
+    Textarea,
+    Title,
+} from '@mantine/core';
 import { IconPlayerPlay } from '@tabler/icons-react';
-import type { Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
+import type { CurrentVariant, EngineSpeakRequest, Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
-import { useCapabilities, useDialogue, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
+import { speakBody, useCapabilities, useDialogue, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
 import { PageSkeleton } from '../shared/page.skeleton';
 import { DialogueEditor, SAMPLE_TURNS, speakerLabel, type EditedTurn } from './dialogue.editor';
+import { RequestSnippet } from './request.snippet';
 import { VoicesCard } from './voices.card';
 
 const SAMPLE = 'Right, that was The Verve Pipe. [laugh] Nobody warned me about that intro.';
@@ -39,7 +55,7 @@ export function TryPanel({ engine, defaultVariant }: TryPanelProps) {
             variants={variants}
             initial={initial}
             voices={voices.data ?? []}
-            referenceSeconds={capabilities.data.current?.cloning.referenceSeconds}
+            current={capabilities.data.current}
         />
     );
 }
@@ -49,10 +65,10 @@ interface ControlsProps {
     variants: Record<string, Variant>;
     initial: string;
     voices: Voice[];
-    referenceSeconds?: number[];
+    current?: CurrentVariant;
 }
 
-function Controls({ engine, variants, initial, voices, referenceSeconds }: ControlsProps) {
+function Controls({ engine, variants, initial, voices, current }: ControlsProps) {
     const speak = useSpeak();
     const converse = useDialogue();
     const [variant, setVariant] = useState(initial);
@@ -71,6 +87,8 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
 
     const claims = variants[variant]!;
     const languages = claims.languages ?? [];
+    // A worker from before variants said whether they clone leaves it to `current`, when loaded. § 4.
+    const cloning = claims.cloning ?? current?.cloning;
     // Offered only where the variant declares it, which is the whole of how the page knows. § 4.
     const dialogue = mode === 'dialogue' && claims.dialogue !== undefined;
     const asking = dialogue ? converse : speak;
@@ -106,6 +124,18 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
         });
     };
 
+    // One request, for the Speak button and for the snippet that shows it as code.
+    const request: EngineSpeakRequest = {
+        engine,
+        text,
+        variant,
+        ...(voice === undefined ? {} : { voice }),
+        ...(delivery === '' ? {} : { delivery: delivery as 'hushed' | 'frantic' }),
+        ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
+        ...(language === undefined ? {} : { language }),
+        ...(seed === undefined ? {} : { seed }),
+    };
+
     const say = () => {
         setSlow(false);
         const timer = setTimeout(() => setSlow(true), SLOW_MS);
@@ -138,19 +168,7 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
             );
             return;
         }
-        speak.mutate(
-            {
-                engine,
-                text,
-                variant,
-                ...(voice === undefined ? {} : { voice }),
-                ...(delivery === '' ? {} : { delivery: delivery as 'hushed' | 'frantic' }),
-                ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
-                ...(language === undefined ? {} : { language }),
-                ...(seed === undefined ? {} : { seed }),
-            },
-            settle,
-        );
+        speak.mutate(request, settle);
     };
 
     return (
@@ -322,10 +340,23 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
                                 </Text>
                             </Stack>
                         ) : undefined}
+                        {/* The snippet writes a /speak call; a conversation is not one. */}
+                        {dialogue ? undefined : (
+                            <Accordion variant="contained" radius="md">
+                                <Accordion.Item value="code">
+                                    <Accordion.Control>
+                                        <Text size="sm">As code</Text>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <RequestSnippet body={speakBody(request)} />
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
+                        )}
                     </Stack>
                 </Card>
             </SimpleGrid>
-            <VoicesCard engine={engine} voices={voices} referenceSeconds={referenceSeconds} onCloned={setVoice} />
+            <VoicesCard engine={engine} voices={voices} cloning={cloning} onCloned={setVoice} />
         </Stack>
     );
 }

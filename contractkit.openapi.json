@@ -1,0 +1,16 @@
+{
+    "rootDir": ".",
+    "patterns": ["contracts/rhapsode.types.ck", "contracts/rhapsode.public.ck", "contracts/rhapsode.openai.ck"],
+    "plugins": {
+        "@contractkit/plugin-docs": {
+            "openapi": {
+                "baseDir": "docs/",
+                "output": "openapi.yaml",
+                "info": {
+                    "title": "Rhapsode",
+                    "version": "0.0.0"
+                }
+            }
+        }
+    }
+}

@@ -73,6 +73,10 @@ class TestCapabilities:
     def test_cloning_is_derived_rather_than_declared(self, worker: RunningWorker) -> None:
         # An adapter that did not implement create_voice cannot advertise cloning, and one that did
         # cannot forget to. Nothing here is the adapter author's to remember.
+        post(worker, "/unload", {})
+        unloaded = get(worker, "/capabilities")
+        # Said on every variant before anything loads, since cloning needs no model. § 4.
+        assert all(variant["cloning"]["supported"] is True for variant in unloaded["variants"].values())
         post(worker, "/load", {})
         assert get(worker, "/capabilities")["current"]["cloning"]["supported"] is True
 
@@ -84,6 +88,8 @@ class TestCapabilities:
                 handshake=(handshake := await_handshake(process)),
                 base_url=url_for(handshake),
             )
+            variants = get(other, "/capabilities")["variants"].values()
+            assert all(variant["cloning"]["supported"] is False for variant in variants)
             post(other, "/load", {})
             assert get(other, "/capabilities")["current"]["cloning"]["supported"] is False
         finally:

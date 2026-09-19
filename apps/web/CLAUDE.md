@@ -6,11 +6,14 @@ rules, so that somebody who knows one knows the other.
 
 ## What it is for
 
-Two pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
+Three pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
 uninstall with each job followed as it happens. **Try it** (`/try`) is § 6 and § 7: say a line with
 an installed engine, offering only what the chosen variant's capability document claims, and list,
-preview, clone and delete its voices. The page holds no logic the API lacks and gets no route of
-its own. If the page needs something the API does not offer, the API grows it, in the spec first.
+preview, clone and delete its voices. **API** (`/reference`) is § 9: every route, drawn from the
+`GET /openapi.json` the core serves, never from a copy of its own, so it describes the core it is
+talking to. Its route is not `/api`, which is the proxy's prefix. The page holds no logic the API
+lacks and gets no route of its own. If the page needs something the API does not offer, the API
+grows it, in the spec first.
 
 **The capability document decides what is offered.** Cues, deliveries, dials and languages come
 from the chosen variant and nothing is hardcoded per engine. A new engine appears correctly with

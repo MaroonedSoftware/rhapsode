@@ -23,6 +23,31 @@ operation /health: {
     }
 }
 
+# This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
+# top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
+# already has a library that types it.
+contract mode(loose) OpenApiDocument: {
+    openapi: string
+    info: ApiInfo
+    paths: record(string, json)
+    components?: record(string, json)
+}
+
+contract mode(loose) ApiInfo: {
+    title: string
+    version: string                     # The running core's package version. Not the contract.
+}
+
+operation /openapi.json: {
+    get: {
+        # Open to every caller, like /health. The public API only: never a worker route.
+        sdk: openapi
+        response: {
+            200: { application/json: OpenApiDocument }
+        }
+    }
+}
+
 operation /engines: {
     get: {
         # Every declared engine, whether or not it is running. Never spawns one: this is the list an
@@ -201,6 +226,11 @@ operation /engines/{engine}/install: {
     }
     post: {
         sdk: installEngine
+        # A query rather than a body: ServerKit refuses a missing body on a route that declares
+        # one, and an install with nothing else to say has always been a bare POST. protocol.md § 10.
+        query: {
+            pull?: string                       # A variant to fetch once registered, as step 5.
+        }
         response: {
             202: { application/json: InstallJob }
             403: { application/json: ErrorBody }

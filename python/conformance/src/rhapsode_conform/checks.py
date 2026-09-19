@@ -536,8 +536,26 @@ def cloning_round_trips(worker: Worker, report: Report) -> None:
     Optional, so an engine that answers the create with `unsupported` conforms and the rest is not
     asked. One that accepts it is held to all of it.
     """
+    _, capabilities = worker.get("/capabilities")
+    variants: dict[str, Any] = capabilities.get("variants") or {}
+    claims = [
+        variant["cloning"].get("supported") is True
+        for variant in variants.values()
+        if isinstance(variant, dict) and isinstance(variant.get("cloning"), dict)
+    ]
+
     status, created = worker.create_voice(CLONE_ID, _reference_wav(220.0), transcript=CLONE_TRANSCRIPT)
-    if status == 422 and _error_code(created) == "unsupported":
+    refused = status == 422 and _error_code(created) == "unsupported"
+    # A client decides from these claims whether to offer cloning at all (§ 4), so one that says
+    # yes and is refused, or says no of a worker that clones, misleads it before any request fails.
+    if claims:
+        report.record(
+            "the variants' cloning claims match what a create does",
+            "§ 4",
+            any(claims) != refused,
+            f"claimed {'yes' if any(claims) else 'no'}, create {'refused' if refused else f'answered {status}'}",
+        )
+    if refused:
         report.record("cloning is offered, or refused as unsupported", "§ 7", True, "not offered")
         return
     try:
