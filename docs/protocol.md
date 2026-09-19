@@ -258,6 +258,10 @@ that only knows its trained speakers can be the same engine, as Orpheus's base m
 finetune are. `cloning` is optional, since contract 1 shipped without it; a reader that finds it
 absent does not know, and falls back to `current`, then to offering it and letting the worker refuse.
 
+`blending` sits beside it on every variant and in `current`, for the same reason: a blend reads the
+voices it mixes and never the model (§ 7). Absent means no, because an engine blends only if its
+adapter says so, and a worker that predates the field cannot.
+
 ### `license` carries code and weights separately
 
 The weights licence is the one that package metadata never reveals, and it is the one that decides
