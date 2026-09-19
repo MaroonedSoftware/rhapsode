@@ -1,6 +1,7 @@
 {
     "name": "rhapsode",
     "version": "0.0.0",
+    "private": true,
     "description": "A multi-engine speech server: one contract, many TTS models.",
     "type": "module",
     "license": "MIT",
@@ -30,8 +31,5 @@
         "@swc-node/register": "^1.12.1",
         "@swc/core": "^1.16.2",
         "vitest": "^5.0.0"
-    },
-    "publishConfig": {
-        "access": "public"
     }
 }

@@ -24,6 +24,11 @@ updates:
       cooldown:
           default-days: 7
       open-pull-requests-limit: 5
+      # TypeScript 7 fails every lint run with "typescript-eslint does not support TS 7.0" (#8).
+      # Support is tracked in typescript-eslint/typescript-eslint#10940; drop this once it lands.
+      ignore:
+          - dependency-name: typescript
+            update-types: ['version-update:semver-major']
       groups:
           minor-and-patch:
               update-types: [minor, patch]
