@@ -22,7 +22,7 @@ from rhapsode_worker import BadRequest, CreateVoiceRequest, Unsupported
 REFERENCE_SECONDS = (5.0, 10.0)
 
 #: The longest clip taken. Every second of reference is 86 of the 3072 positions a generation has, so
-#: a 20 s clip leaves about 15 s to speak in, and the segments this engine cuts are up to about 17.
+#: a 20 s clip leaves about 15 s to speak in, and pieces spoken beside it are cut shorter to fit.
 #: Longer is refused rather than trimmed, because trimming the clip would leave a transcript that no
 #: longer matches it, which clones worse without any error.
 LONGEST_SECONDS = 20.0

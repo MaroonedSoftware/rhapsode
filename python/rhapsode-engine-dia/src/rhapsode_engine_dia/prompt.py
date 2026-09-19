@@ -20,6 +20,28 @@ FIRST_SPEAKER = "[S1]"
 #: far inside the encoder's 1024 bytes, past which the tokenizer truncates without a word.
 SEGMENT_CHARACTERS = 250
 
+#: How long one generation can be, prompt included: the checkpoint's 3072 decoder positions at
+#: upstream's 86 a second.
+GENERATION_SECONDS = 3072 / 86
+
+#: How fast Dia is assumed to read when sizing a piece to the room left beside its prompt. Slow on
+#: purpose, because a piece read slower than assumed is one cut off mid-word: measured on real
+#: weights it read 604 characters in 29.1 s (20.8 a second) and a 97 character line with a laugh in
+#: 10.3 s (9.4, trailing silence included).
+CHARACTERS_PER_SECOND = 12
+
+#: Kept free of every generation, so a piece that reads slower than the rule of thumb still ends.
+SPARE_SECONDS = 3.0
+
+#: The first piece of an unvoiced request, which every later piece continues from and so pays for
+#: in positions. About 9 s: past the 5 s upstream says sounds unnatural, and short enough to leave
+#: a full piece beside it.
+ANCHOR_CHARACTERS = 130
+
+#: The least a piece is given however long its prompt, so a long prompt makes many short pieces
+#: rather than none.
+FEWEST_CHARACTERS = 60
+
 #: Anything already written in the model's own syntax: its nonverbal tags, and its speaker tags, which
 #: in a line spoken by one voice would hand the rest of the line to somebody else.
 _NATIVE_TAG = re.compile(
@@ -54,6 +76,12 @@ def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
     """
     pieces = [piece for sentence in _SENTENCE_END.split(text) for piece in _fit(sentence, limit)]
     return _pack([piece for piece in pieces if piece], limit)
+
+
+def room(prompt_seconds: float) -> int:
+    """How many characters fit in a generation beside a prompt this long, up to a whole piece."""
+    seconds = GENERATION_SECONDS - prompt_seconds - SPARE_SECONDS
+    return max(FEWEST_CHARACTERS, min(SEGMENT_CHARACTERS, int(seconds * CHARACTERS_PER_SECOND)))
 
 
 def line(segment: str) -> str:

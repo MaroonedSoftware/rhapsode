@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from rhapsode_engine_dia.builds import CUES, NATIVE_TAGS
-from rhapsode_engine_dia.prompt import SEGMENT_CHARACTERS, line, segments, translate_cues
+from rhapsode_engine_dia.prompt import (
+    FEWEST_CHARACTERS,
+    GENERATION_SECONDS,
+    SEGMENT_CHARACTERS,
+    line,
+    room,
+    segments,
+    translate_cues,
+)
 
 
 class TestCues:
@@ -85,3 +93,17 @@ class TestSegments:
 class TestLine:
     def test_the_first_speaker_leads(self) -> None:
         assert line("Hello there.") == "[S1] Hello there."
+
+
+class TestRoom:
+    def test_a_short_prompt_leaves_room_for_a_whole_piece(self) -> None:
+        assert room(5.0) == SEGMENT_CHARACTERS
+
+    def test_a_long_prompt_leaves_less(self) -> None:
+        assert FEWEST_CHARACTERS < room(20.0) < SEGMENT_CHARACTERS
+
+    def test_a_prompt_that_fills_the_generation_still_leaves_something(self) -> None:
+        assert room(GENERATION_SECONDS) == FEWEST_CHARACTERS
+
+    def test_less_room_as_the_prompt_grows(self) -> None:
+        assert room(8.0) >= room(12.0) >= room(16.0) >= room(20.0)

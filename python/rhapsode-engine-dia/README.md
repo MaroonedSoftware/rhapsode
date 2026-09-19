@@ -40,10 +40,11 @@ Then in `rhapsode.config.json`:
 ## How it reads a long text
 
 Dia reads 5 to 20 seconds well: less sounds unnatural and more gets fast, in upstream's words. So a
-long text is cut into pieces of at most 250 characters, broken where a reader would pause, and each is
-one generation. Dia picks a new voice on every generation unless it is given one, so every piece
-after the first continues from the first, its audio and its words as the prompt. A cloned voice's
-clip is the prompt for every piece instead.
+long text is cut into pieces broken where a reader would pause, and each is one generation. Dia
+picks a new voice on every generation unless it is given one, so every piece continues from a
+prompt: a cloned voice's clip and transcript, or for a request with no voice its own first piece,
+which is kept to about 130 characters. A generation holds about 35 seconds with its prompt, so each
+later piece is sized to what the prompt leaves, at most 250 characters.
 
 Each generation is whole before any of it is sent, so a long request streams piece by piece.
 

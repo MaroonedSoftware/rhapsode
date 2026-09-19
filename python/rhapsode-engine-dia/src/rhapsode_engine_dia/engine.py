@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from rhapsode_worker import (
+    BadRequest,
     CreateVoiceRequest,
     Engine,
     NativeFormat,
@@ -18,7 +19,7 @@ from rhapsode_worker import (
 )
 from rhapsode_worker.engine import Device
 
-from .backends import Generator, Prompt, Sampling, TransformersDia
+from .backends import Generator, Prompt, Sampling, Spoken, TransformersDia
 from .builds import (
     CFG_SCALE_RANGE,
     CODEC_FILES,
@@ -32,7 +33,7 @@ from .builds import (
     TOP_P_RANGE,
     variants,
 )
-from .prompt import line, segments, translate_cues
+from .prompt import ANCHOR_CHARACTERS, line, room, segments, translate_cues
 from .voices import REFERENCE_SECONDS, clips, digest, load, remove, store
 
 #: The Descript codec's rate. Every generation is 44.1 kHz mono.
@@ -160,42 +161,67 @@ class DiaEngine(Engine):
     # ------------------------------------------------------------------ speaking
 
     def speak(self, request: SpeakRequest) -> Iterator[bytes]:
-        """Generate one segment at a time, and hand the SDK each as soon as it is whole.
+        """Generate one piece at a time, and hand the SDK each as soon as it is whole.
 
-        Dia generates a segment all at once, so this chunks a finished waveform rather than pretending
+        Dia generates a piece all at once, so this chunks a finished waveform rather than pretending
         to be incremental. Long text is several generations, and upstream says plainly that without an
         audio prompt "you will get different voices every time you run the model", which in one
-        request would be a different reader every 17 seconds. So every segment after the first
-        continues from the first: its audio and its words are the prompt, and the voice the model
-        picked for it is the voice of the whole request. A cloned voice is a prompt already, its clip
-        and transcript, and every segment continues from that instead.
-
-        Each segment's seed is the request's plus its index, so the whole request reproduces and no
-        two segments are sampled alike.
+        request would be a different reader for every piece. So every piece continues from a prompt:
+        a cloned voice's clip and transcript, or for a request with no voice its own first piece, kept
+        short because every later one pays for it in positions. Each later piece is sized to the room
+        its prompt leaves in a generation.
         """
         generator = self._generator
         if generator is None:
             raise Unsupported("no model is loaded")
-        anchor = None if request.voice is None else self._cloned(request.voice)
-        cloned = anchor is not None
 
         dials = self.dials_for(request)
-        for index, segment in enumerate(segments(translate_cues(request.text))):
-            text = line(segment)
-            sampling = Sampling(
-                cfg_scale=dials.get("cfgScale", CFG_SCALE_RANGE[2]),
-                temperature=dials.get("temperature", TEMPERATURE_RANGE[2]),
-                top_p=dials.get("topP", TOP_P_RANGE[2]),
-                seed=None if request.seed is None else request.seed + index,
+        text = translate_cues(request.text)
+        if not text:
+            raise BadRequest(
+                "nothing is left to say once Dia's own tags are removed; cues are written [laugh]"
             )
-            spoken = generator.generate(text, sampling, anchor)
-            if spoken.exhausted:
-                # The model was still speaking when it ran out, so this segment ends mid-word. It is
-                # what SEGMENT_CHARACTERS exists to prevent, and the evidence for tuning it.
-                self.log.warn("a segment ran out of positions", characters=len(segment))
+        index = 0
+
+        if request.voice is not None:
+            prompt = self._cloned(request.voice)
+            rest = text
+        else:
+            first, *others = segments(text, ANCHOR_CHARACTERS)
+            spoken = self._generate(generator, first, dials, request.seed, index, None)
             yield from chunked_pcm(spoken.audio)
-            if not cloned and anchor is None:
-                anchor = Prompt(audio=spoken.audio, text=text)
+            prompt = Prompt(audio=spoken.audio, text=line(first))
+            rest = " ".join(others)
+            index += 1
+
+        for piece in segments(rest, room(len(prompt.audio) / SAMPLE_RATE)):
+            spoken = self._generate(generator, piece, dials, request.seed, index, prompt)
+            yield from chunked_pcm(spoken.audio)
+            index += 1
+
+    def _generate(
+        self,
+        generator: Generator,
+        piece: str,
+        dials: dict[str, float],
+        seed: int | None,
+        index: int,
+        prompt: Prompt | None,
+    ) -> Spoken:
+        """One generation. Its seed is the request's plus its index, so the whole request reproduces
+        and no two pieces are sampled alike."""
+        sampling = Sampling(
+            cfg_scale=dials.get("cfgScale", CFG_SCALE_RANGE[2]),
+            temperature=dials.get("temperature", TEMPERATURE_RANGE[2]),
+            top_p=dials.get("topP", TOP_P_RANGE[2]),
+            seed=None if seed is None else seed + index,
+        )
+        spoken = generator.generate(line(piece), sampling, prompt)
+        if spoken.exhausted:
+            # The model was still speaking when it ran out, so this piece ends mid-word, which is
+            # what `room` exists to prevent and the evidence for tuning it.
+            self.log.warn("a segment ran out of positions", characters=len(piece))
+        return spoken
 
     def _cloned(self, voice: str) -> Prompt:
         """A cloned voice as the prompt it continues from, or `unknown_voice` and never a substitute."""

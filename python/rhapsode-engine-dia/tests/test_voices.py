@@ -15,6 +15,7 @@ from rhapsode_worker import BadRequest, CreateVoiceRequest, SpeakRequest, Unknow
 from rhapsode_worker.engine import Device
 
 from rhapsode_engine_dia.engine import DiaEngine
+from rhapsode_engine_dia.prompt import room
 from rhapsode_engine_dia.voices import LONGEST_SECONDS, SAMPLE_RATE
 
 LONG = " ".join(["This sentence is exactly as long as it needs to be for the test."] * 10)
@@ -141,6 +142,18 @@ class TestSpeaking:
         create(built, transcript="Ha [laugh] (burps) [S2] fine.")
         spoken(built, voice="narrator")
         assert dia.generations[0].text.startswith("[S1] Ha (laughs) fine. [S1] ")
+
+    def test_a_long_clip_leaves_shorter_pieces_so_none_is_cut_off(
+        self, dia: Recorder, tmp_path: Path
+    ) -> None:
+        built = engine(tmp_path)
+        create(built, reference=clip(seconds=LONGEST_SECONDS))
+        spoken(built, LONG, voice="narrator")
+        transcript = "[S1] Hello, this is how I sound. [S1] "
+        assert all(
+            len(generation.text) - len(transcript) <= room(LONGEST_SECONDS) for generation in dia.generations
+        )
+        assert room(LONGEST_SECONDS) < room(6.0)
 
     def test_a_voice_it_does_not_have_is_refused_not_substituted(self, dia: Recorder, tmp_path: Path) -> None:
         with pytest.raises(UnknownVoice):

@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pytest
 from harness.stubs import HOP, Recorder
-from rhapsode_worker import Log, SpeakRequest, UnknownVoice, Unsupported
+from rhapsode_worker import BadRequest, Log, SpeakRequest, UnknownVoice, Unsupported
 from rhapsode_worker.engine import Device
 
 from rhapsode_engine_dia.backends import MAX_POSITIONS
@@ -21,7 +21,7 @@ from rhapsode_engine_dia.builds import (
     REVISION,
 )
 from rhapsode_engine_dia.engine import CHUNK_SAMPLES, DiaEngine, chunked_pcm
-from rhapsode_engine_dia.prompt import SEGMENT_CHARACTERS
+from rhapsode_engine_dia.prompt import ANCHOR_CHARACTERS, room
 
 
 class RecordingLog(Log):
@@ -129,8 +129,24 @@ class TestText:
     ) -> None:
         spoken(loaded(tmp_path), LONG)
         assert len(dia.generations) > 1
-        # Every generation after the first carries the first as its prompt, so only the tail is new.
-        assert len(dia.generations[0].text) <= len("[S1] ") + SEGMENT_CHARACTERS
+
+    def test_the_first_piece_is_short_because_every_later_one_pays_for_it(
+        self, dia: Recorder, tmp_path: Path
+    ) -> None:
+        spoken(loaded(tmp_path), LONG)
+        assert len(dia.generations[0].text) <= len("[S1] ") + ANCHOR_CHARACTERS
+
+    def test_every_later_piece_fits_beside_the_first(self, dia: Recorder, tmp_path: Path) -> None:
+        spoken(loaded(tmp_path), LONG)
+        first, *rest = dia.generations
+        fits = room(first.frames * HOP / 44_100)
+        for generation in rest:
+            assert len(generation.text) - len(first.text + " [S1] ") <= fits
+
+    def test_nothing_but_dias_own_tags_is_a_bad_request(self, dia: Recorder, tmp_path: Path) -> None:
+        with pytest.raises(BadRequest, match=r"\[laugh\]"):
+            spoken(loaded(tmp_path), "(burps) (sneezes)")
+        assert dia.generations == []
 
 
 class TestVoice:
