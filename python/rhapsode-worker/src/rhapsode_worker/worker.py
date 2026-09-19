@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 from typing import Any
 
-from . import encoding
+from . import encoding, streaming
 from .engine import (
     CreateVoiceRequest,
     DialogueRequest,
@@ -41,6 +41,12 @@ class Worker:
         self.draining = False
         self._transition = asyncio.Lock()
         self._slots = asyncio.Semaphore(max(1, engine.concurrency))
+        #: Synthesis threads still running, abandoned ones included. A slot is released when the
+        #: request ends; this only falls when the engine's call does. protocol.md § 3.
+        self._synthesising = 0
+        self._settled = asyncio.Condition()
+        #: Held until they run, since the loop keeps only a weak reference to a task.
+        self._announcements: set[asyncio.Task[None]] = set()
         #: Set by serve(), so that /terminate can ask the server to stop without importing it.
         self.stop: Callable[[], None] = lambda: None
 
@@ -155,6 +161,7 @@ class Worker:
         await self._attempt_load(variant)
 
     async def _attempt_load(self, variant: str) -> None:
+        await self.until_synthesising_fewer_than(1)
         self.model = "loading"
         self.log.info("loading", variant=variant)
         try:
@@ -168,6 +175,7 @@ class Worker:
         self.log.info("loaded", variant=variant)
 
     async def _unload_locked(self, *, quiet: bool = False) -> None:
+        await self.until_synthesising_fewer_than(1)
         self.model = "unloading"
         try:
             await asyncio.to_thread(self.engine.unload)
@@ -345,6 +353,39 @@ class Worker:
             raise BadRequest("`stream` must be a boolean")
 
         return fmt, language, params, seed, stream
+
+    def synthesis(self, request: SpeakRequest | DialogueRequest) -> AsyncIterator[bytes]:
+        """The engine's PCM on a thread, counted until that thread ends rather than until the
+        request does.
+
+        A model's `generate()` is one blocking call, so a client that hangs up stops the stream only
+        when the call returns. Until then the device is busy, and loading or unloading under it is
+        what crashed Dia on Metal with "failed assertion _status < MTLCommandBufferStatusCommitted".
+        """
+        return self._counted(lambda: self.pcm(request))
+
+    def preview(self, voice: str) -> AsyncIterator[bytes]:
+        """A voice's preview, counted as any synthesis is."""
+        return self._counted(lambda: self.engine.preview(voice))
+
+    def _counted(self, make: Callable[[], Iterator[bytes]]) -> AsyncIterator[bytes]:
+        self._synthesising += 1
+        return streaming.from_blocking(make, on_exit=self._synthesis_ended)
+
+    def _synthesis_ended(self) -> None:
+        self._synthesising -= 1
+        task = asyncio.ensure_future(self._announce())
+        self._announcements.add(task)
+        task.add_done_callback(self._announcements.discard)
+
+    async def _announce(self) -> None:
+        async with self._settled:
+            self._settled.notify_all()
+
+    async def until_synthesising_fewer_than(self, limit: int) -> None:
+        """Wait until fewer than `limit` synthesis threads are running, abandoned ones included."""
+        async with self._settled:
+            await self._settled.wait_for(lambda: self._synthesising < limit)
 
     def pcm(self, request: SpeakRequest | DialogueRequest) -> Iterator[bytes]:
         """The adapter's own output, still in its native format."""

@@ -644,6 +644,11 @@ serve(ChatterboxEngine())
   called, so an adapter never receives a request it did not declare support for.
 - Serialises requests by default. One model, one utterance at a time is the correct default for a
   GPU; an engine that can genuinely batch sets `concurrency > 1` and takes responsibility.
+- **Waits for an abandoned synthesis to end** before it loads, unloads or starts another. A model's
+  `generate()` is one blocking call, so a client that hangs up stops the stream only when that call
+  returns, and until then the model is still on the device. Measured with Dia on Metal: a load that
+  started under an abandoned generation killed the process with "failed assertion _status <
+  MTLCommandBufferStatusCommitted".
 
 ### `fetch`, the one optional verb
 

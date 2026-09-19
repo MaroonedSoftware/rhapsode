@@ -79,8 +79,9 @@ def create_app(worker: Worker) -> Starlette:
 
         native = worker.engine.native_format
         async with worker.slots():
+            await worker.until_synthesising_fewer_than(max(1, worker.engine.concurrency))
             pcm = bytearray()
-            async for chunk in streaming.from_blocking(lambda: worker.engine.preview(voice)):
+            async for chunk in worker.preview(voice):
                 pcm.extend(chunk)
 
         body = encoding.wav_header(native.sample_rate, native.channels, len(pcm)) + bytes(pcm)
@@ -143,6 +144,13 @@ def create_app(worker: Worker) -> Starlette:
         # streaming handler returns long before the audio does.
         await worker.slots().acquire()
         released = False
+        # And until an abandoned synthesis has really ended, since it is still on the device: one
+        # model, one utterance at a time is what `concurrency` promises. protocol.md § 3.
+        try:
+            await worker.until_synthesising_fewer_than(max(1, worker.engine.concurrency))
+        except BaseException:
+            worker.slots().release()
+            raise
 
         def release() -> None:
             nonlocal released
@@ -170,7 +178,7 @@ def create_app(worker: Worker) -> Starlette:
             # priming only the encoded stream primed that header: an unknown voice in wav was an
             # aborted connection. The encoded stream is primed after, so an ffmpeg that cannot start
             # is still a status.
-            first_pcm, pcm = await streaming.prime(streaming.from_blocking(lambda: worker.pcm(spoken)))
+            first_pcm, pcm = await streaming.prime(worker.synthesis(spoken))
             if first_pcm is None:
                 raise WorkerError("the engine produced no audio")
             counted = _Counted(pcm)
@@ -256,7 +264,7 @@ async def _buffered(worker: Worker, spoken: Any, content_type: str, native: Any)
     only case where a WAV header can carry the real sizes.
     """
     pcm = bytearray()
-    async for chunk in streaming.from_blocking(lambda: worker.pcm(spoken)):
+    async for chunk in worker.synthesis(spoken):
         pcm.extend(chunk)
 
     async def once() -> Any:
