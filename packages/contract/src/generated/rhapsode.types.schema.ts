@@ -19,7 +19,7 @@ export const Dial = z.looseObject({
 export type Dial = z.infer<typeof Dial>;
 
 /**
- * generated from [Cloning](../../../../contracts/rhapsode.types.ck#L32)
+ * generated from [Cloning](../../../../contracts/rhapsode.types.ck#L33)
  */
 export const Cloning = z.looseObject({
     supported: z.preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean()),
@@ -32,7 +32,7 @@ export const Cloning = z.looseObject({
 export type Cloning = z.infer<typeof Cloning>;
 
 /**
- * generated from [Streaming](../../../../contracts/rhapsode.types.ck#L38)
+ * generated from [Streaming](../../../../contracts/rhapsode.types.ck#L39)
  */
 export const Streaming = z.looseObject({
     supported: z.preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean()),
@@ -41,7 +41,7 @@ export const Streaming = z.looseObject({
 export type Streaming = z.infer<typeof Streaming>;
 
 /**
- * generated from [NativeFormat](../../../../contracts/rhapsode.types.ck#L43)
+ * generated from [NativeFormat](../../../../contracts/rhapsode.types.ck#L44)
  */
 export const NativeFormat = z.looseObject({
     encoding: z.string().describe('v1 accepts pcm_s16le and nothing else.'),
@@ -51,7 +51,7 @@ export const NativeFormat = z.looseObject({
 export type NativeFormat = z.infer<typeof NativeFormat>;
 
 /**
- * generated from [EngineIdentity](../../../../contracts/rhapsode.types.ck#L59)
+ * generated from [EngineIdentity](../../../../contracts/rhapsode.types.ck#L60)
  */
 export const EngineIdentity = z.looseObject({
     id: z.string(),
@@ -65,7 +65,7 @@ export type EngineIdentity = z.infer<typeof EngineIdentity>;
  * Code and weights separately, because the weights licence is the one package metadata never reveals
  * and the one that decides whether a commercial user may ship. A scanner reads the package, reports
  * the code licence, and is wrong in the way that matters.
- * generated from [License](../../../../contracts/rhapsode.types.ck#L69)
+ * generated from [License](../../../../contracts/rhapsode.types.ck#L70)
  */
 export const License = z.looseObject({
     code: z.string(),
@@ -76,7 +76,7 @@ export const License = z.looseObject({
 export type License = z.infer<typeof License>;
 
 /**
- * generated from [Device](../../../../contracts/rhapsode.types.ck#L76)
+ * generated from [Device](../../../../contracts/rhapsode.types.ck#L77)
  */
 export const Device = z.looseObject({
     type: z.enum(['cuda', 'rocm', 'mps', 'cpu']),
@@ -86,7 +86,7 @@ export const Device = z.looseObject({
 export type Device = z.infer<typeof Device>;
 
 /**
- * generated from [Voice](../../../../contracts/rhapsode.types.ck#L96)
+ * generated from [Voice](../../../../contracts/rhapsode.types.ck#L97)
  */
 export const Voice = z.looseObject({
     id: z.string(),
@@ -99,7 +99,7 @@ export const Voice = z.looseObject({
 export type Voice = z.infer<typeof Voice>;
 
 /**
- * generated from [CreateVoiceForm](../../../../contracts/rhapsode.types.ck#L105)
+ * generated from [CreateVoiceForm](../../../../contracts/rhapsode.types.ck#L106)
  */
 export const CreateVoiceForm = z.strictObject({
     id: z.string(),
@@ -109,7 +109,7 @@ export const CreateVoiceForm = z.strictObject({
 export type CreateVoiceForm = z.infer<typeof CreateVoiceForm>;
 
 /**
- * generated from [SpeakRequest](../../../../contracts/rhapsode.types.ck#L115)
+ * generated from [SpeakRequest](../../../../contracts/rhapsode.types.ck#L116)
  */
 export const SpeakRequest = z.strictObject({
     text: z.string().min(1),
@@ -131,7 +131,7 @@ export const SpeakRequest = z.strictObject({
 export type SpeakRequest = z.infer<typeof SpeakRequest>;
 
 /**
- * generated from [LoadRequest](../../../../contracts/rhapsode.types.ck#L131)
+ * generated from [LoadRequest](../../../../contracts/rhapsode.types.ck#L132)
  */
 export const LoadRequest = z.strictObject({
     variant: z.string().optional(),
@@ -141,7 +141,7 @@ export type LoadRequest = z.infer<typeof LoadRequest>;
 /**
  * Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
  * not loaded yet. protocol.md § 8.
- * generated from [FetchRequest](../../../../contracts/rhapsode.types.ck#L137)
+ * generated from [FetchRequest](../../../../contracts/rhapsode.types.ck#L138)
  */
 export const FetchRequest = z.strictObject({
     variant: z.string(),
@@ -153,7 +153,7 @@ export type FetchRequest = z.infer<typeof FetchRequest>;
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L149)
+ * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L150)
  */
 export const ErrorDetail = z.looseObject({
     code: z
@@ -178,7 +178,7 @@ export const ErrorDetail = z.looseObject({
 export type ErrorDetail = z.infer<typeof ErrorDetail>;
 
 /**
- * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L167)
+ * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L168)
  */
 export const WorkerHealth = z.looseObject({
     process: z.enum(['up', 'draining']),
@@ -190,7 +190,7 @@ export const WorkerHealth = z.looseObject({
 export type WorkerHealth = z.infer<typeof WorkerHealth>;
 
 /**
- * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L186)
+ * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L187)
  */
 export const ResidencySummary = z.looseObject({
     resident: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -201,7 +201,7 @@ export const ResidencySummary = z.looseObject({
 export type ResidencySummary = z.infer<typeof ResidencySummary>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L229)
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L230)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -211,7 +211,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L235)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L236)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -236,11 +236,12 @@ export const Variant = z.looseObject({
         .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
         .optional()
         .describe("Overrides the engine's own ceiling for this build."),
+    cloning: Cloning.optional().describe('Optional only because contract 1 shipped without it. § 4.'),
 });
 export type Variant = z.infer<typeof Variant>;
 
 /**
- * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L175)
+ * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L176)
  */
 export const EngineSummary = z.looseObject({
     id: z.string(),
@@ -257,7 +258,7 @@ export type EngineSummary = z.infer<typeof EngineSummary>;
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L206)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L207)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -273,7 +274,7 @@ export const CatalogEntry = z.looseObject({
 export type CatalogEntry = z.infer<typeof CatalogEntry>;
 
 /**
- * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L127)
+ * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L128)
  */
 export const EngineSpeakRequest = SpeakRequest.extend({
     engine: z.string(),
@@ -281,7 +282,7 @@ export const EngineSpeakRequest = SpeakRequest.extend({
 export type EngineSpeakRequest = z.infer<typeof EngineSpeakRequest>;
 
 /**
- * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L159)
+ * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L160)
  */
 export const ErrorBody = z.looseObject({
     error: ErrorDetail,
@@ -289,7 +290,7 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L216)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L217)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
@@ -306,7 +307,7 @@ export const InstallJob = z.looseObject({
 export type InstallJob = z.infer<typeof InstallJob>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L242)
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L243)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -325,7 +326,7 @@ export type FeedEvent = z.infer<typeof FeedEvent>;
  * The resident build, and everything true only while it is resident. Absent from the capability
  * document entirely when nothing is loaded, because a worker in up(unloaded) has nothing to
  * describe and an invented answer is worse than no answer.
- * generated from [CurrentVariant](../../../../contracts/rhapsode.types.ck#L52)
+ * generated from [CurrentVariant](../../../../contracts/rhapsode.types.ck#L53)
  */
 export const CurrentVariant = Variant.extend({
     variant: z.string(),
@@ -336,7 +337,7 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L193)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L194)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -347,7 +348,7 @@ export const CoreHealth = z.looseObject({
 export type CoreHealth = z.infer<typeof CoreHealth>;
 
 /**
- * generated from [Capabilities](../../../../contracts/rhapsode.types.ck#L82)
+ * generated from [Capabilities](../../../../contracts/rhapsode.types.ck#L83)
  */
 export const Capabilities = z.looseObject({
     contract: z

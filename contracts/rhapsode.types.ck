@@ -27,6 +27,7 @@ contract mode(loose) Variant: {
     dials: record(string, Dial)         # Engine-specific numbers, named by the adapter.
     languages?: array(string)
     maxCharacters?: int                 # Overrides the engine's own ceiling for this build.
+    cloning?: Cloning                   # Optional only because contract 1 shipped without it. § 4.
 }
 
 contract mode(loose) Cloning: {
