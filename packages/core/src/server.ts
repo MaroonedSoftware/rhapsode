@@ -24,6 +24,7 @@ import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
 import { residencyModule } from './residency/residency.module.js';
 import { openaiRoutes } from './openai/openai.routes.js';
+import { apiReferenceRoutes } from './reference/api.reference.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
 import { workerModule } from './workers/worker.module.js';
 import type { RhapsodeConfig } from './config.js';
@@ -75,6 +76,8 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
 
     const routes: ServerKitRouteMount[] = [
         { plugin: healthRoutes },
+        // The routes below, described. § 9.
+        { plugin: apiReferenceRoutes },
         { plugin: enginesRoutes },
         { plugin: engineDetailRoutes },
         { plugin: speakRoutes },

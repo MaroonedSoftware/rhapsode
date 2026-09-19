@@ -12,6 +12,8 @@ export const queryKeys = {
         capabilities: (engine: string) => ['engine', engine, 'capabilities'] as const,
         voices: (engine: string) => ['engine', engine, 'voices'] as const,
     },
+    /** The core's OpenAPI document. */
+    reference: () => ['reference'] as const,
     installs: {
         all: () => ['installs'] as const,
         list: () => ['installs', 'list'] as const,

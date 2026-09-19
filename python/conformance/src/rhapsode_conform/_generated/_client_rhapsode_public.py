@@ -5,6 +5,7 @@ from urllib.parse import quote
 from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
+from ._models_rhapsode_public import OpenApiDocument
 from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
 
 
@@ -281,6 +282,13 @@ class RhapsodePublicClient(BaseClient):
         """
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
+
+    async def openapi(self) -> OpenApiDocument:
+        """
+        Open to every caller, like /health. The public API only: never a worker route.
+        """
+        result = await self._fetch("/openapi.json", method="GET")
+        return OpenApiDocument.model_validate(result)
 
     async def engines(self) -> list[EngineSummary]:
         """

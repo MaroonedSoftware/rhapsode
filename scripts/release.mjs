@@ -96,7 +96,26 @@ function setVersions(version) {
         const path = `${dir}/pyproject.toml`;
         write(path, read(path).replace(PYPROJECT_VERSION, `version = "${version}"`).replace(WORKER_PIN, `"rhapsode-worker==${version}"`));
     }
+    for (const [path, pattern] of OPENAPI_VERSION) {
+        const text = read(path);
+        if (!pattern.test(text)) fail(`${path} has no info.version where release.mjs expects one`);
+        write(path, text.replace(pattern, `$1${version}$2`));
+    }
 }
+
+/**
+ * Where the OpenAPI documents carry the core's version as `info.version` (§ 9). Left at the old
+ * number, the release commit would fail `codegen:check` on a tree nobody edited by hand.
+ *
+ * Replaced as text rather than by rerunning scripts/openapi.document.mjs, which parses YAML: the
+ * release-pr job installs no dependencies, and a `yaml` import there fails every release pull request.
+ * The text is what that script writes, so `codegen:check` finds the two agree.
+ */
+const OPENAPI_VERSION = [
+    ['docs/openapi.yaml', /^(info:\n(?: {4}.*\n)*? {4}version: ).*()$/m],
+    ['docs/openapi.worker.yaml', /^(info:\n(?: {4}.*\n)*? {4}version: ).*()$/m],
+    ['packages/contract/src/generated/openapi.document.ts', /("info": \{\n\s*"title": "[^"]*",\n\s*"version": ")[^"]*(")/],
+];
 
 /** A changeset's body without its header, and when it was first committed, for ordering. */
 function changesets() {

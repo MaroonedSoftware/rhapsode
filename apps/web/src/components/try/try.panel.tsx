@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Group, NumberInput, SegmentedControl, Select, SimpleGrid, Slider, Stack, Text, Textarea, Title } from '@mantine/core';
+import {
+    Accordion,
+    Alert,
+    Button,
+    Card,
+    Group,
+    NumberInput,
+    SegmentedControl,
+    Select,
+    SimpleGrid,
+    Slider,
+    Stack,
+    Text,
+    Textarea,
+    Title,
+} from '@mantine/core';
 import { IconPlayerPlay } from '@tabler/icons-react';
-import type { Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
+import type { EngineSpeakRequest, Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
-import { useCapabilities, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
+import { speakBody, useCapabilities, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
 import { PageSkeleton } from '../shared/page.skeleton';
+import { RequestSnippet } from './request.snippet';
 import { VoicesCard } from './voices.card';
 
 const SAMPLE = 'Right, that was The Verve Pipe. [laugh] Nobody warned me about that intro.';
@@ -96,28 +112,28 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
         });
     };
 
+    // One request, for the Speak button and for the snippet that shows it as code.
+    const request: EngineSpeakRequest = {
+        engine,
+        text,
+        variant,
+        ...(voice === undefined ? {} : { voice }),
+        ...(delivery === '' ? {} : { delivery: delivery as 'hushed' | 'frantic' }),
+        ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
+        ...(language === undefined ? {} : { language }),
+        ...(seed === undefined ? {} : { seed }),
+    };
+
     const say = () => {
         setSlow(false);
         const timer = setTimeout(() => setSlow(true), SLOW_MS);
-        speak.mutate(
-            {
-                engine,
-                text,
-                variant,
-                ...(voice === undefined ? {} : { voice }),
-                ...(delivery === '' ? {} : { delivery: delivery as 'hushed' | 'frantic' }),
-                ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
-                ...(language === undefined ? {} : { language }),
-                ...(seed === undefined ? {} : { seed }),
+        speak.mutate(request, {
+            onSuccess: spoken => setPlayed(spoken),
+            onSettled: () => {
+                clearTimeout(timer);
+                setSlow(false);
             },
-            {
-                onSuccess: spoken => setPlayed(spoken),
-                onSettled: () => {
-                    clearTimeout(timer);
-                    setSlow(false);
-                },
-            },
-        );
+        });
     };
 
     return (
@@ -247,6 +263,16 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
                                 </Text>
                             </Stack>
                         ) : undefined}
+                        <Accordion variant="contained" radius="md">
+                            <Accordion.Item value="code">
+                                <Accordion.Control>
+                                    <Text size="sm">As code</Text>
+                                </Accordion.Control>
+                                <Accordion.Panel>
+                                    <RequestSnippet body={speakBody(request)} />
+                                </Accordion.Panel>
+                            </Accordion.Item>
+                        </Accordion>
                     </Stack>
                 </Card>
             </SimpleGrid>
