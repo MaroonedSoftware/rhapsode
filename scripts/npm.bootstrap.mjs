@@ -99,12 +99,16 @@ for (const dir of packages) {
         try {
             const tagged = manifest(join(tree, dir));
             // Thrown rather than failed, so the worktree is still removed: process.exit skips `finally`.
+            // A package renamed since the tag is not in it under this name. pnpm's filter matched nothing
+            // and exited 0, and the 0.1.0 bootstrap went on to publish a package it never installed.
+            if (tagged.name !== name)
+                throw new Error(`${tag} names this package ${tagged.name}, not ${name}. Release a version that carries the new name, then re-run.`);
             if (tagged.version !== version) throw new Error(`${tag} has ${name} at ${tagged.version}, not ${version}.`);
             if (tagged.private === true) throw new Error(`${name} is private at ${tag}, so it was not released there.`);
 
             console.log(`building: ${name} ${version} from ${tag}`);
-            run('pnpm', ['install', '--frozen-lockfile', '--filter', `${name}...`], tree);
-            run('pnpm', ['--filter', name, 'build'], tree);
+            run('pnpm', ['install', '--frozen-lockfile', '--fail-if-no-match', '--filter', `${name}...`], tree);
+            run('pnpm', ['--filter', name, '--fail-if-no-match', 'build'], tree);
 
             // pnpm, because only pnpm rewrites `workspace:` ranges. --no-git-checks because a detached
             // tag checkout is what pnpm's branch check refuses, and the tag is the stronger guarantee.
