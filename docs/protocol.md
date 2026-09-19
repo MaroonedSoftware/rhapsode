@@ -4,7 +4,7 @@ The contract, written before the code.
 
 **Rhapsode** is a multi-engine speech server: one HTTP contract, many TTS models behind it, each in
 its own process. `MaroonedSoftware/rhapsode`, published as `ghcr.io/maroonedsoftware/rhapsode`, with
-the engine SDK on PyPI as `rhapsode-worker`. A rhapsode was a performer who recited written verse
+the engine SDK as the Python package `rhapsode-worker`. A rhapsode was a performer who recited written verse
 aloud, which is the job description.
 
 Two audiences read this file and they need different things. A **client author** needs the public
@@ -644,11 +644,14 @@ is the specific future this section exists to prevent.
 
 ### Package versions are not the contract
 
-Every published package carries one version, on npm and PyPI alike, and they release together:
-`@rhapsode/sdk` on npm, and on PyPI `rhapsode-worker`, `rhapsode-conform` and every engine in the
-catalog. The server ships as a Docker image tagged with the same version, and its workspace packages
-(`@rhapsode/contract`, `@rhapsode/core` and `rhapsode`) carry that version without being published,
-because the core reads its own to pin engines, below. The first release is 0.1.0.
+Every released package carries one version, and they release together. The server ships as a
+Docker image tagged with it, and `@rhapsode/sdk` is published to npm at it. The rest carry it
+without being published: the workspace packages (`@rhapsode/contract`, `@rhapsode/core` and
+`rhapsode`), because the core reads its own to pin engines, below, and the Python packages
+(`rhapsode-worker`, `rhapsode-conform` and every engine in the catalog), because every way to run the
+core today installs engines from the sources it ships with, so nothing reads the package index yet.
+Versioning them anyway means publishing one later is a release like any other, not a renumbering.
+The first release is 0.1.0.
 
 That version and `contract` answer different questions. `contract` says what a core and a worker
 can say to each other, and moves only by the rules above. The package version says which code this

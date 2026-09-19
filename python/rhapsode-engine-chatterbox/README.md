@@ -7,10 +7,15 @@ The `turbo` build performs the paralinguistic tags and discards the expressivene
 and `multilingual` honour the dials and perform no tags. So on this engine you get cues or dials and
 never both, and which one is a fact about the weights that are resident right now.
 
+From the root of a checkout, the SDK first, because the engine pins it exactly and neither is on PyPI
+yet:
+
 ```bash
 python -m venv /opt/rhapsode/venvs/chatterbox
-/opt/rhapsode/venvs/chatterbox/bin/pip install rhapsode-engine-chatterbox
+/opt/rhapsode/venvs/chatterbox/bin/pip install python/rhapsode-worker python/rhapsode-engine-chatterbox
 ```
+
+`pnpm wizard install chatterbox`, or the web page, does this and the config below for you.
 
 Then in `rhapsode.config.json`:
 

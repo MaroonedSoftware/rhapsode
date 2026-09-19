@@ -7,10 +7,15 @@ tags perform seven of the eight standard cues, which makes it the second engine 
 and it generates token by token, so it streams audio as it goes, not by chunking a finished
 waveform.
 
+From the root of a checkout, the SDK first, because the engine pins it exactly and neither is on PyPI
+yet:
+
 ```bash
 python -m venv /opt/rhapsode/venvs/orpheus
-/opt/rhapsode/venvs/orpheus/bin/pip install rhapsode-engine-orpheus
+/opt/rhapsode/venvs/orpheus/bin/pip install python/rhapsode-worker python/rhapsode-engine-orpheus
 ```
+
+`pnpm wizard install orpheus`, or the web page, does this and the config below for you.
 
 Then in `rhapsode.config.json`:
 
@@ -42,7 +47,7 @@ The package installs the backend that runs where it lands without compiling anyt
 A Linux box without an NVIDIA card installs the GGUF builds instead, which needs a C++ compiler:
 
 ```bash
-/opt/rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[llama]'
+/opt/rhapsode/venvs/orpheus/bin/pip install './python/rhapsode-engine-orpheus[llama]'
 ```
 
 The default is the first build the worker lists: `full` where it can run, then `q8`.

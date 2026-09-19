@@ -35,71 +35,18 @@ jobs:
         needs: [versions]
         uses: ./.github/workflows/build.yml
 
-    pypi:
-        # Before npm, because a core installs its engines from PyPI at its own version (§ 9). If this
-        # fails, nothing else goes out at a version whose engines are not on the index.
-        needs: [build]
-        runs-on: ubuntu-latest
-        environment: pypi
-        permissions:
-            contents: read
-            # Trusted publishing: PyPI accepts this workflow's identity in place of a token, and
-            # attestations are made from the same one.
-            id-token: write
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with:
-                  persist-credentials: false
-
-            - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-              with:
-                  python-version: '3.11'
-
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-              with:
-                  node-version: 22
-                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
-                  # names a packageManager, and then fails looking for pnpm before any step runs.
-                  package-manager-cache: false
-
-            # The generated contract code is committed, so a plain build of each directory is the
-            # whole package. --strict because PyPI renders what twine would only warn about.
-            #
-            # Two directories, because one upload goes in alphabetical order and puts rhapsode_worker
-            # last. Every engine pins the SDK at its own version exactly (§ 9), so an engine on the
-            # index before its SDK cannot be installed, for seconds normally and until a re-run if the
-            # upload fails between the two.
-            - name: Build
-              run: |
-                  python -m pip install build twine
-                  for dir in $(node scripts/release.mjs list python); do
-                      out=dist/rest
-                      [ "$dir" = python/rhapsode-worker ] && out=dist/sdk
-                      python -m build --outdir "$out" "$dir"
-                  done
-                  python -m twine check --strict dist/sdk/* dist/rest/*
-
-            # skip-existing on both, so a run that died halfway is finished by re-running it.
-            - name: Publish the SDK
-              uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-              with:
-                  packages-dir: dist/sdk/
-                  skip-existing: true
-
-            - name: Publish the conformance suite and the engines
-              uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-              with:
-                  packages-dir: dist/rest/
-                  skip-existing: true
-
+    # No PyPI job. Nothing reads the index yet (release.mjs, PYPI), so there is nothing to publish.
+    # The job that was here is in git history: it built each directory with `python -m build`,
+    # checked it with `twine check --strict`, and uploaded the SDK first by trusted publishing from
+    # the `pypi` environment, because every engine pins the SDK exactly and cannot install before it.
     npm:
-        needs: [pypi]
+        needs: [build]
         runs-on: ubuntu-latest
         environment: npm
         permissions:
             contents: read
-            # Trusted publishing: npm accepts this workflow's identity in place of a token, as PyPI
-            # does above, and records provenance from the same one.
+            # Trusted publishing: npm accepts this workflow's identity in place of a token, and
+            # records provenance from the same one.
             id-token: write
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -146,8 +93,8 @@ jobs:
                   done
 
     image:
-        # Independent of both registries: the server image installs engines from the Python sources
-        # baked into it (`install.sourceDir`), so it is consistent with itself whatever PyPI holds.
+        # Independent of npm: the server image installs engines from the Python sources baked into it
+        # (`install.sourceDir`), so it is consistent with itself and needs no package index.
         needs: [build]
         runs-on: ubuntu-latest
         permissions:
@@ -192,7 +139,7 @@ jobs:
                   cache-to: type=gha,mode=max
 
     github:
-        needs: [pypi, npm, image]
+        needs: [npm, image]
         runs-on: ubuntu-latest
         permissions:
             contents: write
