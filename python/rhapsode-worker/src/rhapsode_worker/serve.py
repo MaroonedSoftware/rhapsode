@@ -104,8 +104,13 @@ def _prepare(engine: Engine) -> tuple[str, int, socket.socket]:
 def _server(app: Any) -> Any:
     import uvicorn
 
+    from .trailers import with_trailers
+
     config = uvicorn.Config(
-        app,
+        with_trailers(app),
+        # h11, never httptools even where it is installed, because only over h11 can the SDK send
+        # the trailer a streamed /speak ends with (§ 6). See trailers.py.
+        http="h11",
         log_config=None,
         # uvicorn's own access log would go to stdout, which is sealed, and would duplicate what the
         # core already records about every request it made.

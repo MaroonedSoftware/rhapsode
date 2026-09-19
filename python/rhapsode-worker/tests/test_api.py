@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import io
 import json
+import socket
 import urllib.error
 import urllib.request
 import wave
 from typing import Any
 
+import h11
 import pytest
 from conftest import RunningWorker, await_handshake, spawn, stop, url_for
 
@@ -149,6 +151,53 @@ class TestSpeak:
         assert int(headers["content-length"]) == len(body)
         # pcm is the native s16le at 24 kHz mono, so the body is the samples and nothing else.
         assert int(headers["x-rhapsode-duration-ms"]) == round(len(body) / 2 / 24_000 * 1000)
+
+    def test_a_streamed_answer_says_how_long_it_was_in_a_trailer(self, worker: RunningWorker) -> None:
+        # § 6: with `stream: true` the duration is not known until the audio has finished, so it is a
+        # trailer. None of uvicorn's HTTP implementations send one, so the SDK serves on its own h11
+        # protocol that does. h11 as the client too, because urllib and httpx both drop trailers.
+        host, _, port = worker.base_url[len("http://") :].rpartition(":")
+        body = json.dumps({"text": "one two three", "format": "pcm", "stream": True}).encode()
+        client = h11.Connection(h11.CLIENT)
+        with socket.create_connection((host, int(port)), timeout=60) as connection:
+            connection.sendall(
+                client.send(
+                    h11.Request(
+                        method="POST",
+                        target="/speak",
+                        headers=[
+                            ("host", host),
+                            ("content-type", "application/json"),
+                            ("content-length", str(len(body))),
+                            ("te", "trailers"),
+                        ],
+                    )
+                )
+                + client.send(h11.Data(data=body))
+                + client.send(h11.EndOfMessage())
+            )
+
+            response: h11.Response | None = None
+            audio = bytearray()
+            trailers: dict[str, str] = {}
+            while True:
+                event = client.next_event()
+                if event is h11.NEED_DATA:
+                    client.receive_data(connection.recv(65536))
+                elif isinstance(event, h11.Response):
+                    response = event
+                elif isinstance(event, h11.Data):
+                    audio.extend(event.data)
+                elif isinstance(event, h11.EndOfMessage):
+                    trailers = {name.decode(): value.decode() for name, value in event.headers}
+                    break
+
+        assert response is not None and response.status_code == 200
+        declared = {name.decode(): value.decode() for name, value in response.headers}
+        assert declared["trailer"].lower() == "x-rhapsode-duration-ms"
+        assert "content-length" not in declared
+        # pcm is the native s16le at 24 kHz mono, so the body is the samples and nothing else.
+        assert int(trailers["x-rhapsode-duration-ms"]) == round(len(audio) / 2 / 24_000 * 1000)
 
     def test_longer_text_makes_more_audio(self, worker: RunningWorker) -> None:
         _, short, _ = post(worker, "/speak", {"text": "one", "format": "pcm", "stream": False})

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from typing import Any
 
 from starlette.applications import Starlette
@@ -11,7 +12,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
-from . import encoding, streaming
+from . import encoding, streaming, trailers
 from .engine import CreateVoiceRequest, check_voice_id
 from .errors import BadRequest, WorkerError, classify
 from .worker import Worker
@@ -20,7 +21,8 @@ from .worker import Worker
 #: `send()` raising, which uvicorn does not do. See `_check_disconnect_assumption`.
 DISCONNECT_RACE_CEILING = (2, 4)
 
-#: § 6. A header on a buffered answer, because only there is the duration known before the headers.
+#: § 6. A header on a buffered answer, because only there is the duration known before the headers,
+#: and a trailer on a streamed one.
 DURATION_HEADER = "X-Rhapsode-Duration-Ms"
 
 
@@ -155,9 +157,10 @@ def create_app(worker: Worker) -> Starlette:
             first_pcm, pcm = await streaming.prime(streaming.from_blocking(lambda: worker.pcm(spoken)))
             if first_pcm is None:
                 raise WorkerError("the engine produced no audio")
+            counted = _Counted(pcm)
             source = encoding.encode(
                 spoken.format,
-                pcm,
+                counted.stream(),
                 sample_rate=native.sample_rate,
                 channels=native.channels,
             )
@@ -183,7 +186,11 @@ def create_app(worker: Worker) -> Starlette:
             finally:
                 release()
 
-        return StreamingResponse(body(), media_type=content_type)
+        return _TimedStream(
+            body(),
+            media_type=content_type,
+            duration_ms=lambda: _duration_ms(counted.bytes, native.sample_rate, native.channels),
+        )
 
     async def on_worker_error(_: Request, error: Exception) -> Response:
         failure = classify(error)
@@ -248,12 +255,71 @@ async def _buffered(worker: Worker, spoken: Any, content_type: str, native: Any)
     ):
         body.extend(chunk)
 
-    # From the PCM rather than the encoded body, because an mp3 or opus body's length says nothing
-    # about how long it plays. The native format is s16le, two bytes a sample.
-    frames = len(pcm) // (2 * native.channels)
-    duration_ms = round(frames * 1000 / native.sample_rate)
-
+    duration_ms = _duration_ms(len(pcm), native.sample_rate, native.channels)
     return Response(bytes(body), media_type=content_type, headers={DURATION_HEADER: str(duration_ms)})
+
+
+def _duration_ms(pcm_bytes: int, sample_rate: int, channels: int) -> int:
+    """From the PCM rather than the encoded body, because an mp3 or opus body's length says nothing
+    about how long it plays. The native format is s16le, two bytes a sample."""
+    return round(pcm_bytes // (2 * channels) * 1000 / sample_rate)
+
+
+class _Counted:
+    """The engine's PCM, passed through unchanged, counting the bytes for the duration."""
+
+    def __init__(self, source: AsyncIterator[bytes]) -> None:
+        self._source = source
+        self.bytes = 0
+
+    async def stream(self) -> AsyncIterator[bytes]:
+        try:
+            async for chunk in self._source:
+                self.bytes += len(chunk)
+                yield chunk
+        finally:
+            # Closed with this layer rather than left to the collector, so a client that hangs up
+            # still reaches the engine's generator, which is what stops the synthesis.
+            await streaming.aclose(self._source)
+
+
+class _TimedStream(StreamingResponse):
+    """A streamed answer that ends with its duration in a trailer. § 6.
+
+    Only `stream_response` is overridden: Starlette's `__call__` is where it races its own disconnect
+    listener, which `_check_disconnect_assumption` explains is what stops a synthesis nobody is
+    listening to, and that stays exactly as it was. A failure mid-stream raises out of the body before
+    the trailer, so an aborted connection never carries a duration for audio that did not arrive.
+    """
+
+    def __init__(self, content: Any, *, media_type: str, duration_ms: Any) -> None:
+        super().__init__(content, media_type=media_type)
+        self._duration_ms = duration_ms
+        self._trailers = False
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        # Declared only where the server said it can send one. Under a server without the extension
+        # the response is what it always was, with no promise in it that nothing keeps.
+        self._trailers = trailers.EXTENSION in scope.get("extensions", {})
+        if self._trailers:
+            self.headers["trailer"] = DURATION_HEADER
+        await super().__call__(scope, receive, send)
+
+    async def stream_response(self, send: Any) -> None:
+        start = {"type": "http.response.start", "status": self.status_code, "headers": self.raw_headers}
+        await send({**start, "trailers": True} if self._trailers else start)
+        async for chunk in self.body_iterator:
+            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+        if self._trailers:
+            value = str(self._duration_ms()).encode()
+            await send(
+                {
+                    "type": "http.response.trailers",
+                    "headers": [(DURATION_HEADER.lower().encode(), value)],
+                    "more_trailers": False,
+                }
+            )
 
 
 _warned_about_disconnect = False
