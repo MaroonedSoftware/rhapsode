@@ -15,6 +15,13 @@ def test_turbo_has_cues_and_no_dials() -> None:
     assert turbo.deliveries == ()
 
 
+def test_nano_claims_exactly_what_turbo_does() -> None:
+    # Upstream loads nano through turbo's class and generates with turbo's method, so there is no
+    # dial nano honours or cue it lacks that turbo does not. A difference here would be invented.
+    declared = variants()
+    assert declared["nano"] == declared["turbo"]
+
+
 def test_the_dialled_builds_have_dials_and_no_cues() -> None:
     for name in ("original", "multilingual"):
         variant = variants()[name]
@@ -33,6 +40,7 @@ def test_you_get_cues_or_dials_and_never_both() -> None:
 def test_only_the_multilingual_build_claims_more_than_english() -> None:
     declared = variants()
     assert declared["turbo"].languages == ("en",)
+    assert declared["nano"].languages == ("en",)
     assert declared["original"].languages == ("en",)
     assert len(declared["multilingual"].languages) > 10
     assert "fr" in declared["multilingual"].languages

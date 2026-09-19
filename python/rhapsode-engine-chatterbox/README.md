@@ -3,9 +3,13 @@
 Chatterbox as a rhapsode engine.
 
 This is the engine the capability document was designed around, and the reason it has two levels.
-The `turbo` build performs the paralinguistic tags and discards the expressiveness dials; `original`
-and `multilingual` honour the dials and perform no tags. So on this engine you get cues or dials and
-never both, and which one is a fact about the weights that are resident right now.
+The `turbo` and `nano` builds perform the paralinguistic tags and discard the expressiveness dials;
+`original` and `multilingual` honour the dials and perform no tags. So on this engine you get cues or
+dials and never both, and which one is a fact about the weights that are resident right now.
+
+`nano` is turbo's architecture with a smaller backbone, 110M parameters, loaded through turbo's own
+class. It claims exactly what turbo claims. It is in no upstream release yet, which is why this package
+installs upstream from a pinned commit on its master rather than from PyPI.
 
 ```bash
 python -m venv /opt/rhapsode/venvs/chatterbox

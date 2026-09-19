@@ -83,27 +83,30 @@ class ChatterboxEngine(Engine):
     def load(self, variant: str) -> None:
         """Bring one build onto the device.
 
-        Each build is its own class upstream rather than an argument to one, which is a fact about
-        this engine and not about the protocol. The import is here rather than at module scope so
-        that the adapter is importable, and testable, without torch.
+        Upstream mostly gives each build its own class rather than an argument to one, which is a
+        fact about this engine and not about the protocol. Nano is the exception: turbo's class with
+        `nano=True`. The import is here rather than at module scope so that the adapter is
+        importable, and testable, without torch.
         """
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
         from chatterbox.tts import ChatterboxTTS
         from chatterbox.tts_turbo import ChatterboxTurboTTS
 
-        builds = {
-            "turbo": ChatterboxTurboTTS,
-            "original": ChatterboxTTS,
-            "multilingual": ChatterboxMultilingualTTS,
+        builds: dict[str, tuple[Any, dict[str, Any]]] = {
+            "turbo": (ChatterboxTurboTTS, {}),
+            "nano": (ChatterboxTurboTTS, {"nano": True}),
+            "original": (ChatterboxTTS, {}),
+            "multilingual": (ChatterboxMultilingualTTS, {}),
         }
         build = builds.get(variant)
         if build is None:
             raise Unsupported(f'no build "{variant}"; this engine has {sorted(builds)}')
+        upstream, options = build
 
         # A string, never a torch.device. Upstream decides whether to map a CUDA-saved checkpoint
         # onto the CPU with `device in ["cpu", "mps"]`, which a torch.device never satisfies, so on
         # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
-        self._model = build.from_pretrained(device=self._torch_device())
+        self._model = upstream.from_pretrained(device=self._torch_device(), **options)
         _float32_loudness(self._model)
 
     def fetch(self, variant: str) -> None:
@@ -246,10 +249,10 @@ class ChatterboxEngine(Engine):
         if request.seed is not None:
             self._seed(request.seed)
 
-        if variant == "turbo":
+        if variant in {"turbo", "nano"}:
             # Zero on purpose. Anything above it makes upstream log that CFG, min_p and exaggeration
-            # are unsupported and ignore them, and the capability document already says this build
-            # has no dials, so a non-zero value here could only have come from the SDK ignoring it.
+            # are unsupported and ignore them, and the capability document already says these builds
+            # have no dials, so a non-zero value here could only have come from the SDK ignoring it.
             return {**arguments, "exaggeration": 0.0, "cfg_weight": 0.0, "min_p": 0.0}
 
         dials = self.dials_for(request)
@@ -279,8 +282,8 @@ def _float32_loudness(model: Any) -> None:
     Turbo normalises a reference clip with pyloudnorm, which returns float64, and the array goes to
     the device as it is. MPS has no float64, so on Apple Silicon every clone failed at its first
     `speak` with "Cannot convert a MPS Tensor to float64 dtype" (measured, turbo, chatterbox-tts
-    0.1.7). The other builds have no such step. Wrapped per instance rather than patched on the
-    class, so nothing outside this adapter is changed.
+    0.1.7). Nano is turbo's class and has the same step; the other builds have none. Wrapped per
+    instance rather than patched on the class, so nothing outside this adapter is changed.
     """
     original = getattr(model, "norm_loudness", None)
     if original is None:

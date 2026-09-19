@@ -31,7 +31,7 @@ class Recorded:
 
 @dataclass
 class StubBuild:
-    """Stands in for one of upstream's three classes."""
+    """Stands in for one of upstream's builds."""
 
     name: str
     calls: list[Recorded] = field(default_factory=list)
@@ -58,10 +58,12 @@ class StubFactory:
         self._name = name
         self._registry = registry
 
-    def from_pretrained(self, device: Any) -> StubBuild:
-        build = StubBuild(name=self._name)
+    def from_pretrained(self, device: Any, nano: bool = False) -> StubBuild:
+        # Upstream's turbo class loads nano too, when asked; `nano` is its argument and only its.
+        name = "nano" if nano else self._name
+        build = StubBuild(name=name)
         build.device = device  # type: ignore[attr-defined]
-        self._registry[self._name] = build
+        self._registry[name] = build
         return build
 
 

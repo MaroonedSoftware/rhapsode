@@ -1,13 +1,13 @@
 """The Chatterbox adapter, served for real, against a model that is not real.
 
 Everything here is the actual adapter and the actual SDK: the socket, the handshake, the capability
-document, the encoder, the error taxonomy and the residency verbs. Only the three upstream classes
-are stubs, because the real ones bring torch and several gigabytes of weights.
+document, the encoder, the error taxonomy and the residency verbs. Only upstream's classes are stubs,
+because the real ones bring torch and several gigabytes of weights.
 
 What running `rhapsode-conform` against this proves is that the adapter's protocol surface is
-correct: that the two-level capability document is well formed, that turbo declares cues and no
-dials while the dialled builds declare the reverse, that a request's text and dials reach the model,
-and that every refusal is the right code with the right retryable flag.
+correct: that the two-level capability document is well formed, that turbo and nano declare cues and
+no dials while the dialled builds declare the reverse, that a request's text and dials reach the
+model, and that every refusal is the right code with the right retryable flag.
 
 What it cannot prove is that the turbo weights actually perform a laugh. Nothing short of the real
 weights can, and `rhapsode-conform` against a real install is where that gets asked.
@@ -37,9 +37,9 @@ class _Factory:
     def __init__(self, name: str) -> None:
         self._name = name
 
-    def from_pretrained(self, device: Any) -> _Build:
+    def from_pretrained(self, device: Any, nano: bool = False) -> _Build:
         del device
-        return _Build(self._name)
+        return _Build("nano" if nano else self._name)
 
 
 def install() -> None:

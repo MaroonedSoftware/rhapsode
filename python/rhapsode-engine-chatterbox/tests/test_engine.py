@@ -30,12 +30,18 @@ def spoken(built: ChatterboxEngine, **overrides: Any) -> list[bytes]:
 
 class TestLoading:
     def test_each_variant_loads_its_own_upstream_class(self, chatterbox, tmp_path: Path) -> None:
-        # Upstream ships three classes rather than one class with a variant argument, which is a fact
-        # about this engine and not about the protocol.
+        # Upstream ships a class per build rather than one class with a variant argument, which is a
+        # fact about this engine and not about the protocol. Nano is the one exception, below.
         built = engine(tmp_path)
-        for name in ("turbo", "original", "multilingual"):
+        for name in ("turbo", "nano", "original", "multilingual"):
             built.load(name)
             assert chatterbox[name].name == name
+
+    def test_nano_is_turbo_s_class_asked_for_nano(self, chatterbox, tmp_path: Path) -> None:
+        # Without the flag upstream loads turbo's 3.8 GB, and nothing downstream could tell.
+        engine(tmp_path).load("nano")
+        assert "nano" in chatterbox
+        assert "turbo" not in chatterbox
 
     def test_the_device_reaches_upstream_as_a_string(self, chatterbox, tmp_path: Path) -> None:
         # Upstream picks its checkpoint map_location with `device in ["cpu", "mps"]`. A torch.device
@@ -72,6 +78,16 @@ class TestWhatReachesGenerate:
         assert arguments["exaggeration"] == 0.0
         assert arguments["cfg_weight"] == 0.0
         assert arguments["min_p"] == 0.0
+
+    def test_nano_is_sent_zeroes_too(self, chatterbox, tmp_path: Path) -> None:
+        # Nano generates with turbo's method, which warns about the same three arguments by name.
+        built = engine(tmp_path)
+        built.load("nano")
+        built.variant = "nano"
+        spoken(built, variant="nano")
+
+        arguments = chatterbox["nano"].calls[-1].arguments
+        assert (arguments["exaggeration"], arguments["cfg_weight"], arguments["min_p"]) == (0.0, 0.0, 0.0)
 
     def test_the_dialled_build_is_sent_the_dials_it_declares(self, chatterbox, tmp_path: Path) -> None:
         built = engine(tmp_path)
@@ -281,6 +297,23 @@ class TestFetching:
                 "token": None,
             }
         ]
+
+    def test_nano_fetches_from_its_own_repository(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Same class and patterns as turbo, different weights. Fetching turbo's repository here would
+        # succeed, download 3.8 GB, and leave the load that follows to download nano all over again.
+        import sys
+        import types
+
+        asked: list[dict[str, Any]] = []
+        hub = types.ModuleType("huggingface_hub")
+        hub.snapshot_download = lambda **arguments: asked.append(arguments) or str(tmp_path)  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+
+        engine(tmp_path).fetch("nano")
+
+        assert asked[0]["repo_id"] == "ResembleAI/chatterbox-nano"
 
     def test_does_not_load_anything(
         self, chatterbox, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
