@@ -272,7 +272,7 @@ export interface InstallJob {
     id: string;
     engine: string;
     kind: 'install' | 'pull';
-    /** For a pull: the variant being fetched. */
+    /** What a pull fetches, or an install fetches in step 5. */
     variant?: string;
     state: 'queued' | 'running' | 'succeeded' | 'failed';
     step?: 'venv' | 'packages' | 'verify' | 'register' | 'weights';

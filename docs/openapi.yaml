@@ -381,6 +381,11 @@ paths:
                   required: true
                   schema:
                       type: string
+                - name: pull
+                  in: query
+                  required: false
+                  schema:
+                      type: string
             responses:
                 '202':
                     description: 'Response 202'
@@ -1115,7 +1120,7 @@ components:
                     enum: [install, pull]
                 variant:
                     type: string
-                    description: 'For a pull: the variant being fetched.'
+                    description: 'What a pull fetches, or an install fetches in step 5.'
                 state:
                     type: string
                     enum: [queued, running, succeeded, failed]

@@ -15,10 +15,13 @@ export const INSTALL_SOURCE = 'install';
 /** Finished jobs kept for reading back. Enough for a session at a terminal; it is not a history. */
 const KEPT = 50;
 
-const STEPS: Record<InstallJob['kind'], InstallStep[]> = {
-    install: ['venv', 'packages', 'verify', 'register'],
-    pull: ['weights'],
-};
+const INSTALL_STEPS: InstallStep[] = ['venv', 'packages', 'verify', 'register'];
+
+/** An install asked for weights has a fifth step, and a job's variant is how it was asked. § 10. */
+function stepsOf(job: InstallJob): InstallStep[] {
+    if (job.kind === 'pull') return ['weights'];
+    return job.variant === undefined ? INSTALL_STEPS : [...INSTALL_STEPS, 'weights'];
+}
 
 /** What a job's work is given: somewhere to report, and a signal that fires on shutdown. */
 export interface JobContext {
@@ -86,7 +89,7 @@ export class InstallJobs {
     }
 
     private async execute(job: InstallJob, work: (context: JobContext) => Promise<void>): Promise<void> {
-        const steps = STEPS[job.kind];
+        const steps = stepsOf(job);
         job.state = 'running';
         job.startedAt = DateTime.utc().toISO();
         this.logger.info('install job started', { job: job.id, kind: job.kind, engine: job.engine });

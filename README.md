@@ -170,8 +170,8 @@ download the `fp16` weights (205 MB) so the first request does not wait on them.
 CPU, brings no torch, and on an Apple Silicon laptop speaks at about nine times realtime, so it works
 on whatever machine you are reading this on. Or do the same from the web page `pnpm dev` serves at
 http://localhost:8081. The wizard and the page are both only clients: the same thing is
-`POST /engines/kokoro/install` and `POST /engines/kokoro/pull`,
-which answer the machine the server runs on and nobody else unless `management.token` is set. See
+`POST /engines/kokoro/install?pull=fp16`, one job that installs the engine and downloads its
+weights, which answers the machine the server runs on and nobody else unless `management.token` is set. See
 [`docs/protocol.md`](docs/protocol.md) § 10 and [`docs/operating.md`](docs/operating.md).
 
 With a GPU, `pnpm wizard install chatterbox` is the next one to try: it clones voices and performs

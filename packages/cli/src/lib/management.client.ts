@@ -90,8 +90,10 @@ export class ManagementClient {
         return CatalogEntry.array().parse(await this.json('GET', '/catalog'));
     }
 
-    async install(engine: string): Promise<InstallJob> {
-        return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/install`));
+    /** With `pull`, a variant, the same job downloads it once the engine is registered. protocol.md § 10. */
+    async install(engine: string, pull?: string): Promise<InstallJob> {
+        const query = pull === undefined ? '' : `?pull=${encodeURIComponent(pull)}`;
+        return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/install${query}`));
     }
 
     async pull(engine: string, variant?: string): Promise<InstallJob> {
