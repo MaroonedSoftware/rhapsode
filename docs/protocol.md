@@ -676,6 +676,27 @@ None of this narrows what the rest of this section allows. A remote worker, or a
 operator configured by hand, is whatever version it is, and negotiation is still what decides
 whether the core will speak to it.
 
+### The core describes its own API
+
+`GET /openapi.json` answers with the public API as an OpenAPI 3.1 document, generated from
+`contracts/` like every other shape. It is open to every caller, like `/health` and `/catalog`: it
+says nothing a caller could not learn by trying, and withholding it only sends people to a copy on
+the web that describes some other version.
+
+- **Public routes only**: § 6 and § 7, the management routes of § 10, and the OpenAI shim of § 11.
+  Never a worker route. A client author should not learn that workers exist, and one document for
+  both cannot even be written, because `/health` and `/speak` are different operations on the same
+  paths. The first combined document had the worker's in both places and described a `/speak`
+  that takes no `engine`.
+- **`info.version` is the running core's package version**, set when the document is served, so it
+  describes this box rather than whichever build published the docs. It is still not the contract.
+  A client reads `contract` from `/health` to decide what it may send, and reads this document to
+  learn the shapes, whether it is a person or a generator building a client. Nothing negotiates
+  from it.
+- **The worker protocol is described by `docs/openapi.worker.yaml`**, committed and served by
+  nobody. An engine author reads it next to `rhapsode.worker.ck`, and a worker is not required to
+  describe itself: `rhapsode-conform` is what says whether it speaks the protocol.
+
 ---
 
 ## 10. Managing engines
@@ -977,7 +998,8 @@ Named so that nobody has to guess whether they were forgotten.
 - **Engines inside the core.** Every engine is a worker, ONNX ones included. § 8 says why.
 - **A UI in the core.** The gap this project fills is that everything else has one, and has put
   its API behind it. A web page for installing engines is a client of § 10 like any other, and gets
-  no route the terminal client does not.
+  no route the terminal client does not. Its API reference renders `GET /openapi.json` (§ 9), the
+  document every other client can read, rather than a copy of its own.
 
 ## 13. Open questions
 
