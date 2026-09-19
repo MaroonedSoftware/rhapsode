@@ -5,17 +5,21 @@
  * This writes one that works in the image, and never touches it again: from then on the file is the
  * operator's, as docs/operating.md promises of the config everywhere else.
  *
- * It also leaves the management token where the web container can read it. docs/operating.md § Docker.
+ * Then it starts nginx beside the server, serving the page and proxying /api to the core with the
+ * management token. docs/operating.md § Docker.
  */
 
+import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { loadSettings } from '@rhapsode/core';
+import { DEFAULTS, loadSettings } from '@rhapsode/core';
 
 const configPath = process.env.RHAPSODE_CONFIG ?? '/config/rhapsode.config.json';
-const tokenPath = join(dirname(configPath), 'management.token');
+// Where a separate web container once read the token. Removed, so no second copy of it lingers in
+// the volume that gets backed up.
+const staleTokenPath = join(dirname(configPath), 'management.token');
 
 const seed = {
     install: {
@@ -30,8 +34,8 @@ const seed = {
     // Cloned voices are the one thing on /data that cannot be downloaded again, so they live in
     // /config with the rest of what is worth backing up.
     workers: { voiceDir: join(dirname(configPath), 'voices') },
-    // The page has no sign-in and a published port is never loopback to the core, so the web
-    // container presents this for it. Ports are published on 127.0.0.1 for the same reason.
+    // The page has no sign-in and a published port is never loopback to the core, so the page's
+    // proxy presents this for it. Ports are published on 127.0.0.1 for the same reason.
     management: { token: randomBytes(32).toString('base64url') },
 };
 
@@ -48,7 +52,43 @@ try {
 // accept, including after an operator edits it or removes it.
 const { settings } = await loadSettings(configPath);
 const token = settings.management?.token;
-if (typeof token === 'string' && token !== '') await writeFile(tokenPath, token, { mode: 0o600 });
-else await rm(tokenPath, { force: true });
+await rm(staleTokenPath, { force: true });
+
+// RFC 6750's b64token, which is every valid bearer token. Anything else would be pasted into
+// nginx's config as it stands, where a `$` reads as a variable and a `"` ends the string.
+const authorization = typeof token === 'string' && /^[A-Za-z0-9\-._~+/]+=*$/.test(token) ? `Bearer ${token}` : '';
+if (typeof token === 'string' && token !== '' && authorization === '') {
+    console.log(JSON.stringify({ level: 'warn', msg: 'management.token is not a valid bearer token, so the page cannot install' }));
+}
+
+const nginxDir = '/tmp/rhapsode-nginx';
+await mkdir(nginxDir, { recursive: true });
+const template = await readFile(new URL('./nginx.conf.template', import.meta.url), 'utf8');
+const values = { RHAPSODE_API_PORT: String(settings.server?.port ?? DEFAULTS.port), RHAPSODE_AUTHORIZATION: authorization };
+await writeFile(
+    join(nginxDir, 'nginx.conf'),
+    template.replace(/\$\{(RHAPSODE_[A-Z_]+)\}/g, (_, name) => values[name]),
+);
+
+// tini forwards a stop to this process alone, so nginx keeps serving while the server drains, and
+// is stopped only once the server exits. Stopped first, a /speak through the page would be cut off
+// mid-sentence by the proxy rather than finished by the core.
+// `-e stderr` because nginx opens its compiled-in error log before reading the config, and as any
+// user but root that is a permission error on every start.
+const nginx = spawn('nginx', ['-c', join(nginxDir, 'nginx.conf'), '-e', 'stderr'], { stdio: 'inherit' });
+let exiting = false;
+process.once('exit', () => {
+    exiting = true;
+    nginx.kill('SIGQUIT');
+});
+// Docker restarts a container that exits, not one that is unhealthy, so a dead nginx would leave a
+// running server nobody can install through. Stopping the server the way `docker stop` does lets it
+// drain, and the restart policy brings both back.
+nginx.once('exit', (code, signal) => {
+    if (exiting) return;
+    console.log(JSON.stringify({ level: 'error', msg: `nginx exited (${signal ?? code}), so the container is stopping` }));
+    process.exitCode = 1;
+    process.kill(process.pid, 'SIGTERM');
+});
 
 await import('./dist/main.js');

@@ -139,7 +139,7 @@ jobs:
                       npm publish "$tarball" --access public --provenance
                   done
 
-    images:
+    image:
         # Independent of both registries: the server image installs engines from the Python sources
         # baked into it (`install.sourceDir`), so it is consistent with itself whatever PyPI holds.
         needs: [build]
@@ -147,9 +147,6 @@ jobs:
         permissions:
             contents: read
             packages: write
-        strategy:
-            matrix:
-                target: [server, web]
         steps:
             - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
               with:
@@ -172,7 +169,7 @@ jobs:
             - id: meta
               uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
               with:
-                  images: ghcr.io/maroonedsoftware/rhapsode-${{ matrix.target }}
+                  images: ghcr.io/maroonedsoftware/rhapsode
                   tags: |
                       type=semver,pattern={{version}}
                       type=semver,pattern={{major}}.{{minor}}
@@ -181,16 +178,15 @@ jobs:
               with:
                   context: .
                   file: docker/Dockerfile
-                  target: ${{ matrix.target }}
                   platforms: linux/amd64,linux/arm64
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha,scope=${{ matrix.target }}
-                  cache-to: type=gha,scope=${{ matrix.target }},mode=max
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
     github:
-        needs: [pypi, npm, images]
+        needs: [pypi, npm, image]
         runs-on: ubuntu-latest
         permissions:
             contents: write

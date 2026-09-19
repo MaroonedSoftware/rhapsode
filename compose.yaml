@@ -1,15 +1,16 @@
-# The server and the web page, with config in one volume and every download in another.
+# The server and the web page in one container, with config in one volume and every download in
+# another. The published image, so this file is the whole install and needs no checkout.
 # docs/operating.md § Docker.
 #
-#   docker compose up -d                                                 the published images
+#   docker compose up -d                                                 the published image
 #   docker compose -f compose.yaml -f compose.build.yaml up -d --build   built from this checkout
 #
-# RHAPSODE_VERSION pins a release, such as 0.1.0. Every package and both images share one version.
+# RHAPSODE_VERSION pins a release, such as 0.1.0. Every package and the image share one version.
 name: rhapsode
 
 services:
     server:
-        image: ghcr.io/maroonedsoftware/rhapsode-server:${RHAPSODE_VERSION:-latest}
+        image: ghcr.io/maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-latest}
         # 99:100 on unraid, to match its shares.
         user: '${PUID:-10001}:${PGID:-10001}'
         environment:
@@ -21,23 +22,13 @@ services:
             # The API, for /speak and OpenAI clients. Install routes refuse callers here without the
             # management token, because a published port is never loopback to the core.
             - '127.0.0.1:${RHAPSODE_API_PORT:-8080}:8080'
+            # The page. 127.0.0.1 is what keeps the install routes local: the page has no sign-in and
+            # its proxy carries the token, so publishing this on the LAN gives everyone on it a way
+            # to run pip here.
+            - '127.0.0.1:${RHAPSODE_WEB_PORT:-8081}:8081'
         # Longer than server.shutdownGraceMs (20 s), or Docker's default of 10 s kills a worker
         # mid-sentence instead of letting it drain.
         stop_grace_period: 30s
-        restart: unless-stopped
-
-    web:
-        image: ghcr.io/maroonedsoftware/rhapsode-web:${RHAPSODE_VERSION:-latest}
-        volumes:
-            # For management.token, which this container presents on the page's behalf.
-            - config:/config:ro
-        ports:
-            # 127.0.0.1 is what keeps the install routes local. The page has no sign-in and carries
-            # the token, so publishing this on the LAN gives everyone on it a way to run pip here.
-            - '127.0.0.1:${RHAPSODE_WEB_PORT:-8081}:80'
-        depends_on:
-            server:
-                condition: service_healthy
         restart: unless-stopped
 
 volumes:

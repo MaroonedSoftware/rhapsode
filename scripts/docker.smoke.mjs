@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Build both images, start them, install tone through the page's proxy, speak, then throw the
-// containers away and start new ones on the same volumes. docs/operating.md § Docker.
+// Build the image, start it, install tone through the page's proxy, speak, then throw the
+// container away and start a new one on the same volumes. docs/operating.md § Docker.
 //
 // The last step is the point. Everything before it would pass with no volumes at all, and an image
 // that put an engine anywhere outside /config and /data would pass it too, until its first upgrade.
@@ -19,7 +19,8 @@ const env = {
     RHAPSODE_WEB_PORT: process.env.RHAPSODE_WEB_PORT ?? '18081',
 };
 const api = `http://127.0.0.1:${env.RHAPSODE_API_PORT}`;
-const page = `http://127.0.0.1:${env.RHAPSODE_WEB_PORT}/api`;
+const site = `http://127.0.0.1:${env.RHAPSODE_WEB_PORT}`;
+const page = `${site}/api`;
 
 function compose(...args) {
     // compose.build.yaml, so this tests the checkout it runs in and never a published image.
@@ -55,6 +56,9 @@ let failed = false;
 try {
     compose('up', '--build', '--detach', '--wait');
 
+    const index = await fetch(`${site}/try`);
+    check(index.ok && (await index.text()).includes('<div id="root">'), 'the page is served, at its own routes as well as /');
+
     const direct = await fetch(`${api}/engines/tone/install`, { method: 'POST' });
     check(direct.status === 403, 'the published API port refuses an install without the token');
 
@@ -73,8 +77,8 @@ try {
 
     compose('down');
     compose('up', '--detach', '--wait');
-    check((await installedEngines()).includes('tone'), 'tone is still installed in new containers');
-    check(await speak(), 'tone speaks in new containers, from the virtualenv in the volume');
+    check((await installedEngines()).includes('tone'), 'tone is still installed in a new container');
+    check(await speak(), 'tone speaks in a new container, from the virtualenv in the volume');
 } catch (error) {
     failed = true;
     console.error(`failed: ${error.message}${error.cause ? ` (${error.cause.message ?? error.cause})` : ''}`);

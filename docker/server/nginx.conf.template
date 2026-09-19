@@ -1,0 +1,63 @@
+# The page and its proxy, in the server's own container. docker-entrypoint.mjs renders this into /tmp
+# and starts nginx beside the core. docs/operating.md § Docker.
+#
+# Not run as root: the container runs as PUID:PGID, often unraid's 99:100. So the pid file and every
+# temp path are in /tmp, because Debian's nginx creates its compiled-in temp directories under
+# /var/lib/nginx at startup and exits when it cannot, used or not.
+
+daemon off;
+worker_processes 1;
+pid /tmp/rhapsode-nginx/nginx.pid;
+error_log stderr warn;
+
+events {
+    worker_connections 256;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # The core's log is JSON, one object a line, and nginx's is not. Errors still reach stderr.
+    access_log off;
+
+    client_body_temp_path /tmp/rhapsode-nginx/body;
+    proxy_temp_path /tmp/rhapsode-nginx/proxy;
+    fastcgi_temp_path /tmp/rhapsode-nginx/fastcgi;
+    uwsgi_temp_path /tmp/rhapsode-nginx/uwsgi;
+    scgi_temp_path /tmp/rhapsode-nginx/scgi;
+
+    server {
+        # IPv4 only, as Docker's port publishing is. A [::] listen stops nginx starting at all on a
+        # host that disables IPv6 in its containers, which is why the stock image edits it out.
+        listen 8081;
+
+        # A cloned voice's reference clip may be 25 MB, docs/protocol.md § 7. nginx's default is 1 MB,
+        # which refuses a clip longer than about ten seconds with a 413 the page cannot explain.
+        client_max_body_size 26m;
+
+        location ^~ /api/ {
+            # The trailing slash strips /api. Loopback, so there is no name to resolve: a proxy in
+            # its own container had to re-ask Docker's DNS, or lost the core when it was recreated.
+            proxy_pass http://127.0.0.1:${RHAPSODE_API_PORT}/;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            # nginx connects from loopback, so without this every browser it forwarded would be a
+            # local caller. The core believes the header from loopback only to trust less. § 10.
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            # A browser behind a published port is never local, so the page reaches the install
+            # routes on this token or not at all. Empty when there is none, which removes the
+            # header. Whoever reaches this port reaches the install routes, which is why compose
+            # publishes it on 127.0.0.1.
+            proxy_set_header Authorization "${RHAPSODE_AUTHORIZATION}";
+            # An install's events stream stays open while it runs.
+            proxy_buffering off;
+            proxy_read_timeout 1h;
+        }
+
+        location / {
+            root /app/web;
+            try_files $uri /index.html;
+        }
+    }
+}

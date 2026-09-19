@@ -175,22 +175,43 @@ page's requests as coming from a site it does not know.
 
 ## Docker
 
+No checkout, no Node and no build: `compose.yaml` is the whole install, and pulls the published
+image.
+
 ```bash
-docker compose up -d             # the server on 127.0.0.1:8080, the page on http://localhost:8081
+mkdir rhapsode && cd rhapsode
+curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.yaml
+docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-Two images, `ghcr.io/maroonedsoftware/rhapsode-server` and `ghcr.io/maroonedsoftware/rhapsode-web`:
-the core, and the page behind nginx proxying `/api` as above. Each release publishes both for amd64
-and arm64, tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION`
-pins one. They share the version every package carries (`docs/protocol.md` § 9), so server 0.3.0
-is core 0.3.0, and it installs the engines that were released with it. `RHAPSODE_API_PORT` and
-`RHAPSODE_WEB_PORT` move the published ports.
+One image, `ghcr.io/maroonedsoftware/rhapsode`. Each release publishes it for amd64 and arm64,
+tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
+shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
+it installs the engines that were released with it. `docker compose pull` followed by
+`docker compose up -d` upgrades in place, keeping both volumes.
 
-From a checkout, `compose.build.yaml` builds both from `docker/Dockerfile` instead, tagged `local`
-so that a build never passes for a release:
+From a checkout, `compose.build.yaml` builds it from `docker/Dockerfile` instead, tagged `local` so
+that a build never passes for a release. It is what the Docker smoke test runs:
 
 ```bash
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+The image is the whole install: the core, and the page behind nginx in the same container, proxying
+`/api` as above. The entrypoint starts nginx beside the server and stops it only once the server has
+drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
+
+It was two containers, and one is less to run for nothing lost: unraid needed a network and a
+second template so the page could find the server, the token crossed between them through a file in
+`/config`, and nginx had to re-ask Docker's DNS or lose the core whenever its container was
+recreated. The core still serves no page of its own (protocol.md § 12). nginx is a second process
+beside it, reaching it over loopback like any other proxy on the same machine.
+
+Coming from the two-container compose, the old page container still holds port 8081, so replace it
+along with the server:
+
+```bash
+docker compose up -d --remove-orphans
 ```
 
 ### Two volumes
@@ -198,7 +219,6 @@ docker compose -f compose.yaml -f compose.build.yaml up -d --build
 | Mount     | What                                                        | Where in it                            |
 | --------- | ----------------------------------------------------------- | -------------------------------------- |
 | `/config` | the config, and `rhapsode.engines.json` beside it           | `rhapsode.config.json`                 |
-|           | the management token the page presents                      | `management.token`                     |
 |           | cloned voices                                               | `voices/<engine>`                      |
 | `/data`   | each engine's virtualenv                                    | `.rhapsode/venvs/<engine>`             |
 |           | the Python interpreters those virtualenvs run on            | `.local/share/uv/python`               |
@@ -217,8 +237,7 @@ the wizard. Lose `/config` and the downloads survive, but the engines and voices
 On first boot, with an empty `/config`, the server writes a config there and never touches it
 again. It differs from an empty one in four things: `install.sourceDir` names the Python sources in
 the image, `install.python` is `3.12`, `workers.voiceDir` is `/config/voices`, and there is a
-generated `management.token`. Leave `server.port` at 8080: the healthcheck and the page both expect
-it inside the container.
+generated `management.token`. Leave `server.port` at 8080, the port compose publishes.
 
 ### No Python in the image
 
@@ -235,9 +254,10 @@ interpreter you mount in instead.
 ### Installing from the page
 
 A published port is never loopback to the core: a request through one arrives from Docker's bridge.
-So the install routes answer only the management token, and the `web` container presents it on the
-page's behalf, reading it from `/config`. It follows an edit to the token once both containers have
-restarted.
+So the install routes answer only the management token, and nginx presents it on the page's behalf.
+It follows an edit to the token once the container restarts. A token that is not a valid bearer
+token, by RFC 6750's alphabet, is not presented and the log says so, since nginx would read a `$` or
+`"` in it as its own syntax.
 
 That makes the page's port the key to the install routes, which run pip, and it is why compose
 publishes both ports on `127.0.0.1` only. Publishing the page to your LAN gives everyone on it that
@@ -256,6 +276,7 @@ environment is constructed rather than inherited.
 ### GPUs
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.gpu.yaml
 docker compose -f compose.yaml -f compose.gpu.yaml up -d
 ```
 
@@ -280,7 +301,7 @@ fails every load without a C compiler. It is C only; nothing in the image compil
 
 Measured on an RTX 4070 Ti SUPER through `compose.gpu.yaml`: installing Chatterbox took 93 seconds
 and 6.2 GB in `/data`, the first `turbo` sentence 50 seconds while 3.8 GB of weights arrived, and
-the next 0.45 seconds, holding 3.1 GB of VRAM. After both containers were replaced, the first
+the next 0.45 seconds, holding 3.1 GB of VRAM. After the containers were replaced, the first
 sentence took 9 seconds, loading from the volume with nothing fetched.
 
 Docker's default ten-second stop kills a worker before the core has drained it. Compose waits 30
@@ -288,20 +309,9 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 ### unraid
 
-Create a network, so that the page can find the server by name:
-
-```bash
-docker network create rhapsode
-```
-
-Then two containers on it, from the published images:
-
-- `rhapsode-server`, from `ghcr.io/maroonedsoftware/rhapsode-server`: `/config` to
-  `/mnt/user/appdata/rhapsode`, `/data` to a share such as `/mnt/user/rhapsode`, `--user 99:100` so
-  both are written as unraid's own `nobody:users`, port 8080, and `--stop-timeout 30` in Extra
-  Parameters.
-- `rhapsode-web`, from `ghcr.io/maroonedsoftware/rhapsode-web`: the same `/config` mapping,
-  read-only, `RHAPSODE_UPSTREAM=rhapsode-server:8080`, port 8081 to 80.
+One container, from `ghcr.io/maroonedsoftware/rhapsode`: `/config` to `/mnt/user/appdata/rhapsode`,
+`/data` to a share such as `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own
+`nobody:users`, ports 8080 and 8081, and `--stop-timeout 30` in Extra Parameters.
 
 Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
 so add it to `management.origins`. That is also the moment the page reaches the install routes from
