@@ -1,0 +1,16 @@
+{
+    "rootDir": ".",
+    "patterns": ["contracts/rhapsode.types.ck", "contracts/rhapsode.worker.ck"],
+    "plugins": {
+        "@contractkit/plugin-docs": {
+            "openapi": {
+                "baseDir": "docs/",
+                "output": "openapi.worker.yaml",
+                "info": {
+                    "title": "Rhapsode worker protocol",
+                    "version": "0.0.0"
+                }
+            }
+        }
+    }
+}
