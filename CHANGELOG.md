@@ -2,6 +2,13 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.3
+
+- `@maroonedsoftware/rhapsode-sdk` names its repository, which npm requires to accept its provenance. 0.1.2 was refused for want of it, so no 0.1.2 of the SDK exists on npm; the image and every other part of 0.1.2 were published.
+- An install can download an engine's weights in the same job: `POST /engines/chatterbox/install?pull=turbo` runs a fifth step, `weights`, once the engine is registered, so the first `/speak` does not wait on the download. A failed download leaves the engine installed, to be finished with a pull, and an engine that cannot download ahead of time succeeds and fetches on first load. The SDK's `installEngine` takes an optional `{ pull }` query. A bare `POST .../install` is unchanged.
+- The web page downloads an engine's default weights as part of installing it, so an engine it installs is ready to speak. The install dialog has a "Download the turbo weights too" box, ticked by default, and the job shows the download as a fifth step. If only the download fails, the page says the engine is installed and its weights can be downloaded from its card.
+- `pnpm wizard install <engine>` asks about the weights before it starts, and the server downloads them as part of the install job instead of in a second job afterwards. If only the download fails, it says the engine is installed and that `--pull` retries the download. For an engine that is already installed, `--pull` still downloads its weights on their own.
+
 ## 0.1.2
 
 - The Docker image carries git, so installing Chatterbox works in it. Upstream Chatterbox names its watermarker, `resemble-perth`, by `git+https`, and every Chatterbox install in the container failed with "Cannot find command 'git'".
