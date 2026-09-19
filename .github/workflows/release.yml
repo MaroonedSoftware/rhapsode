@@ -36,8 +36,8 @@ jobs:
         uses: ./.github/workflows/build.yml
 
     pypi:
-        # Before npm, because a published core installs its engines from PyPI at its own version
-        # (§ 9), and a core on npm whose engines are not on PyPI yet fails every install.
+        # Before npm, because a core installs its engines from PyPI at its own version (§ 9). If this
+        # fails, nothing else goes out at a version whose engines are not on the index.
         needs: [build]
         runs-on: ubuntu-latest
         environment: pypi
@@ -128,13 +128,9 @@ jobs:
             # A version already on the registry is skipped rather than failed, so a run that died
             # halfway is finished by re-running it, not by cutting a new version.
             #
-            # No token. npm tries the workflow's identity first and falls back to NODE_AUTH_TOKEN, which
-            # is empty unless NPM_TOKEN is set. A trusted publisher is registered in a package's settings
-            # on npmjs.com, so a package never published has nowhere to register one: for its first
-            # release set NPM_TOKEN on the `npm` environment, register the publisher, then delete it.
+            # No token. A package's first version, and the trust config that lets this job publish
+            # the rest, come from `node scripts/npm.bootstrap.mjs`, run once by hand.
             - name: Publish
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
               run: |
                   version="${GITHUB_REF_NAME#v}"
                   out="$RUNNER_TEMP/npm"
