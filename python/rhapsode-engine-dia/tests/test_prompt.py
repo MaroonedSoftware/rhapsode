@@ -8,9 +8,13 @@ from rhapsode_engine_dia.prompt import (
     GENERATION_SECONDS,
     SEGMENT_CHARACTERS,
     line,
+    rendered,
     room,
+    script,
     segments,
+    take,
     translate_cues,
+    windows,
 )
 
 
@@ -107,3 +111,36 @@ class TestRoom:
 
     def test_less_room_as_the_prompt_grows(self) -> None:
         assert room(8.0) >= room(12.0) >= room(16.0) >= room(20.0)
+
+
+TAGS = {"a": "[S1]", "b": "[S2]"}
+
+
+class TestScript:
+    def test_under_each_speakers_tag_with_a_speaker_going_on_kept_as_one(self) -> None:
+        said = script([("a", "One."), ("a", "Two."), ("b", "Three.")], TAGS)
+        assert said == [("[S1]", "One. Two."), ("[S2]", "Three.")]
+        assert rendered(said) == "[S1] One. Two. [S2] Three."
+
+
+class TestWindows:
+    def test_whole_turns_until_the_next_would_not_fit(self) -> None:
+        said = [("[S1]", "x" * 40), ("[S2]", "y" * 40), ("[S1]", "z" * 40)]
+        piece, rest = take(said, 90)
+        assert piece == said[:2]
+        assert rest == said[2:]
+
+    def test_a_turn_too_long_to_fit_alone_is_broken_and_its_remainder_leads_what_is_left(self) -> None:
+        long = "Short one. " + "And then a much longer sentence follows it here."
+        piece, rest = take([("[S2]", long), ("[S1]", "Right.")], 20)
+        assert piece == [("[S2]", "Short one.")]
+        assert rest[0] == ("[S2]", "And then a much longer sentence follows it here.")
+        assert rest[1] == ("[S1]", "Right.")
+
+    def test_every_word_is_in_exactly_one_window(self) -> None:
+        said = [
+            ("[S1]" if index % 2 == 0 else "[S2]", f"Sentence number {index} is here.") for index in range(30)
+        ]
+        pieces = windows(said, 100)
+        assert len(pieces) > 1
+        assert [words for piece in pieces for _, words in piece] == [words for _, words in said]

@@ -83,3 +83,15 @@ def test_an_unknown_voice_is_a_404_before_any_audio(stubbed: str) -> None:
         status, body = worker.speak({"text": "x", "voice": "narrator", "stream": False})
     assert status == 404
     assert json.loads(body)["error"]["code"] == "unknown_voice"
+
+
+def test_its_dialogue_is_checked_and_passes(stubbed: str) -> None:
+    with Worker(stubbed) as worker:
+        report = run(worker)
+
+    checks = [result for result in report.results if "dialogue" in result.name or "speakers" in result.name]
+    assert {
+        'a dialogue speaks on variant "1.6b"',
+        'more than 2 speakers is refused as unsupported on variant "1.6b"',
+    } <= {result.name for result in checks}
+    assert all(result.passed for result in checks)

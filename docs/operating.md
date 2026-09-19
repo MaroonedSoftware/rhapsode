@@ -150,6 +150,7 @@ hear it and not enough to use it. On a CPU it will be slower still.
 It generates each piece of text whole, about 17 s of speech at a time, so the first audio of a long
 request arrives when its first piece is finished rather than as it is spoken.
 
+It answers `/dialogue` (protocol.md § 6) with up to two speakers, which is what it was trained for.
 It has no voices of its own. A request that names none is read in whichever voice the model picks,
 which a `seed` holds fixed; a long one keeps its first piece's voice to the end. A cloned voice needs
 the clip's `transcript` (protocol.md § 7), and clones best from 5 to 10 seconds of it.

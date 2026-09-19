@@ -6,6 +6,7 @@ Pure, so every decision about text is testable without a model.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 from .builds import CUE_TAGS, NATIVE_TAGS
 
@@ -87,6 +88,67 @@ def room(prompt_seconds: float) -> int:
 def line(segment: str) -> str:
     """One voice's segment as the model is given it."""
     return f"{FIRST_SPEAKER} {segment}"
+
+
+#: One speaker's words in a conversation, under the tag the model knows them by.
+Said = tuple[str, str]
+
+
+def script(turns: Iterable[tuple[str, str]], tags: dict[str, str]) -> list[Said]:
+    """A conversation's turns as the model is given them: each under its speaker's tag, in Dia's
+    syntax, and a speaker who goes on talking kept as one turn, since upstream says the tags must
+    alternate. A turn that is nothing once Dia's own tags are removed is dropped."""
+    said: list[Said] = []
+    for speaker, text in turns:
+        words = translate_cues(text)
+        if not words:
+            continue
+        tag = tags[speaker]
+        if said and said[-1][0] == tag:
+            said[-1] = (tag, f"{said[-1][1]} {words}")
+        else:
+            said.append((tag, words))
+    return said
+
+
+def take(said: list[Said], limit: int) -> tuple[list[Said], list[Said]]:
+    """As many whole turns as fit in `limit` characters of speech, and what is left.
+
+    A turn too long to fit alone is broken where a reader would pause, and its remainder stays at
+    the front of what is left, under the same tag. Never nothing, so a conversation always moves on.
+    """
+    taken: list[Said] = []
+    spoken = 0
+    rest = list(said)
+    while rest:
+        tag, words = rest[0]
+        if spoken + len(words) <= limit:
+            taken.append(rest.pop(0))
+            spoken += len(words)
+            continue
+        if not taken:
+            first, *remainder = segments(words, limit)
+            taken.append((tag, first))
+            rest[0] = (tag, " ".join(remainder))
+            if not remainder:
+                rest.pop(0)
+        break
+    return taken, rest
+
+
+def windows(said: list[Said], limit: int) -> list[list[Said]]:
+    """The whole conversation, in pieces of whole turns that each fit in `limit`."""
+    pieces: list[list[Said]] = []
+    rest = said
+    while rest:
+        piece, rest = take(rest, limit)
+        pieces.append(piece)
+    return pieces
+
+
+def rendered(said: list[Said]) -> str:
+    """Turns as the model reads them: `[S1] words [S2] words`."""
+    return " ".join(f"{tag} {words}" for tag, words in said)
 
 
 def _fit(sentence: str, limit: int) -> list[str]:

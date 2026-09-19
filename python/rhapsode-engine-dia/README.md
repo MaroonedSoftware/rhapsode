@@ -3,8 +3,8 @@
 Dia as a rhapsode engine.
 
 Dia is Nari Labs' 1.6B dialogue model, run here through transformers' `DiaForConditionalGeneration`.
-It writes nonverbals where they happen and performs all eight standard cues. It was trained to make
-two speakers in one pass, and this adapter speaks one voice through `/speak`.
+It writes nonverbals where they happen and performs all eight standard cues, and it makes two
+speakers in one pass: `/dialogue` (protocol.md § 6) as well as `/speak`.
 
 From the root of a checkout, the SDK first, because the engine pins it exactly and neither is on PyPI
 yet:
@@ -33,6 +33,9 @@ Then in `rhapsode.config.json`:
 - **Voices:** none of its own. A request that names none is read in whichever voice the model picks,
   which a `seed` holds fixed. Cloning takes a clip and a `transcript` of it, 5 to 10 seconds of
   speech and at most 20.
+- **Dialogue:** two speakers. A speaker with a voice is read from its clip; one without is read in
+  a voice the model picks, which a `seed` holds fixed. Two cloned clips together leave room to speak
+  only up to about 28 s, so 5 to 10 s of each.
 - **Variants:** `1.6b`, the June 2025 checkpoint. 6.4 GB of weights and 0.3 GB of codec, fetched
   from pinned revisions.
 - **Languages:** English.
@@ -45,6 +48,10 @@ picks a new voice on every generation unless it is given one, so every piece con
 prompt: a cloned voice's clip and transcript, or for a request with no voice its own first piece,
 which is kept to about 130 characters. A generation holds about 35 seconds with its prompt, so each
 later piece is sized to what the prompt leaves, at most 250 characters.
+
+A conversation is cut the same way, into windows of whole turns, and a speaker who goes on talking
+is kept as one turn, because upstream says the tags must alternate. Speakers with a voice are `[S1]`
+and `[S2]` first, so the text the model is given begins with `[S1]` as upstream requires.
 
 Each generation is whole before any of it is sent, so a long request streams piece by piece.
 

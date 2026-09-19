@@ -6,9 +6,11 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, ClassVar
 
+import numpy as np
 from rhapsode_worker import (
     BadRequest,
     CreateVoiceRequest,
+    DialogueRequest,
     Engine,
     NativeFormat,
     SpeakRequest,
@@ -33,7 +35,21 @@ from .builds import (
     TOP_P_RANGE,
     variants,
 )
-from .prompt import ANCHOR_CHARACTERS, line, room, segments, translate_cues
+from .prompt import (
+    ANCHOR_CHARACTERS,
+    CHARACTERS_PER_SECOND,
+    FEWEST_CHARACTERS,
+    GENERATION_SECONDS,
+    SPARE_SECONDS,
+    line,
+    rendered,
+    room,
+    script,
+    segments,
+    take,
+    translate_cues,
+    windows,
+)
 from .voices import REFERENCE_SECONDS, clips, digest, load, remove, store
 
 #: The Descript codec's rate. Every generation is 44.1 kHz mono.
@@ -78,6 +94,9 @@ class DiaEngine(Engine):
     concurrency = 1
 
     max_characters = 4096
+
+    #: `[S1]` and `[S2]`, which are the only two speakers the model was trained on.
+    max_speakers = 2
 
     #: Which transformers is installed, since that is where the model's code lives. A plain attribute
     #: rather than a property, because the base class declares it as one.
@@ -188,21 +207,79 @@ class DiaEngine(Engine):
             rest = text
         else:
             first, *others = segments(text, ANCHOR_CHARACTERS)
-            spoken = self._generate(generator, first, dials, request.seed, index, None)
+            spoken = self._generate(generator, line(first), dials, request.seed, index, None)
             yield from chunked_pcm(spoken.audio)
             prompt = Prompt(audio=spoken.audio, text=line(first))
             rest = " ".join(others)
             index += 1
 
         for piece in segments(rest, room(len(prompt.audio) / SAMPLE_RATE)):
-            spoken = self._generate(generator, piece, dials, request.seed, index, prompt)
+            spoken = self._generate(generator, line(piece), dials, request.seed, index, prompt)
             yield from chunked_pcm(spoken.audio)
             index += 1
+
+    def dialogue(self, request: DialogueRequest) -> Iterator[bytes]:
+        """Two speakers in one pass, which is what Dia was trained to make. protocol.md § 6.
+
+        Speakers with a voice are `[S1]` and `[S2]` first, then those without, so the model is given
+        text that begins with `[S1]` as upstream requires: the voices' clips and transcripts lead it.
+        With no voice, the first short window is the prompt every later one continues from, as for
+        `/speak`, and holds whoever spoke in it. A speaker who first speaks after it is held only by
+        the seed.
+        """
+        generator = self._generator
+        if generator is None:
+            raise Unsupported("no model is loaded")
+
+        voiced = [speaker for speaker in request.speakers if speaker in request.voices]
+        order = voiced + [speaker for speaker in request.speakers if speaker not in request.voices]
+        tags = {speaker: f"[S{number}]" for number, speaker in enumerate(order, start=1)}
+        said = script(((turn.speaker, turn.text) for turn in request.turns), tags)
+        if not said:
+            raise BadRequest(
+                "nothing is left to say once Dia's own tags are removed; cues are written [laugh]"
+            )
+
+        dials = self.dials_for(request)
+        index = 0
+        if voiced:
+            prompt = self._voices(voiced, request.voices, tags)
+            rest = said
+        else:
+            first, rest = take(said, ANCHOR_CHARACTERS)
+            spoken = self._generate(generator, rendered(first), dials, request.seed, index, None)
+            yield from chunked_pcm(spoken.audio)
+            prompt = Prompt(audio=spoken.audio, text=rendered(first))
+            index += 1
+
+        for window in windows(rest, room(len(prompt.audio) / SAMPLE_RATE)):
+            spoken = self._generate(generator, rendered(window), dials, request.seed, index, prompt)
+            yield from chunked_pcm(spoken.audio)
+            index += 1
+
+    def _voices(self, voiced: list[str], voices: dict[str, str], tags: dict[str, str]) -> Prompt:
+        """Each voiced speaker's clip, one after another, and their transcripts under their tags."""
+        references = [load(self._clip(voices[speaker])) for speaker in voiced]
+        audio = np.concatenate([reference.audio for reference in references])
+        seconds = len(audio) / SAMPLE_RATE
+        # Refused rather than cut off: pieces beside a prompt this long would all run out mid-word.
+        most = GENERATION_SECONDS - SPARE_SECONDS - FEWEST_CHARACTERS / CHARACTERS_PER_SECOND
+        if seconds > most:
+            raise BadRequest(
+                f"these voices' clips come to {seconds:.1f} s, and Dia holds about "
+                f"{GENERATION_SECONDS:.0f} s with its prompt, which leaves no room to speak; clone from "
+                "5 to 10 s of each"
+            )
+        text = " ".join(
+            f"{tags[speaker]} {translate_cues(reference.transcript)}"
+            for speaker, reference in zip(voiced, references, strict=True)
+        )
+        return Prompt(audio=audio, text=text)
 
     def _generate(
         self,
         generator: Generator,
-        piece: str,
+        text: str,
         dials: dict[str, float],
         seed: int | None,
         index: int,
@@ -216,11 +293,11 @@ class DiaEngine(Engine):
             top_p=dials.get("topP", TOP_P_RANGE[2]),
             seed=None if seed is None else seed + index,
         )
-        spoken = generator.generate(line(piece), sampling, prompt)
+        spoken = generator.generate(text, sampling, prompt)
         if spoken.exhausted:
             # The model was still speaking when it ran out, so this piece ends mid-word, which is
             # what `room` exists to prevent and the evidence for tuning it.
-            self.log.warn("a segment ran out of positions", characters=len(piece))
+            self.log.warn("a segment ran out of positions", characters=len(text))
         return spoken
 
     def _cloned(self, voice: str) -> Prompt:
