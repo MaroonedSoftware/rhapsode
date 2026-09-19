@@ -58,6 +58,31 @@ describe('TryPanel', () => {
         expect(screen.queryByRole('slider')).not.toBeInTheDocument();
     });
 
+    it('offers cloning only on a variant that says it clones, with nothing loaded', async () => {
+        // Orpheus's shape if its base model cloned and its finetune did not: `current` is absent, so
+        // the variants are all the page has to go on. § 4.
+        api.engineCapabilities.mockResolvedValue({
+            status: 200,
+            data: {
+                ...capabilities,
+                variants: {
+                    turbo: { ...capabilities.variants.turbo!, cloning: { supported: false } },
+                    original: { ...capabilities.variants.original!, cloning: { supported: true } },
+                },
+            },
+        });
+        const user = setupUser();
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await screen.findByRole('button', { name: 'laugh' });
+        expect(screen.queryByText('Clone a voice')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('combobox', { name: 'Variant' }));
+        await user.click(await screen.findByRole('option', { name: 'original' }));
+
+        expect(await screen.findByText('Clone a voice')).toBeInTheDocument();
+    });
+
     it('trades cues for deliveries and dials when the variant changes', async () => {
         const user = setupUser();
         render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);

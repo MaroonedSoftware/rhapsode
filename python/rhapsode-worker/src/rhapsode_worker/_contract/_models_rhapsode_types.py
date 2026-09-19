@@ -157,6 +157,8 @@ class Variant(BaseModel):
     languages: list[str] | None = None
     # Overrides the engine's own ceiling for this build.
     max_characters: int | None = Field(alias="maxCharacters", default=None)
+    # Optional only because contract 1 shipped without it. § 4.
+    cloning: Cloning | None = None
 
 class EngineSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

@@ -947,6 +947,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "maxCharacters": {
                         "type": "integer",
                         "description": "Overrides the engine's own ceiling for this build."
+                    },
+                    "cloning": {
+                        "$ref": "#/components/schemas/Cloning",
+                        "description": "Optional only because contract 1 shipped without it. § 4."
                     }
                 },
                 "required": [

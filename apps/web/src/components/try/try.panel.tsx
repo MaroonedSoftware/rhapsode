@@ -16,7 +16,7 @@ import {
     Title,
 } from '@mantine/core';
 import { IconPlayerPlay } from '@tabler/icons-react';
-import type { EngineSpeakRequest, Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
+import type { CurrentVariant, EngineSpeakRequest, Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { speakBody, useCapabilities, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
@@ -54,7 +54,7 @@ export function TryPanel({ engine, defaultVariant }: TryPanelProps) {
             variants={variants}
             initial={initial}
             voices={voices.data ?? []}
-            referenceSeconds={capabilities.data.current?.cloning.referenceSeconds}
+            current={capabilities.data.current}
         />
     );
 }
@@ -64,10 +64,10 @@ interface ControlsProps {
     variants: Record<string, Variant>;
     initial: string;
     voices: Voice[];
-    referenceSeconds?: number[];
+    current?: CurrentVariant;
 }
 
-function Controls({ engine, variants, initial, voices, referenceSeconds }: ControlsProps) {
+function Controls({ engine, variants, initial, voices, current }: ControlsProps) {
     const speak = useSpeak();
     const [variant, setVariant] = useState(initial);
     const [voice, setVoice] = useState<string | undefined>(undefined);
@@ -82,6 +82,8 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
 
     const claims = variants[variant]!;
     const languages = claims.languages ?? [];
+    // A worker from before variants said whether they clone leaves it to `current`, when loaded. § 4.
+    const cloning = claims.cloning ?? current?.cloning;
 
     // The previous line's URL is released when it is replaced, and the last when the panel goes.
     useEffect(
@@ -276,7 +278,7 @@ function Controls({ engine, variants, initial, voices, referenceSeconds }: Contr
                     </Stack>
                 </Card>
             </SimpleGrid>
-            <VoicesCard engine={engine} voices={voices} referenceSeconds={referenceSeconds} onCloned={setVoice} />
+            <VoicesCard engine={engine} voices={voices} cloning={cloning} onCloned={setVoice} />
         </Stack>
     );
 }

@@ -203,7 +203,8 @@ GET /capabilities
     "nativeFormat": { "encoding": "pcm_s16le", "sampleRate": 24000, "channels": 1 }
   },
   "variants": {
-    "turbo":        { "cues": ["laugh", "..."], "deliveries": [], "dials": {} },
+    "turbo":        { "cues": ["laugh", "..."], "deliveries": [], "dials": {},
+                      "cloning": { "supported": true, "referenceSeconds": [5, 10] } },
     "original":     { "cues": [], "deliveries": ["hushed", "frantic"],
                       "dials": { "exaggeration": {"min":0,"max":2,"default":0.5},
                                  "cfgWeight":    {"min":0,"max":1,"default":0.5} } },
@@ -246,6 +247,15 @@ engine's default otherwise, then reads `variants[effective]`. That rule is total
 same answer as `current` in every case where `current` means anything. It also covers the case the
 two-level document exists for: a request that names a variant which is not the one loaded, where
 `current` describes weights that are about to be evicted.
+
+**Each variant says whether it clones**, as `cloning`, the same shape `current` carries. Cloning
+needs no model (§ 7), so whether it is offered cannot wait on one being resident: a client reading
+only `current` could not tell an engine that cannot clone from one that is idle, and offering a clone
+form that every submission fails is the first sign it would get. It is per variant rather than per
+engine because nothing makes it engine-wide: a build that conditions on reference audio and a build
+that only knows its trained speakers can be the same engine, as Orpheus's base model and its
+finetune are. `cloning` is optional, since contract 1 shipped without it; a reader that finds it
+absent does not know, and falls back to `current`, then to offering it and letting the worker refuse.
 
 ### `license` carries code and weights separately
 
