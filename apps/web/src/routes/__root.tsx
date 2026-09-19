@@ -39,6 +39,13 @@ export function RootLayout() {
                         >
                             Try it
                         </Button>
+                        <Button
+                            variant={pathname === '/reference' ? 'light' : 'subtle'}
+                            size="compact-sm"
+                            renderRoot={(props: object) => <Link to="/reference" {...props} />}
+                        >
+                            API
+                        </Button>
                     </Group>
                 </Group>
             </AppShell.Header>
