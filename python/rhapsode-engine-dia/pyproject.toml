@@ -11,6 +11,13 @@ license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "rhapsode-worker==0.1.2",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "numpy>=1.26",
+    # The model's code lives in transformers since 4.53. The floor is the release that renamed
+    # `torch_dtype` to `dtype`, which is what the backend passes; tested against 5.17.
+    "transformers>=4.56",
+    # torch's wheels carry their own CUDA.
+    "torch>=2.6",
+    "huggingface_hub>=0.23",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -27,6 +34,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 strict = true
 files = ["src"]
 
+[[tool.mypy.overrides]]
+module = ["torch.*", "transformers.*", "numpy.*", "huggingface_hub", "huggingface_hub.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts fakes where torch and transformers would be.
+pythonpath = ["tests"]
 timeout = 60
