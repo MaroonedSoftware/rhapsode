@@ -1,0 +1,127 @@
+name: release-pr
+
+# Keeps a "Release x.y.z" pull request open while main has changesets, and tags the release when
+# that pull request is merged, which is what release.yml publishes on. Merging it is the whole of
+# cutting a release.
+#
+# Through a GitHub App's token, not GITHUB_TOKEN, for two reasons. A pull request or tag pushed with
+# GITHUB_TOKEN starts no workflow, so the pull request would never get the ci-ok check main requires
+# and the tag would never publish. And the `release tags` ruleset lets only admins create v* tags,
+# so the app has to be on its bypass list. The app needs Contents and Pull requests, both write, on
+# this repository; its client ID goes in the RELEASE_APP_CLIENT_ID variable and a private key in the
+# RELEASE_APP_PRIVATE_KEY secret. Until the variable is set this does nothing, rather than failing
+# on every push to main.
+on:
+    push:
+        branches: [main]
+    workflow_dispatch:
+        inputs:
+            version:
+                description: The version to propose, such as 0.2.0. Empty keeps the one proposed already, or the next patch.
+                required: false
+                type: string
+
+concurrency:
+    group: release-pr
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    release-pr:
+        if: github.ref == 'refs/heads/main' && vars.RELEASE_APP_CLIENT_ID != ''
+        runs-on: ubuntu-latest
+        env:
+            BRANCH: release/next
+            REPO: ${{ github.repository }}
+        steps:
+            - id: app
+              uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+                  permission-pull-requests: write
+
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  # All of it: release.mjs orders the changelog by when each changeset was added.
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 22
+                  # No pnpm in this job. setup-node turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
+
+            # Commits and tags as the app, so they are attributed to it rather than to nobody.
+            - name: Identity
+              env:
+                  GH_TOKEN: ${{ steps.app.outputs.token }}
+                  SLUG: ${{ steps.app.outputs.app-slug }}
+              run: |
+                  id=$(gh api "/users/${SLUG}[bot]" --jq .id)
+                  git config user.name "${SLUG}[bot]"
+                  git config user.email "${id}+${SLUG}[bot]@users.noreply.github.com"
+
+            # A merged release pull request leaves main at a version with no tag. `check` and `notes`
+            # refuse anything release.mjs did not make: a version bumped by hand with no changelog
+            # section fails here, loudly, rather than publishing.
+            - name: Tag a merged release
+              env:
+                  GH_TOKEN: ${{ steps.app.outputs.token }}
+              run: |
+                  version=$(node scripts/release.mjs current)
+                  if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+                      echo "v$version is tagged already"
+                      exit 0
+                  fi
+                  node scripts/release.mjs check "v$version"
+                  node scripts/release.mjs notes "$version" >/dev/null
+                  git tag -a "v$version" -m "Release $version"
+                  git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "refs/tags/v$version"
+
+            # Rebuilt from main on every push, so it always releases exactly what main holds. The
+            # version it proposed survives the rebuild: without that, a push to main would turn a
+            # minor someone asked for back into a patch.
+            - name: Open or update the release pull request
+              env:
+                  GH_TOKEN: ${{ steps.app.outputs.token }}
+                  REQUESTED: ${{ inputs.version }}
+              run: |
+                  if [ "$(node scripts/release.mjs pending)" = 0 ]; then
+                      echo "no changesets, so there is nothing to release"
+                      exit 0
+                  fi
+                  proposed=""
+                  if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+                      git fetch -q origin "$BRANCH"
+                      proposed=$(git show FETCH_HEAD:packages/core/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+                  fi
+                  version=${REQUESTED:-$(node scripts/release.mjs next "$proposed")}
+
+                  git switch -q -C "$BRANCH"
+                  node scripts/release.mjs version "$version"
+                  git add -A
+                  git commit -q -m "Release $version"
+                  git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/$BRANCH"
+
+                  {
+                      echo "Merging this tags \`v$version\`, and the tag publishes it (\`release.yml\`)."
+                      echo
+                      echo "Every push to main rebuilds this branch from main. To release under another version, run the \`release-pr\` workflow with that version."
+                      echo
+                      echo "## $version"
+                      echo
+                      node scripts/release.mjs notes "$version"
+                  } > "$RUNNER_TEMP/body.md"
+
+                  number=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+                  if [ -z "$number" ]; then
+                      gh pr create --repo "$REPO" --base main --head "$BRANCH" --title "Release $version" --body-file "$RUNNER_TEMP/body.md"
+                  else
+                      gh pr edit "$number" --repo "$REPO" --title "Release $version" --body-file "$RUNNER_TEMP/body.md"
+                  fi
