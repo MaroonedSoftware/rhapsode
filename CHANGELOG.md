@@ -2,6 +2,15 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.4
+
+- `docs/openapi.yaml` describes the public API alone, and at the release version rather than `1.0.0`. It used to merge in the worker protocol, whose `/health` and `/speak` replaced the public ones: the document described a `/speak` that takes no `engine`. The worker protocol has its own document, `docs/openapi.worker.yaml`.
+- The core serves its public API as OpenAPI 3.1 at `GET /openapi.json`, open to every caller like `/health`, with `info.version` set to the running core's version. The client SDK gains `openapi()` to read it. Worker routes are never in it.
+- The web page has an **API** page listing every route the core answers, read from `GET /openapi.json`: parameters, request fields, every declared response, which routes are management routes, and the models they use. It is drawn from the running core, so it always matches the installed version.
+- **Try it** shows the request it sends as code, curl or the TypeScript SDK, under "As code", with a copy button. It is built from the same body the Speak button sends, so the copied call reproduces what was heard.
+- Each entry in a capability document's `variants` now says whether it clones, as `cloning`, the same shape `current` carries. Cloning needs no loaded model, so a client can now tell an engine that cannot clone from one that is idle. The field is optional, since contract 1 shipped without it, and the conformance suite checks that it matches what `POST /voices` actually does.
+- **Try it** offers the clone form only when the chosen variant says it can clone, so Orpheus, whose voices are names its finetune was trained on, no longer shows a form that every clip would fail. A worker too old to say still gets the form, and its refusal is shown as before.
+
 ## 0.1.3
 
 - `@maroonedsoftware/rhapsode-sdk` names its repository, which npm requires to accept its provenance. 0.1.2 was refused for want of it, so no 0.1.2 of the SDK exists on npm; the image and every other part of 0.1.2 were published.

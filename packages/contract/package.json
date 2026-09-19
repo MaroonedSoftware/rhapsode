@@ -1,6 +1,6 @@
 {
     "name": "@rhapsode/contract",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "private": true,
     "description": "The rhapsode contract: generated schemas and types, plus the standard cue and delivery vocabulary as pure functions.",
     "type": "module",
