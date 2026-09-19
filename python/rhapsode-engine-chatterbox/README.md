@@ -33,6 +33,29 @@ Measured on an Apple Silicon Mac (MPS), September 2026:
   `~/.cache/huggingface`. `turbo` is 3.8 GB, and all three variants together are 9.7 GB.
 - Loading `turbo` once it is cached takes about 10 s. A first `/speak` through the core (spawn, load,
   speak) took 17 s, and a warm one about 1 s for 2.4 s of audio.
+- `nano` is a 3.0 GB fetch, of which it loads 1.9 GB: upstream's loader also downloads a 1.06 GB
+  `s3gen.safetensors` that nano never reads.
+
+## Nano against turbo
+
+Measured through the adapter on an Apple M5 Pro, September 2026, pinned upstream commit `5de7a54`.
+One 98-character English line with a cue in it, about 5 to 6 s of audio. Each figure is the median of
+five warm runs after one discarded. "Realtime" is seconds of audio per second of wall clock.
+
+| build   | device | load     | stock voice   | cloned voice  |
+| ------- | ------ | -------- | ------------- | ------------- |
+| `nano`  | MPS    | 9 s      | 5.0x realtime | 3.7x realtime |
+| `turbo` | MPS    | 13 s     | 2.7x realtime | 1.3x realtime |
+| `nano`  | CPU    | 8–30 s   | 1.5–2.3x      | 0.9–1.4x      |
+| `turbo` | CPU    | 25 s     | 0.8x          | 0.9x          |
+
+The CPU rows are ranges because the machine was busy while they were taken (a load average of 9 to 14
+on 18 cores), and torch used 6 threads. Upstream says nano is 3x realtime on 8 CPU cores; it was
+not here. On a Mac, MPS is the device for either build.
+
+A cloned voice costs more than the stock one on every row because the reference clip is analysed
+again on every request, a second or more of each. Upstream's `generate` prepares the reference
+whenever it is handed a path, and this adapter hands it one each time.
 
 Apple Silicon works through MPS with no configuration. The residency figures in the protocol (memory
 stranded by an OOM, the share an unload reclaims) were measured on CUDA and are not verified on
