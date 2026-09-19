@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import sys
 import types
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -26,8 +27,18 @@ import numpy as np
 class _Build:
     def __init__(self, name: str) -> None:
         self.name = name
+        # Upstream's `conds`, which a clone overwrites and `generate` speaks from when handed no
+        # reference. A file name rather than a path, so the audio does not depend on a temp dir.
+        self.conds = "stock"
 
-    def generate(self, text: str, **arguments: Any) -> Any:
+    def prepare_conditionals(self, wav_fpath: str, exaggeration: float = 0.5, **options: Any) -> None:
+        del exaggeration, options
+        self.conds = f"cloned:{Path(wav_fpath).name}"
+
+    def generate(self, text: str, audio_prompt_path: str | None = None, **arguments: Any) -> Any:
+        if audio_prompt_path:
+            self.prepare_conditionals(audio_prompt_path)
+        arguments = {**arguments, "conds": self.conds}
         # hashlib, never hash(): a str's hash() is salted per process, so two requests that differ
         # collided mod 997 on roughly one hash seed in 600, and conformance, which compares a couple of
         # dozen such pairs, failed a CI run on 'delivery "frantic" changes the audio'. A stable digest

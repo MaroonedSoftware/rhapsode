@@ -134,6 +134,19 @@ class TestWhatReachesGenerate:
 
         assert chatterbox["turbo"].calls[-1].arguments["audio_prompt_path"].endswith("narrator.wav")
 
+    def test_no_voice_speaks_as_the_build_after_a_clone_has(self, chatterbox, tmp_path: Path) -> None:
+        # Upstream keeps one `conds` per model and a clone overwrites it, so every request without a
+        # voice after the first clone spoke as that clone. Measured on nano with seed 7: the stock
+        # line reproduced exactly until a clone ran, and never again after it.
+        (tmp_path / "narrator.wav").write_bytes(b"RIFF" + b"\0" * 64)
+        built = engine(tmp_path)
+        for name in ("turbo", "original"):
+            built.load(name)
+            built.variant = name
+            spoken(built, variant=name, voice="narrator")
+            spoken(built, variant=name)
+            assert chatterbox[name].calls[-1].conds == "stock"
+
     def test_a_voice_that_does_not_exist_is_refused_before_anything_is_generated(
         self, chatterbox, tmp_path: Path
     ) -> None:

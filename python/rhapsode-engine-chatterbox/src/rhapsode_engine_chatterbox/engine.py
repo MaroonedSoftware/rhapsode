@@ -72,6 +72,10 @@ class ChatterboxEngine(Engine):
     upstream_version = _installed_chatterbox()
 
     _model: Any = None
+    #: The build's own voice, as upstream loaded it from `conds.pt`. Upstream keeps one `conds` per
+    #: model and a clone overwrites it, so without this copy every request that named no voice after
+    #: the first clone spoke as that clone.
+    _stock: Any = None
 
     # ------------------------------------------------------------------ what this engine can do
 
@@ -107,6 +111,7 @@ class ChatterboxEngine(Engine):
         # onto the CPU with `device in ["cpu", "mps"]`, which a torch.device never satisfies, so on
         # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
         self._model = upstream.from_pretrained(device=self._torch_device(), **options)
+        self._stock = getattr(self._model, "conds", None)
         _float32_loudness(self._model)
 
     def fetch(self, variant: str) -> None:
@@ -132,6 +137,7 @@ class ChatterboxEngine(Engine):
         `terminate` as well and why a residency manager with only this verb slowly loses a card.
         """
         self._model = None
+        self._stock = None
         try:
             import torch
 
@@ -235,6 +241,8 @@ class ChatterboxEngine(Engine):
 
         variant = self.effective_variant(request.variant)
         arguments = self._arguments(request, variant)
+        if request.voice is None:
+            self._model.conds = self._stock
         waveform = self._model.generate(request.text, **arguments)
 
         yield from chunked_pcm(waveform, CHUNK_SAMPLES)

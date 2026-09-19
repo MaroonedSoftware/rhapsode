@@ -17,6 +17,7 @@ import sys
 import types
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -28,6 +29,8 @@ class Recorded:
 
     text: str
     arguments: dict[str, Any]
+    #: Whose voice the build was holding when it spoke: "stock", or "cloned:<file>".
+    conds: str = "stock"
 
 
 @dataclass
@@ -41,10 +44,26 @@ class StubBuild:
     #: varies with its input, because "did this cue reach the model" is only visible that way.
     fixed_length: bool = True
 
-    def generate(self, text: str, **arguments: Any) -> Any:
+    #: Upstream's `conds`: what the build speaks as when `generate` is handed no reference. It
+    #: starts as the build's own voice and a clone overwrites it, exactly as upstream's does.
+    conds: str = "stock"
+    #: Every reference upstream would have analysed, in order.
+    prepared: list[str] = field(default_factory=list)
+
+    def prepare_conditionals(self, wav_fpath: str, exaggeration: float = 0.5, **options: Any) -> None:
+        del exaggeration, options
+        self.prepared.append(wav_fpath)
+        self.conds = f"cloned:{Path(wav_fpath).name}"
+
+    def generate(self, text: str, audio_prompt_path: str | None = None, **arguments: Any) -> Any:
         import numpy as np
 
-        self.calls.append(Recorded(text=text, arguments=arguments))
+        if audio_prompt_path:
+            self.prepare_conditionals(audio_prompt_path)
+            arguments = {**arguments, "audio_prompt_path": audio_prompt_path}
+        self.calls.append(Recorded(text=text, arguments=arguments, conds=self.conds))
+        arguments = {**arguments, "conds": self.conds}
+        arguments.pop("audio_prompt_path", None)
         # Varies with everything it was given, which is what a real model does and what the
         # conformance suite needs in order to see that a cue reached it at all. It is not pretending
         # to be a model: the audio is a ramp, and only its length and pitch depend on the input.
