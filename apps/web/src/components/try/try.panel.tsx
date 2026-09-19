@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, Group, NumberInput, SegmentedControl, Select, SimpleGrid, Slider, Stack, Text, Textarea, Title } from '@mantine/core';
 import { IconPlayerPlay } from '@tabler/icons-react';
-import type { Variant, Voice } from '@rhapsode/sdk';
+import type { Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useCapabilities, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';

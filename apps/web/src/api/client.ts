@@ -1,4 +1,4 @@
-import { RhapsodeSdk } from '@rhapsode/sdk';
+import { RhapsodeSdk } from '@maroonedsoftware/rhapsode-sdk';
 
 /**
  * The page is served from the same origin as the core, through Vite's proxy in development and a

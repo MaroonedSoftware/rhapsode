@@ -1,4 +1,4 @@
-import type { FeedEvent } from '@rhapsode/sdk';
+import type { FeedEvent } from '@maroonedsoftware/rhapsode-sdk';
 
 /**
  * An EventSource that a test drives. jsdom has none, and a real one would need a server.

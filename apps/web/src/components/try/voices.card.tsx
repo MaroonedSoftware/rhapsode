@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconMicrophone, IconPlayerPlay, IconTrash, IconUpload } from '@tabler/icons-react';
-import type { Voice } from '@rhapsode/sdk';
+import type { Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { BASE_URL } from '../../api/client';
 import { useCloneVoice, useDeleteVoice } from '../../api/engines.queries';

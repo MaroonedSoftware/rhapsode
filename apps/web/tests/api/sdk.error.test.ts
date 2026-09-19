@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SdkError } from '@rhapsode/sdk';
+import { SdkError } from '@maroonedsoftware/rhapsode-sdk';
 
 import { ApiRefusal, apiErrorCode, apiErrorMessage, isUnreachable, unwrap } from '../../src/api/sdk.error';
 

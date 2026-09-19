@@ -1,5 +1,5 @@
 import { Badge, Group, Stack, Text, UnstyledButton } from '@mantine/core';
-import type { InstallJob } from '@rhapsode/sdk';
+import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { jobTitle } from './job.panel';
 import { jobBadge } from './job.state';

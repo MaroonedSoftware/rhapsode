@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Voice } from '@rhapsode/sdk';
+import type { Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { VoicesCard } from '../../../src/components/try/voices.card';
 import { render, screen, setupUser, waitFor, within } from '../../utils/render';

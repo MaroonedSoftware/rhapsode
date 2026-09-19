@@ -1,5 +1,5 @@
 {
-    "name": "@rhapsode/sdk",
+    "name": "@maroonedsoftware/rhapsode-sdk",
     "version": "0.1.0",
     "description": "A typed client for the rhapsode public API, generated from contracts/.",
     "type": "module",

@@ -645,7 +645,7 @@ is the specific future this section exists to prevent.
 ### Package versions are not the contract
 
 Every released package carries one version, and they release together. The server ships as a
-Docker image tagged with it, and `@rhapsode/sdk` is published to npm at it. The rest carry it
+Docker image tagged with it, and `@maroonedsoftware/rhapsode-sdk` is published to npm at it. The rest carry it
 without being published: the workspace packages (`@rhapsode/contract`, `@rhapsode/core` and
 `rhapsode`), because the core reads its own to pin engines, below, and the Python packages
 (`rhapsode-worker`, `rhapsode-conform` and every engine in the catalog), because every way to run the

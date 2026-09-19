@@ -1,4 +1,4 @@
-import { SdkError, type ErrorBody } from '@rhapsode/sdk';
+import { SdkError, type ErrorBody } from '@maroonedsoftware/rhapsode-sdk';
 
 /**
  * A refusal the core declared and explained: the protocol's envelope, carried as an error so a

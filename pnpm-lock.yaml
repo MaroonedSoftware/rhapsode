@@ -87,7 +87,7 @@ importers:
       '@mantine/notifications':
         specifier: ^9.5.1
         version: 9.6.1(@mantine/core@9.6.1(@mantine/hooks@9.6.1(react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@mantine/hooks@9.6.1(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@rhapsode/sdk':
+      '@maroonedsoftware/rhapsode-sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       '@tabler/icons-react':
