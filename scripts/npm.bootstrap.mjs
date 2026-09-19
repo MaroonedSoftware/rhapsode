@@ -71,7 +71,9 @@ for (const scope of scopes) {
         execFileSync('npm', ['org', 'ls', scope], { cwd: root, stdio: ['ignore', 'ignore', 'pipe'] });
     } catch (error) {
         if (String(error.stderr).includes('Scope not found'))
-            fail(`npm has no @${scope} scope. Create the organisation at https://www.npmjs.com/org/create (free plan, public packages), then re-run.`);
+            fail(
+                `npm has no @${scope} scope. Create the organisation at https://www.npmjs.com/org/create (free plan, public packages), then re-run.`,
+            );
         // Anything else (a non-member cannot list the org, say) is left for the publish to report.
     }
 }
