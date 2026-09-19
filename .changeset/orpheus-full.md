@@ -1,4 +1,0 @@
----
----
-
-`rhapsode-engine-orpheus` runs in the server image on an NVIDIA card. On Linux x86_64 the package installs vLLM rather than llama.cpp, which has no wheel there and needs a C++ compiler the image does not have, and serves the `full` build: the finetune unquantised, from unsloth's ungated bfloat16 copy, so no Hugging Face token is needed. Elsewhere it installs llama.cpp and serves `q8` and `q4` as before, and `[llama]` asks for them on a Linux box without an NVIDIA card. The worker lists only the builds its install can load, with `full` first where it can run, and has no fixed default. vLLM samples with PyTorch rather than FlashInfer, which needs nvcc, runs one sequence at a time, and claims 7 GiB of the card. Measured on an RTX 4070 Ti SUPER in the image: 1.05 times real time, first audio after 0.34 seconds, 7.5 GB of VRAM, and `rhapsode-conform` passes all 35 checks. `docs/protocol.md` § 4 now says a worker lists only the variants it can load.

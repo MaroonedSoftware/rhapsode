@@ -1,6 +1,6 @@
 {
     "name": "@rhapsode/sdk",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "description": "A typed client for the rhapsode public API, generated from contracts/.",
     "type": "module",
     "main": "./dist/index.js",
