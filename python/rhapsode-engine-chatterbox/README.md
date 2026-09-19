@@ -53,9 +53,13 @@ The CPU rows are ranges because the machine was busy while they were taken (a lo
 on 18 cores), and torch used 6 threads. Upstream says nano is 3x realtime on 8 CPU cores; it was
 not here. On a Mac, MPS is the device for either build.
 
-A cloned voice costs more than the stock one on every row because the reference clip is analysed
-again on every request, a second or more of each. Upstream's `generate` prepares the reference
-whenever it is handed a path, and this adapter hands it one each time.
+The cloned column was measured when every request analysed its reference clip again, a second or
+more of each, because upstream's `generate` does that whenever it is handed a path. The adapter now
+analyses a voice once per resident build and keeps the result, so only a voice's first request after
+a load pays for it. Afterwards a warm clone cost what the stock voice did: nano 3.6x realtime against
+3.6x, turbo 1.9x against 1.7x, taken once on a machine too busy for the absolute figures to stand
+beside the table's. An entry is 1.3 MB on nano and 0.8 MB on original, and the 32 most recently used
+voices are kept.
 
 Apple Silicon works through MPS with no configuration. The residency figures in the protocol (memory
 stranded by an OOM, the share an unload reclaims) were measured on CUDA and are not verified on
