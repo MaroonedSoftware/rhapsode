@@ -35,9 +35,11 @@ FROM node:${NODE_VERSION}-bookworm-slim AS server
 # gcc and libc6-dev because Triton, under vLLM, compiles a small C helper the first time a worker
 # launches a kernel, and without a C compiler Orpheus's `full` build failed every load with "Failed
 # to find C compiler". C only, and no CUDA toolkit: nothing here compiles C++ or CUDA. nginx for the
-# page and its proxy, which the entrypoint starts beside the server.
+# page and its proxy, which the entrypoint starts beside the server. git because pip clones any
+# dependency named by git+https: Chatterbox's upstream names its watermarker that way, and without
+# git every Chatterbox install failed with "Cannot find command 'git'", whatever the adapter pinned.
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates ffmpeg tini gcc libc6-dev nginx \
+    && apt-get install --yes --no-install-recommends ca-certificates ffmpeg tini gcc libc6-dev nginx git \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /usr/local/bin/uv
 

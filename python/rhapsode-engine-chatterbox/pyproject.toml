@@ -20,8 +20,10 @@ dependencies = [
     #
     # A commit on upstream's master rather than a release, because Nano (resemble-ai/chatterbox#542,
     # 2026-07-21) is in no release: PyPI's newest is 0.1.7 from March, and master still calls itself
-    # 0.1.7 too, so no version floor can tell the two apart. An archive rather than git+https, so the
-    # server image needs no git. Back to a plain version floor once upstream publishes one with Nano,
+    # 0.1.7 too, so no version floor can tell the two apart. An archive rather than git+https, though
+    # the image carries git anyway: upstream names its own watermarker, resemble-perth, by
+    # git+https at master, and pip cannot override one dependency's direct URL with another. Back to
+    # a plain version floor once upstream publishes one with Nano,
     # and until then this adapter cannot go to PyPI, which refuses a direct reference.
     "chatterbox-tts @ https://github.com/resemble-ai/chatterbox/archive/5de7a54aa4e5e2baadb0182dde554908b48b85c2.zip",
     # Upstream's watermarker (resemble-perth 1.0.1) imports pkg_resources, which setuptools 81

@@ -304,6 +304,10 @@ The image carries `gcc` for the same reason it carries no CUDA: vLLM, which Orph
 runs on, brings CUDA in its wheels, but Triton under it compiles a small C helper at run time and
 fails every load without a C compiler. It is C only; nothing in the image compiles C++ or CUDA.
 
+It carries `git` too, because pip clones any dependency named by `git+https`. Chatterbox's upstream
+names its watermarker that way, so without git every Chatterbox install failed before downloading
+anything.
+
 Measured on an RTX 4070 Ti SUPER through `compose.gpu.yaml`: installing Chatterbox took 93 seconds
 and 6.2 GB in `/data`, the first `turbo` sentence 50 seconds while 3.8 GB of weights arrived, and
 the next 0.45 seconds, holding 3.1 GB of VRAM. After the containers were replaced, the first
