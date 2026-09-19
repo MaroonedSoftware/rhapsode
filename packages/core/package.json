@@ -1,6 +1,6 @@
 {
     "name": "@rhapsode/core",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "private": true,
     "description": "Routing, worker supervision and model residency. Never imports torch and holds no engine knowledge.",
     "type": "module",
