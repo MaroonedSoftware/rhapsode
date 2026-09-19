@@ -25,6 +25,9 @@ jobs:
             - uses: actions/setup-node@v5
               with:
                   node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
             - run: node scripts/release.mjs check "$GITHUB_REF_NAME"
 
     build:
@@ -55,6 +58,9 @@ jobs:
             - uses: actions/setup-node@v5
               with:
                   node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
 
             # The generated contract code is committed, so a plain build of each directory is the
             # whole package. --strict because PyPI renders what twine would only warn about.
@@ -181,6 +187,9 @@ jobs:
             - uses: actions/setup-node@v5
               with:
                   node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
             - name: Release notes, from CHANGELOG.md
               env:
                   GH_TOKEN: ${{ github.token }}
