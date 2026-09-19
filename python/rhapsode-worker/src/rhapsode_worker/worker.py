@@ -71,7 +71,9 @@ class Worker:
             "device": engine.device.document(),
             # On every variant as well as `current`, because cloning needs no model and a client
             # must be able to tell an engine that cannot clone from one that is idle. protocol.md § 4.
-            "variants": {name: {**variant.document(), "cloning": cloning} for name, variant in variants.items()},
+            "variants": {
+                name: {**variant.document(), "cloning": cloning} for name, variant in variants.items()
+            },
             "formats": encoding.available_formats(),
         }
 

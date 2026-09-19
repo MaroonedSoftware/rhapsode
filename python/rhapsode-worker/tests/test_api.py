@@ -88,9 +88,8 @@ class TestCapabilities:
                 handshake=(handshake := await_handshake(process)),
                 base_url=url_for(handshake),
             )
-            assert all(
-                variant["cloning"]["supported"] is False for variant in get(other, "/capabilities")["variants"].values()
-            )
+            variants = get(other, "/capabilities")["variants"].values()
+            assert all(variant["cloning"]["supported"] is False for variant in variants)
             post(other, "/load", {})
             assert get(other, "/capabilities")["current"]["cloning"]["supported"] is False
         finally:
