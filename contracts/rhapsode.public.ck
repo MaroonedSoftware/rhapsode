@@ -135,6 +135,35 @@ operation /speak: {
     }
 }
 
+operation /engines/{engine}/dialogue: {
+    params: {
+        engine: string
+    }
+    post: {
+        # A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per
+        # turn, the ceiling is the sum of every turn's text, and one that does not declare it is
+        # unsupported. Hand-written: ContractKit cannot express a streamed body.
+        sdk: dialogue
+        request: {
+            application/json: DialogueRequest
+        }
+        response: {
+            200: {
+                audio/wav: binary
+                audio/mpeg: binary
+                audio/opus: binary
+                audio/flac: binary
+                audio/L16: binary
+            }
+            400: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
+            429: { application/json: ErrorBody }
+            503: { application/json: ErrorBody }
+        }
+    }
+}
+
 ############################################################################################
 # Managing engines. protocol.md § 10. Everything below except /catalog answers loopback callers,
 # or a bearer token when one is configured, and nobody else.

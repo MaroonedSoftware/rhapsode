@@ -9,7 +9,16 @@ from pathlib import Path
 from typing import Any
 
 from . import encoding
-from .engine import CreateVoiceRequest, Engine, SpeakRequest, Voice, check_voice_id
+from .engine import (
+    CreateVoiceRequest,
+    DialogueRequest,
+    DialogueTurn,
+    Engine,
+    SpeakRequest,
+    Variant,
+    Voice,
+    check_voice_id,
+)
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
@@ -64,7 +73,7 @@ class Worker:
             },
             "license": _license_document(engine.license),
             "device": engine.device.document(),
-            "variants": {name: variant.document() for name, variant in variants.items()},
+            "variants": {name: self._variant_document(variant) for name, variant in variants.items()},
             "formats": encoding.available_formats(),
         }
 
@@ -74,7 +83,7 @@ class Worker:
             resident = variants[engine.variant]
             reference = engine.reference_seconds()
             document["current"] = {
-                **resident.document(),
+                **self._variant_document(resident),
                 "variant": engine.variant,
                 "maxCharacters": resident.max_characters or engine.max_characters,
                 "cloning": {
@@ -88,6 +97,14 @@ class Worker:
                     "channels": engine.native_format.channels,
                 },
             }
+        return document
+
+    def _variant_document(self, variant: Variant) -> dict[str, Any]:
+        """A variant as the capability document shows it, with `dialogue` wherever the engine
+        overrides it and nowhere else, so a client knows before it asks. protocol.md § 4."""
+        document = variant.document()
+        if self.engine.supports_dialogue:
+            document["dialogue"] = {"maxSpeakers": self.engine.max_speakers}
         return document
 
     def voices(self) -> list[dict[str, Any]]:
@@ -235,6 +252,71 @@ class Worker:
         if len(text) > ceiling:
             raise BadRequest(f"`text` is {len(text)} characters and this variant accepts {ceiling}")
 
+        fmt, language, params, seed, stream = self._shared(body, variant_key, variant)
+
+        delivery = _optional_str(body, "delivery")
+        if delivery is not None and delivery not in variant.deliveries:
+            # The core drops a delivery the variant did not claim before dispatch, so reaching here
+            # means somebody is talking to the worker directly. Say so rather than ignoring it.
+            raise Unsupported(
+                f'variant "{variant_key}" does not perform "{delivery}"; '
+                f"it performs {sorted(variant.deliveries) or 'nothing'}"
+            )
+
+        return SpeakRequest(
+            text=text,
+            voice=_voice(body),
+            variant=variant_name,
+            format=fmt,
+            language=language,
+            delivery=delivery,
+            params=params,
+            seed=seed,
+            stream=stream,
+        )
+
+    def validate_dialogue(self, body: dict[str, Any]) -> DialogueRequest:
+        """`validate` for a conversation: the same checks, and the ones only a conversation has.
+        protocol.md § 6."""
+        if not isinstance(body, dict):
+            raise BadRequest("the body must be a JSON object")
+        if not self.engine.supports_dialogue:
+            raise Unsupported(f'engine "{self.engine.id}" does not speak dialogue')
+
+        turns = _turns(body.get("turns"))
+        variant_name = _optional_str(body, "variant")
+        variant_key = self.engine.effective_variant(variant_name)
+        variant = self.engine.variants()[variant_key]
+
+        speakers = tuple(dict.fromkeys(turn.speaker for turn in turns))
+        if len(speakers) > self.engine.max_speakers:
+            raise Unsupported(
+                f"this dialogue has {len(speakers)} speakers and this engine takes {self.engine.max_speakers}"
+            )
+
+        # One take, so one budget: splitting it into turns does not buy a longer one.
+        ceiling = variant.max_characters or self.engine.max_characters
+        length = sum(len(turn.text) for turn in turns)
+        if length > ceiling:
+            raise BadRequest(f"the turns come to {length} characters and this variant accepts {ceiling}")
+
+        voices = _dialogue_voices(body.get("voices"), speakers)
+        fmt, language, params, seed, stream = self._shared(body, variant_key, variant)
+        return DialogueRequest(
+            turns=turns,
+            voices=voices,
+            variant=variant_name,
+            format=fmt,
+            language=language,
+            params=params,
+            seed=seed,
+            stream=stream,
+        )
+
+    def _shared(
+        self, body: dict[str, Any], variant_key: str, variant: Variant
+    ) -> tuple[str, str, dict[str, float], int | None, bool]:
+        """What `/speak` and `/dialogue` check alike: format, language, dials, seed and stream."""
         fmt = _optional_str(body, "format") or "wav"
         if fmt not in encoding.FORMATS:
             raise Unsupported(f'no format "{fmt}"; this contract has {sorted(encoding.FORMATS)}')
@@ -252,15 +334,6 @@ class Worker:
                 f"{', '.join(variant.languages) or 'nothing it declared'}"
             )
 
-        delivery = _optional_str(body, "delivery")
-        if delivery is not None and delivery not in variant.deliveries:
-            # The core drops a delivery the variant did not claim before dispatch, so reaching here
-            # means somebody is talking to the worker directly. Say so rather than ignoring it.
-            raise Unsupported(
-                f'variant "{variant_key}" does not perform "{delivery}"; '
-                f"it performs {sorted(variant.deliveries) or 'nothing'}"
-            )
-
         params = _validate_params(body.get("params"), variant.dials, variant_key)
 
         seed = body.get("seed")
@@ -271,20 +344,12 @@ class Worker:
         if not isinstance(stream, bool):
             raise BadRequest("`stream` must be a boolean")
 
-        return SpeakRequest(
-            text=text,
-            voice=_voice(body),
-            variant=variant_name,
-            format=fmt,
-            language=language,
-            delivery=delivery,
-            params=params,
-            seed=seed,
-            stream=stream,
-        )
+        return fmt, language, params, seed, stream
 
-    def pcm(self, request: SpeakRequest) -> Iterator[bytes]:
+    def pcm(self, request: SpeakRequest | DialogueRequest) -> Iterator[bytes]:
         """The adapter's own output, still in its native format."""
+        if isinstance(request, DialogueRequest):
+            return self.engine.dialogue(request)
         return self.engine.speak(request)
 
     def slots(self) -> asyncio.Semaphore:
@@ -359,6 +424,41 @@ def _validate_params(
 
 
 __all__ = ["SUPPORTED_CONTRACTS", "Worker", "WorkerError"]
+
+
+def _turns(value: Any) -> tuple[DialogueTurn, ...]:
+    if not isinstance(value, list) or not value:
+        raise BadRequest("`turns` is required and must be a non-empty list")
+    turns: list[DialogueTurn] = []
+    for index, turn in enumerate(value):
+        if not isinstance(turn, dict):
+            raise BadRequest(f"turn {index} must be an object")
+        speaker, text = turn.get("speaker"), turn.get("text")
+        if not isinstance(speaker, str) or not speaker:
+            raise BadRequest(f"turn {index} needs a `speaker`, a non-empty string")
+        if not isinstance(text, str) or not text:
+            raise BadRequest(f"turn {index} needs `text`, a non-empty string")
+        turns.append(DialogueTurn(speaker=speaker, text=text))
+    return tuple(turns)
+
+
+def _dialogue_voices(value: Any, speakers: tuple[str, ...]) -> dict[str, str]:
+    """Speaker label to voice id. A label no turn uses is refused rather than ignored, because the
+    likeliest reason for one is a typo that would otherwise read that speaker in a voice nobody chose."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise BadRequest("`voices` must be an object of speaker to voice id")
+    voices: dict[str, str] = {}
+    for speaker, voice in value.items():
+        if speaker not in speakers:
+            raise BadRequest(
+                f'`voices` names "{speaker}", who has no turn; the speakers are {list(speakers)}'
+            )
+        if not isinstance(voice, str):
+            raise BadRequest(f'the voice for "{speaker}" must be a string')
+        voices[speaker] = check_voice_id(voice)
+    return voices
 
 
 def _voice(body: dict[str, Any]) -> str | None:

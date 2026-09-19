@@ -145,8 +145,17 @@ export class WorkerClient {
      * can fail cleanly has already done so. § 6.
      */
     async speak(body: unknown, signal: AbortSignal): Promise<SpokenResponse> {
+        return this.spoken('/speak', body, signal);
+    }
+
+    /** A conversation in one take, answered exactly as `speak` is. § 6. */
+    async dialogue(body: unknown, signal: AbortSignal): Promise<SpokenResponse> {
+        return this.spoken('/dialogue', body, signal);
+    }
+
+    private async spoken(path: '/speak' | '/dialogue', body: unknown, signal: AbortSignal): Promise<SpokenResponse> {
         const response = await this.pool.request({
-            path: '/speak',
+            path,
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(body),

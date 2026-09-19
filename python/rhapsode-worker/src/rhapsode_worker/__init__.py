@@ -7,6 +7,8 @@ in. See `docs/protocol.md` § 8.
 from .engine import (
     CreateVoiceRequest,
     Device,
+    DialogueRequest,
+    DialogueTurn,
     Engine,
     NativeFormat,
     SpeakRequest,
@@ -34,6 +36,8 @@ __all__ = [
     "BadRequest",
     "CreateVoiceRequest",
     "Device",
+    "DialogueRequest",
+    "DialogueTurn",
     "Engine",
     "Internal",
     "Log",

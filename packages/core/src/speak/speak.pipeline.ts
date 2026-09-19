@@ -3,12 +3,20 @@ import { pipeline } from 'node:stream/promises';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Logger } from '@maroonedsoftware/logger';
 
-import { assertWithinCeiling, effectiveVariant, MIN_PLAUSIBLE_AUDIO_BYTES, performable, type Claims } from '@rhapsode/contract';
+import {
+    assertWithinCeiling,
+    effectiveVariant,
+    MIN_PLAUSIBLE_AUDIO_BYTES,
+    performable,
+    performableDialogue,
+    type Claims,
+    type Turn,
+} from '@rhapsode/contract';
 
 import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
 import { ResidencyManager } from '../residency/residency.manager.js';
-import { DURATION_HEADER, type SpokenResponse } from '../workers/worker.client.js';
+import { DURATION_HEADER, type SpokenResponse, type WorkerClient } from '../workers/worker.client.js';
 import { WorkerRegistry } from '../workers/worker.registry.js';
 import { audioFloor, ShortAudioError } from './audio.floor.js';
 
@@ -23,6 +31,19 @@ export interface NativeSpeak {
     format?: string;
     language?: string;
     delivery?: string;
+    params?: Record<string, number>;
+    seed?: number;
+    stream: boolean;
+}
+
+/** A native dialogue request. § 6. `/speak`'s fields except `text`, `voice` and `delivery`. */
+export interface NativeDialogue {
+    engine: string;
+    turns: Turn[];
+    voices?: Record<string, string>;
+    variant?: string;
+    format?: string;
+    language?: string;
     params?: Record<string, number>;
     seed?: number;
     stream: boolean;
@@ -57,26 +78,10 @@ export async function speakThrough(
     options: SpeakOptions = {},
 ): Promise<FastifyReply> {
     const engines = request.container.get(EngineRegistry);
-    const workers = request.container.get(WorkerRegistry);
-    const residency = request.container.get(ResidencyManager);
-    // Resolved before streaming, because ServerKit disposes the request scope when reply.raw
-    // closes, not on onResponse. A container.get() inside a stream callback throws.
-    const logger = request.container.get(Logger);
-
-    const engineId = native.engine;
-    if (!engines.has(engineId)) throw RhapsodeError.unknownEngine(engineId, engines.ids());
+    // An unknown engine before empty text, so a request wrong in both ways hears the first thing to fix.
+    if (!engines.has(native.engine)) throw RhapsodeError.unknownEngine(native.engine, engines.ids());
     if (native.text.length === 0) throw new RhapsodeError('bad_request', '`text` is required and must be a non-empty string');
-
-    // Bringing the process up is cheap and tells us what this engine can do. Loading a model is
-    // not, and happens under the residency lease below.
-    const client = await workers.client(engineId);
-    const capabilities = await client.capabilities();
-
-    const variant = effectiveVariant(native.variant, capabilities.variants, {
-        loaded: capabilities.current?.variant,
-        fallback: engines.entry(engineId)?.defaultVariant,
-    });
-    const claims = capabilities.variants[variant] as Claims;
+    const { engineId, client, variant, claims, logger } = await resolve(request, native.engine, native.variant);
 
     options.refine?.(claims, variant);
     assertWithinCeiling(native.text, claims, DEFAULT_MAX_CHARACTERS);
@@ -91,6 +96,89 @@ export async function speakThrough(
         });
     }
 
+    return deliver(request, reply, { engineId, variant, stream: native.stream, logger }, signal =>
+        client.speak(
+            {
+                text: ready.text,
+                variant,
+                format: native.format,
+                language: native.language,
+                voice: native.voice,
+                delivery: ready.delivery,
+                params: ready.params,
+                seed: native.seed,
+                stream: native.stream,
+            },
+            signal,
+        ),
+    );
+}
+
+/**
+ * A conversation in one take, through its engine, answered exactly as `speakThrough` answers. § 6.
+ *
+ * Only what differs is here: the variant must declare `dialogue`, cues come out of each turn, and the
+ * ceiling is the sum of every turn. The lease, the floor and failing after the headers are
+ * `deliver`'s, so they cannot come to disagree with `/speak`'s.
+ */
+export async function dialogueThrough(request: FastifyRequest, reply: FastifyReply, native: NativeDialogue): Promise<FastifyReply> {
+    const { engineId, client, variant, claims, logger } = await resolve(request, native.engine, native.variant);
+    const ready = performableDialogue({ turns: native.turns, params: native.params }, claims, variant, DEFAULT_MAX_CHARACTERS);
+
+    if (ready.dropped.cues.length > 0) {
+        logger.debug('made the dialogue performable', { engine: engineId, variant, droppedCues: ready.dropped.cues });
+    }
+
+    return deliver(request, reply, { engineId, variant, stream: native.stream, logger }, signal =>
+        client.dialogue(
+            {
+                turns: ready.turns,
+                ...(native.voices === undefined ? {} : { voices: native.voices }),
+                variant,
+                format: native.format,
+                language: native.language,
+                params: ready.params,
+                seed: native.seed,
+                stream: native.stream,
+            },
+            signal,
+        ),
+    );
+}
+
+/** The engine, its worker, and the variant this request is about, before anything is committed. */
+async function resolve(request: FastifyRequest, engineId: string, requested: string | undefined) {
+    const engines = request.container.get(EngineRegistry);
+    const workers = request.container.get(WorkerRegistry);
+    // Resolved before streaming, because ServerKit disposes the request scope when reply.raw
+    // closes, not on onResponse. A container.get() inside a stream callback throws.
+    const logger = request.container.get(Logger);
+
+    if (!engines.has(engineId)) throw RhapsodeError.unknownEngine(engineId, engines.ids());
+
+    // Bringing the process up is cheap and tells us what this engine can do. Loading a model is
+    // not, and happens under the residency lease in `deliver`.
+    const client: WorkerClient = await workers.client(engineId);
+    const capabilities = await client.capabilities();
+
+    const variant = effectiveVariant(requested, capabilities.variants, {
+        loaded: capabilities.current?.variant,
+        fallback: engines.entry(engineId)?.defaultVariant,
+    });
+    return { engineId, client, variant, claims: capabilities.variants[variant] as Claims, logger };
+}
+
+/**
+ * Everything after the request has been made performable, which speaking and dialogue do alike:
+ * the lease, stopping when the client goes, and the answer, buffered or streamed.
+ */
+async function deliver(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    { engineId, variant, stream, logger }: { engineId: string; variant: string; stream: boolean; logger: Logger },
+    ask: (signal: AbortSignal) => Promise<SpokenResponse>,
+): Promise<FastifyReply> {
+    const residency = request.container.get(ResidencyManager);
     const lease = await residency.acquire(engineId, variant);
 
     // One controller for both ways a synthesis should stop early: the client going away, and
@@ -103,27 +191,14 @@ export async function speakThrough(
 
     let upstream;
     try {
-        upstream = await client.speak(
-            {
-                text: ready.text,
-                variant,
-                format: native.format,
-                language: native.language,
-                voice: native.voice,
-                delivery: ready.delivery,
-                params: ready.params,
-                seed: native.seed,
-                stream: native.stream,
-            },
-            clientGone.signal,
-        );
+        upstream = await ask(clientGone.signal);
     } catch (error) {
         settled = true;
         lease.release();
         throw error;
     }
 
-    if (!native.stream) {
+    if (!stream) {
         try {
             return await sendBuffered(reply, upstream);
         } finally {
@@ -160,7 +235,7 @@ export async function speakThrough(
         // short, silent file, which is precisely the bug § 6 exists to prevent. pipeline has
         // already destroyed the destination; this is for the paths where it has not.
         if (!raw.destroyed) raw.destroy();
-        logger.error('speak failed after the headers went out', { engine: engineId, variant, error });
+        logger.error('audio failed after the headers went out', { engine: engineId, variant, error });
     } finally {
         settled = true;
         lease.release();

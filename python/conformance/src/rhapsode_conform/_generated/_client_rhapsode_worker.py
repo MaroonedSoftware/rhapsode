@@ -5,7 +5,7 @@ from urllib.parse import quote
 from typing import Any, Literal, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
-from ._models_rhapsode_types import Capabilities, CreateVoiceForm, ErrorBody, FetchRequest, LoadRequest, SpeakRequest, Voice, WorkerHealth
+from ._models_rhapsode_types import Capabilities, CreateVoiceForm, DialogueRequest, ErrorBody, FetchRequest, LoadRequest, SpeakRequest, Voice, WorkerHealth
 
 
 class WorkerCreateVoice201Response(TypedDict):
@@ -136,6 +136,42 @@ class WorkerSpeak503Response(TypedDict):
     data: ErrorBody
 
 
+class WorkerDialogue200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["audio/wav", "audio/mpeg", "audio/opus", "audio/flac", "audio/l16"]
+    data: bytes
+
+
+class WorkerDialogue400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerDialogue404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerDialogue422Response(TypedDict):
+    status: Literal[422]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerDialogue429Response(TypedDict):
+    status: Literal[429]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WorkerDialogue503Response(TypedDict):
+    status: Literal[503]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 _WORKER_VOICES_RESPONSE: TypeAdapter[list[Voice]] = TypeAdapter(list[Voice])
 
 
@@ -223,6 +259,31 @@ class RhapsodeWorkerClient(BaseClient):
         Loads on demand. It does not fail with \"no model loaded\" and does not require /load first.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/speak", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 422:
+            return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 429:
+            return { "status": 429, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 503:
+            return { "status": 503, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _content_type == "audio/mpeg":
+            return { "status": 200, "content_type": "audio/mpeg", "data": result }
+        if _content_type == "audio/opus":
+            return { "status": 200, "content_type": "audio/opus", "data": result }
+        if _content_type == "audio/flac":
+            return { "status": 200, "content_type": "audio/flac", "data": result }
+        if _content_type == "audio/l16":
+            return { "status": 200, "content_type": "audio/l16", "data": result }
+        return { "status": 200, "content_type": "audio/wav", "data": result }
+
+    async def worker_dialogue(self, body: DialogueRequest) -> WorkerDialogue200Response | WorkerDialogue400Response | WorkerDialogue404Response | WorkerDialogue422Response | WorkerDialogue429Response | WorkerDialogue503Response:
+        """
+        A conversation in one take, where the effective variant declares `dialogue`. Loads on
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full("/dialogue", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:

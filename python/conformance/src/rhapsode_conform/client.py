@@ -86,6 +86,10 @@ class Worker:
         response = self._client.post("/speak", json=body)
         return response.status_code, response.content
 
+    def dialogue(self, body: dict[str, Any]) -> tuple[int, bytes]:
+        response = self._client.post("/dialogue", json=body)
+        return response.status_code, response.content
+
     def speak_with_headers(self, body: dict[str, Any]) -> tuple[int, bytes, dict[str, str]]:
         response = self._client.post("/speak", json=body)
         return response.status_code, response.content, dict(response.headers)

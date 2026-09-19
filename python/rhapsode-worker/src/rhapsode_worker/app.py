@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from . import encoding, streaming, trailers
-from .engine import CreateVoiceRequest, check_voice_id
+from .engine import CreateVoiceRequest, DialogueRequest, SpeakRequest, check_voice_id
 from .errors import BadRequest, WorkerError, classify
 from .worker import Worker
 
@@ -120,7 +120,19 @@ def create_app(worker: Worker) -> Starlette:
     async def speak(request: Request) -> Response:
         worker.reject_if_draining()
         _check_disconnect_assumption(request, worker)
-        spoken = worker.validate(await _json_body(request))
+        return await answer(worker.validate(await _json_body(request)))
+
+    async def dialogue(request: Request) -> Response:
+        # Refused before the body is read by an engine without it, so an old client that sends a
+        # conversation to the wrong engine hears why rather than a validation error about its turns.
+        worker.reject_if_draining()
+        _check_disconnect_assumption(request, worker)
+        return await answer(worker.validate_dialogue(await _json_body(request)))
+
+    async def answer(spoken: SpeakRequest | DialogueRequest) -> Response:
+        """Everything after validation, which `/speak` and `/dialogue` do identically: load on demand,
+        hold a slot for as long as the audio lasts, and fail with a status for as long as one can
+        still be sent. protocol.md § 6."""
         await worker.ensure_loaded(spoken.variant)
 
         native = worker.engine.native_format
@@ -217,6 +229,7 @@ def create_app(worker: Worker) -> Starlette:
             Route("/terminate", terminate, methods=["POST"]),
             Route("/fetch", fetch, methods=["POST"]),
             Route("/speak", speak, methods=["POST"]),
+            Route("/dialogue", dialogue, methods=["POST"]),
         ],
         exception_handlers={Exception: on_worker_error, WorkerError: on_worker_error},
     )

@@ -12,7 +12,7 @@ options {
 #
 # Note what is NOT generated from these declarations: a router. `/speak` streams, ContractKit has no
 # way to say so, and a generated handler would assign a materialized value to the body, which for a
-# five-minute synthesis means buffering it. Both `/speak` routes are hand-written. What the
+# five-minute synthesis means buffering it. Both `/speak` routes, and both `/dialogue` routes, are hand-written. What the
 # declarations are for is the request schemas, the error envelope, the OpenAPI document, and the
 # Python client the conformance suite drives a worker with.
 
@@ -142,6 +142,31 @@ operation /speak: {
         sdk: workerSpeak
         request: {
             application/json: SpeakRequest
+        }
+        response: {
+            200: {
+                audio/wav: binary
+                audio/mpeg: binary
+                audio/opus: binary
+                audio/flac: binary
+                audio/L16: binary
+            }
+            400: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
+            429: { application/json: ErrorBody }
+            503: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /dialogue: {
+    post: {
+        # A conversation in one take, where the effective variant declares `dialogue`. Loads on
+        # demand like /speak, and hand-written on both sides for the same reason.
+        sdk: workerDialogue
+        request: {
+            application/json: DialogueRequest
         }
         response: {
             200: {

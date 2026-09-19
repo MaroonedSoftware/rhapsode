@@ -4,6 +4,7 @@ import type {
     Capabilities,
     CatalogEntry,
     CoreHealth,
+    DialogueRequest,
     EngineSpeakRequest,
     EngineSummary,
     ErrorBody,
@@ -149,6 +150,44 @@ export class PublicClient {
         | { status: 503; contentType: 'application/json'; data: ErrorBody }
     > {
         const result = await this.fetch(`/speak`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body, bigIntReplacer),
+            expectStatuses: [400, 404, 422, 429, 503],
+        });
+        switch (result.status) {
+            case 400:
+                return { status: 400, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 404:
+                return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 422:
+                return { status: 422, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 429:
+                return { status: 429, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 503:
+                return { status: 503, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return {
+                    status: 200,
+                    contentType: readContentType(result) as 'audio/wav' | 'audio/mpeg' | 'audio/opus' | 'audio/flac' | 'audio/l16',
+                    data: await result.blob(),
+                };
+        }
+    }
+
+    /** @description A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per */
+    async dialogue(
+        engine: string,
+        body: DialogueRequest,
+    ): Promise<
+        | { status: 200; contentType: 'audio/wav' | 'audio/mpeg' | 'audio/opus' | 'audio/flac' | 'audio/l16'; data: Blob }
+        | { status: 400; contentType: 'application/json'; data: ErrorBody }
+        | { status: 404; contentType: 'application/json'; data: ErrorBody }
+        | { status: 422; contentType: 'application/json'; data: ErrorBody }
+        | { status: 429; contentType: 'application/json'; data: ErrorBody }
+        | { status: 503; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/dialogue`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body, bigIntReplacer),

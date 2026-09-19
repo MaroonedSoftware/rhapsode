@@ -12,6 +12,12 @@ class Dial(BaseModel):
     # What the engine uses when the request says nothing.
     default: float
 
+# A build that speaks a conversation in one pass. protocol.md § 6.
+class Dialogue(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    max_speakers: int = Field(alias="maxSpeakers")
+
 class Cloning(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -92,6 +98,11 @@ class SpeakRequest(BaseModel):
     seed: int | None = None
     stream: bool | None = None
 
+# One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
+class DialogueTurn(BaseModel):
+    speaker: str
+    text: str
+
 class LoadRequest(BaseModel):
     variant: str | None = None
 
@@ -159,6 +170,8 @@ class Variant(BaseModel):
     languages: list[str] | None = None
     # Overrides the engine's own ceiling for this build.
     max_characters: int | None = Field(alias="maxCharacters", default=None)
+    # Present only where this build answers /dialogue. § 6.
+    dialogue: Dialogue | None = None
 
 class EngineSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -189,6 +202,19 @@ class CatalogEntry(BaseModel):
 
 class EngineSpeakRequest(SpeakRequest):
     engine: str
+
+# A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
+# `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
+class DialogueRequest(BaseModel):
+    turns: list[DialogueTurn]
+    # Speaker label to voice id.
+    voices: dict[str, str] | None = None
+    variant: str | None = None
+    format: Literal["wav", "mp3", "opus", "flac", "pcm"] | None = None
+    language: str | None = None
+    params: dict[str, float] | None = None
+    seed: int | None = None
+    stream: bool | None = None
 
 class ErrorBody(BaseModel):
     error: ErrorDetail

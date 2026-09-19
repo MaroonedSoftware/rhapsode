@@ -24,6 +24,7 @@ import { engineDetailRoutes } from './registry/engine.detail.routes.js';
 import { enginesRoutes } from './registry/engine.routes.js';
 import { residencyModule } from './residency/residency.module.js';
 import { openaiRoutes } from './openai/openai.routes.js';
+import { dialogueRoutes } from './speak/dialogue.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
 import { workerModule } from './workers/worker.module.js';
 import type { RhapsodeConfig } from './config.js';
@@ -78,6 +79,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         { plugin: enginesRoutes },
         { plugin: engineDetailRoutes },
         { plugin: speakRoutes },
+        { plugin: dialogueRoutes },
         // OpenAI's speech route, translated into the one above. § 11.
         { plugin: openaiRoutes },
         { plugin: catalogRoutes },

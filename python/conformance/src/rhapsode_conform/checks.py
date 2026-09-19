@@ -598,6 +598,90 @@ def _cloning(worker: Worker, report: Report, status: int, created: Any) -> None:
     )
 
 
+# --------------------------------------------------------------------------- dialogue
+
+
+#: Two people, three turns, so a speaker returns and has to sound like themselves again.
+DIALOGUE_TURNS = [
+    {"speaker": "a", "text": "Did you hear that?"},
+    {"speaker": "b", "text": "It is only the cat."},
+    {"speaker": "a", "text": "It is never only the cat."},
+]
+
+
+@check
+def dialogue_is_declared_where_it_is_answered(worker: Worker, report: Report) -> None:
+    """§ 4 and § 6. Optional, and declared: a variant that says nothing about it is refused as
+    unsupported, and one that declares it is held to all of it.
+    """
+    declaring = {name: claims for name, claims in _variants(worker).items() if claims.get("dialogue")}
+    if not declaring:
+        status, body = worker.dialogue({"turns": DIALOGUE_TURNS, "stream": False})
+        report.record(
+            "dialogue is declared, or refused as unsupported",
+            "§ 6",
+            (status, _error_of(body).get("code")) == (422, "unsupported"),
+            "not offered" if status == 422 else f"status {status} from an engine that declares none",
+        )
+        return
+
+    for variant, claims in declaring.items():
+        _dialogue(worker, report, variant, claims["dialogue"])
+
+
+def _dialogue(worker: Worker, report: Report, variant: str, declared: dict[str, Any]) -> None:
+    common = {"variant": variant, "format": "wav", "stream": False}
+
+    status, audio = worker.dialogue({**common, "turns": DIALOGUE_TURNS, "seed": SEED})
+    report.record(
+        f'a dialogue speaks on variant "{variant}"',
+        "§ 6",
+        status == 200 and len(audio) >= MIN_PLAUSIBLE_AUDIO_BYTES,
+        f"status {status}, {len(audio)} bytes",
+    )
+    if report.reproducible.get(variant, False):
+        again = worker.dialogue({**common, "turns": DIALOGUE_TURNS, "seed": SEED})[1]
+        report.record(f'a seed reproduces a dialogue on variant "{variant}"', "§ 6", audio == again)
+
+    most = declared.get("maxSpeakers")
+    if isinstance(most, int):
+        crowd = [{"speaker": f"s{index}", "text": "Me too."} for index in range(most + 1)]
+        status, body = worker.dialogue({**common, "turns": crowd})
+        report.record(
+            f'more than {most} speakers is refused as unsupported on variant "{variant}"',
+            "§ 6",
+            (status, _error_of(body).get("code")) == (422, "unsupported"),
+            f"status {status}",
+        )
+
+    status, body = worker.dialogue({**common, "turns": DIALOGUE_TURNS, "voices": {"z": "anyone"}})
+    report.record(
+        f'a voice for a speaker with no turn is refused on variant "{variant}"',
+        "§ 6",
+        (status, _error_of(body).get("code")) == (400, "bad_request"),
+        f"status {status}",
+    )
+
+    status, body = worker.dialogue({**common, "turns": DIALOGUE_TURNS, "voices": {"a": "no_such_voice_x"}})
+    report.record(
+        f'an unknown voice in a dialogue is unknown_voice on variant "{variant}"',
+        "§ 7",
+        (status, _error_of(body).get("code")) == (404, "unknown_voice"),
+        f"status {status}",
+    )
+
+    _, capabilities = worker.get("/capabilities")
+    ceiling = (capabilities.get("current") or {}).get("maxCharacters")
+    if isinstance(ceiling, int):
+        # Each turn under the ceiling, together over it: one take is one budget.
+        half = "x" * (ceiling // 2 + 1)
+        turns = [{"speaker": "a", "text": half}, {"speaker": "b", "text": half}]
+        status, _ = worker.dialogue({**common, "turns": turns})
+        report.record(
+            f'a dialogue past maxCharacters in total is refused on variant "{variant}"', "§ 6", status == 400
+        )
+
+
 def _reference_wav(hz: float, seconds: float = 6.0, rate: int = 24_000) -> bytes:
     """Six seconds of a tone, inside every engine's usable reference range and unlike the other one."""
     import math
