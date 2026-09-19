@@ -523,6 +523,11 @@ def a_voice_id_that_is_not_a_name_is_refused(worker: Worker, report: Report) -> 
 #: An id the suite owns, so a clone it leaves behind after a crash is recognisable and harmless.
 CLONE_ID = "rhapsode_conform_clone"
 
+#: Sent with every clone. The reference is a tone and says nothing, but an engine that clones by
+#: continuing from the clip refuses a create without words, and one that does not read them ignores
+#: them, so the suite always sends some. § 7.
+CLONE_TRANSCRIPT = "A steady tone, held for six seconds."
+
 
 @check
 def cloning_round_trips(worker: Worker, report: Report) -> None:
@@ -531,7 +536,7 @@ def cloning_round_trips(worker: Worker, report: Report) -> None:
     Optional, so an engine that answers the create with `unsupported` conforms and the rest is not
     asked. One that accepts it is held to all of it.
     """
-    status, created = worker.create_voice(CLONE_ID, _reference_wav(220.0))
+    status, created = worker.create_voice(CLONE_ID, _reference_wav(220.0), transcript=CLONE_TRANSCRIPT)
     if status == 422 and _error_code(created) == "unsupported":
         report.record("cloning is offered, or refused as unsupported", "§ 7", True, "not offered")
         return
@@ -568,7 +573,7 @@ def _cloning(worker: Worker, report: Report, status: int, created: Any) -> None:
         f"status {status}",
     )
 
-    status, again = worker.create_voice(CLONE_ID, _reference_wav(330.0))
+    status, again = worker.create_voice(CLONE_ID, _reference_wav(330.0), transcript=CLONE_TRANSCRIPT)
     before = created.get("spec")
     after = again.get("spec") if isinstance(again, dict) else None
     report.record(

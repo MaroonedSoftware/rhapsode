@@ -71,6 +71,22 @@ describe('VoicesCard', () => {
         expect(form.get('id')).toBe('announcer');
         expect(form.get('label')).toBe('The Announcer');
         expect((form.get('reference') as File).name).toBe('clip.wav');
+        expect(form.has('transcript')).toBe(false);
+    });
+
+    it('sends the words spoken in the clip when they are given', async () => {
+        const user = setupUser();
+        api.createVoice.mockResolvedValue({ status: 201, data: { id: 'announcer', label: 'Announcer', spec: 'announcer@1.6b:ab12' } });
+        render(<VoicesCard engine="dia" voices={[]} onCloned={() => {}} />);
+
+        await user.upload(fileInput(), clip());
+        await user.type(screen.getByRole('textbox', { name: 'Id' }), 'announcer');
+        await user.type(screen.getByRole('textbox', { name: /Transcript/ }), '  Hello, this is how I sound.  ');
+        await user.click(screen.getByRole('button', { name: 'Clone' }));
+
+        await waitFor(() => expect(api.createVoice).toHaveBeenCalled());
+        const [, form] = api.createVoice.mock.calls[0]! as [string, FormData];
+        expect(form.get('transcript')).toBe('Hello, this is how I sound.');
     });
 
     it('refuses an id the server would refuse, before uploading anything', async () => {

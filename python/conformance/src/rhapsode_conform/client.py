@@ -60,11 +60,16 @@ class Worker:
         return response.status_code, _decode(response)
 
     def create_voice(
-        self, voice_id: str, reference: bytes, filename: str = "reference.wav"
+        self,
+        voice_id: str,
+        reference: bytes,
+        filename: str = "reference.wav",
+        transcript: str | None = None,
     ) -> tuple[int, Any]:
+        fields = {"id": voice_id} | ({} if transcript is None else {"transcript": transcript})
         response = self._client.post(
             "/voices",
-            data={"id": voice_id},
+            data=fields,
             files={"reference": (filename, reference, "audio/wav")},
         )
         return response.status_code, _decode(response)

@@ -48,12 +48,16 @@ def create_app(worker: Worker) -> Starlette:
         if not isinstance(voice_id, str) or not voice_id:
             raise BadRequest("`id` is required")
         label = form.get("label")
+        transcript = form.get("transcript")
         document = await worker.create_voice(
             CreateVoiceRequest(
                 id=voice_id,
                 reference=await reference.read(),
                 label=label if isinstance(label, str) else None,
                 filename=reference.filename,
+                # Blank is absent, because a form field left empty arrives as "" and an engine that
+                # needs the words should be able to refuse a create that gave none.
+                transcript=transcript.strip() or None if isinstance(transcript, str) else None,
             )
         )
         return JSONResponse(document, status_code=201)

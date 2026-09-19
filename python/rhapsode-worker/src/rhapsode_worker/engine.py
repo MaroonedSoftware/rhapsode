@@ -123,6 +123,10 @@ class CreateVoiceRequest:
     reference: bytes
     label: str | None = None
     filename: str | None = None
+    #: The words spoken in the reference, when the client sent them. An engine that clones by
+    #: continuing from the clip needs them and refuses a create without them as `BadRequest`, naming
+    #: the field; one that does not read them ignores them. protocol.md § 7.
+    transcript: str | None = None
 
 
 @dataclass(frozen=True)

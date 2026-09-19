@@ -74,6 +74,8 @@ class CreateVoiceForm(BaseModel):
     id: str
     label: str | None = None
     reference: bytes
+    # The words spoken in the reference. Required by an engine that continues from it.
+    transcript: str | None = None
 
 class SpeakRequest(BaseModel):
     text: str

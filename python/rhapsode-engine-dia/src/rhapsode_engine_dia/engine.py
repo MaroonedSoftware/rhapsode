@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any, ClassVar
 
-from rhapsode_worker import Engine, NativeFormat, SpeakRequest, UnknownVoice, Unsupported, Variant, Voice
+from rhapsode_worker import (
+    CreateVoiceRequest,
+    Engine,
+    NativeFormat,
+    SpeakRequest,
+    UnknownVoice,
+    Unsupported,
+    Variant,
+    Voice,
+)
 from rhapsode_worker.engine import Device
 
 from .backends import Generator, Prompt, Sampling, TransformersDia
@@ -23,6 +33,7 @@ from .builds import (
     variants,
 )
 from .prompt import line, segments, translate_cues
+from .voices import REFERENCE_SECONDS, clips, digest, load, remove, store
 
 #: The Descript codec's rate. Every generation is 44.1 kHz mono.
 SAMPLE_RATE = 44_100
@@ -122,9 +133,29 @@ class DiaEngine(Engine):
     # ------------------------------------------------------------------ voices
 
     def voices(self) -> list[Voice]:
-        """None of its own. Dia was not finetuned on any voice, so a request naming none is read in
-        whichever voice the model picks, which a seed fixes."""
-        return []
+        """Only what was cloned. Dia was not finetuned on any voice, so a request naming none is read
+        in whichever voice the model picks, which a seed fixes."""
+        return [self._voice(clip) for clip in clips(self.voice_dir)]
+
+    def create_voice(self, request: CreateVoiceRequest) -> Voice:
+        """Keep the clip at the model's rate, and the words spoken in it, which Dia cannot clone without."""
+        return self._voice(store(self.voice_dir, request))
+
+    def delete_voice(self, voice_id: str) -> None:
+        remove(self._clip(voice_id))
+
+    def reference_seconds(self) -> tuple[float, float] | None:
+        return REFERENCE_SECONDS
+
+    def _voice(self, clip: Path) -> Voice:
+        return Voice(
+            id=clip.stem,
+            label=load(clip).label,
+            description="Cloned from a reference and its transcript",
+            # The clip and its words, and the resident build. protocol.md § 7.
+            spec=f"{clip.stem}@{self.variant or self.default_variant}:{digest(clip)}",
+            tags=("cloned",),
+        )
 
     # ------------------------------------------------------------------ speaking
 
@@ -136,7 +167,8 @@ class DiaEngine(Engine):
         audio prompt "you will get different voices every time you run the model", which in one
         request would be a different reader every 17 seconds. So every segment after the first
         continues from the first: its audio and its words are the prompt, and the voice the model
-        picked for it is the voice of the whole request.
+        picked for it is the voice of the whole request. A cloned voice is a prompt already, its clip
+        and transcript, and every segment continues from that instead.
 
         Each segment's seed is the request's plus its index, so the whole request reproduces and no
         two segments are sampled alike.
@@ -144,11 +176,10 @@ class DiaEngine(Engine):
         generator = self._generator
         if generator is None:
             raise Unsupported("no model is loaded")
-        if request.voice is not None:
-            raise UnknownVoice(f'no voice "{request.voice}"; this engine has none of its own')
+        anchor = None if request.voice is None else self._cloned(request.voice)
+        cloned = anchor is not None
 
         dials = self.dials_for(request)
-        anchor: Prompt | None = None
         for index, segment in enumerate(segments(translate_cues(request.text))):
             text = line(segment)
             sampling = Sampling(
@@ -163,8 +194,21 @@ class DiaEngine(Engine):
                 # what SEGMENT_CHARACTERS exists to prevent, and the evidence for tuning it.
                 self.log.warn("a segment ran out of positions", characters=len(segment))
             yield from chunked_pcm(spoken.audio)
-            if anchor is None:
+            if not cloned and anchor is None:
                 anchor = Prompt(audio=spoken.audio, text=text)
+
+    def _cloned(self, voice: str) -> Prompt:
+        """A cloned voice as the prompt it continues from, or `unknown_voice` and never a substitute."""
+        reference = load(self._clip(voice))
+        return Prompt(audio=reference.audio, text=line(translate_cues(reference.transcript)))
+
+    def _clip(self, voice: str) -> Path:
+        """The voice's clip. `path_for` checks the id and the directory, and answers with whichever file
+        has the stem first, which is the `.json` beside it, so the clip is found from that."""
+        clip = self.path_for(voice).with_suffix(".wav")
+        if not (clip.is_file() and clip.with_suffix(".json").is_file()):
+            raise UnknownVoice(f'no voice "{voice}"; this engine has only what was cloned')
+        return clip
 
 
 def chunked_pcm(waveform: Any, chunk_samples: int = CHUNK_SAMPLES) -> Iterator[bytes]:

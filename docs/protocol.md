@@ -485,9 +485,18 @@ Cloning, where the engine supports it:
 ```http
 POST /engines/{engine}/voices          (worker: POST /voices)
 Content-Type: multipart/form-data
-  id=narrator_03  label="Narrator 03"  reference=@clip.wav
+  id=narrator_03  label="Narrator 03"  reference=@clip.wav  transcript="What the clip says."
 DELETE /engines/{engine}/voices/{id}   (worker: DELETE /voices/{id})
 ```
+
+`transcript` is optional: the words spoken in the reference. An engine that clones by continuing
+from the clip, as Dia does, has to be told what was said in it as well as how it sounded, and one
+that is given the wrong words clones worse without any error, so there is nothing to infer it from
+safely. Such an engine refuses a create without one as `bad_request`, naming the field; the capability
+document has no way to say in advance that a transcript is needed, and a refusal naming the field is
+the whole of the discovery. An engine that does not read it ignores it, which is the one exception to
+unknown input being refused: every client can send it to every engine, so a client does not have to
+know which engine reads it.
 
 The answer to a create is the new voice, as `GET /voices` would list it. Creating an id that exists
 replaces it, which is how a voice is re-recorded; its `spec` changes, so a cached preview does too.

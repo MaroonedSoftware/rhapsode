@@ -106,6 +106,7 @@ contract CreateVoiceForm: {
     id: string
     label?: string
     reference: binary
+    transcript?: string     # The words spoken in the reference. Required by an engine that continues from it.
 }
 
 ############################################################################################

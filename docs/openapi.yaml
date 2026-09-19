@@ -934,6 +934,9 @@ components:
                 reference:
                     type: string
                     format: binary
+                transcript:
+                    type: string
+                    description: 'The words spoken in the reference. Required by an engine that continues from it.'
             required: [id, reference]
         SpeakRequest:
             type: object

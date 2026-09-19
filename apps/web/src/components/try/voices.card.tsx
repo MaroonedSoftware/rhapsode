@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconMicrophone, IconPlayerPlay, IconTrash, IconUpload } from '@tabler/icons-react';
 import type { Voice } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -30,6 +30,7 @@ export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: Voice
     const remove = useDeleteVoice(engine);
     const [id, setId] = useState('');
     const [label, setLabel] = useState('');
+    const [transcript, setTranscript] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [playing, setPlaying] = useState<string | undefined>(undefined);
     const [removing, setRemoving] = useState<Voice | undefined>(undefined);
@@ -41,13 +42,14 @@ export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: Voice
     const submit = () => {
         if (file === null || idError || fileError || id === '') return;
         clone.mutate(
-            { id, label, reference: file },
+            { id, label, reference: file, transcript },
             {
                 onSuccess: voice => {
                     notifySuccess(`${voice.label} was cloned.`);
                     onCloned(voice.id);
                     setId('');
                     setLabel('');
+                    setTranscript('');
                     setFile(null);
                 },
             },
@@ -149,6 +151,17 @@ export function VoicesCard({ engine, voices, referenceSeconds, onCloned }: Voice
                         />
                         <TextInput label="Label" placeholder="Narrator 03" value={label} onChange={event => setLabel(event.currentTarget.value)} />
                     </Group>
+                    {/* Always offered, since the capability document cannot say which engines need it,
+                        and sent to every engine, since one that does not read it ignores it. § 7. */}
+                    <Textarea
+                        label="Transcript"
+                        description="What is said in the clip, word for word. Some engines need it to clone."
+                        placeholder="Hello, this is how I sound."
+                        autosize
+                        minRows={2}
+                        value={transcript}
+                        onChange={event => setTranscript(event.currentTarget.value)}
+                    />
                     {clone.isError ? (
                         <ErrorAlert title="That voice was not cloned" error={clone.error} fallback="The server did not answer." />
                     ) : undefined}

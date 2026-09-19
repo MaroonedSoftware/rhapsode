@@ -18,6 +18,9 @@ dependencies = [
     # torch's wheels carry their own CUDA.
     "torch>=2.6",
     "huggingface_hub>=0.23",
+    # Reads a reference clip in any of the four formats a clone accepts. 0.12 is the first whose
+    # wheels carry a libsndfile that reads MP3.
+    "soundfile>=0.12",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -35,7 +38,7 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "transformers.*", "numpy.*", "huggingface_hub", "huggingface_hub.*"]
+module = ["torch.*", "transformers.*", "numpy.*", "huggingface_hub", "huggingface_hub.*", "soundfile"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

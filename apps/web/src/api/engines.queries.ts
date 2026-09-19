@@ -63,6 +63,8 @@ export interface CloneRequest {
     id: string;
     label?: string;
     reference: File;
+    /** The words spoken in the clip. An engine that clones by continuing from it needs them. § 7. */
+    transcript?: string;
 }
 
 /**
@@ -72,10 +74,11 @@ export interface CloneRequest {
 export function useCloneVoice(engine: string) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ id, label, reference }: CloneRequest) => {
+        mutationFn: async ({ id, label, reference, transcript }: CloneRequest) => {
             const form = new FormData();
             form.set('id', id);
             if (label !== undefined && label !== '') form.set('label', label);
+            if (transcript !== undefined && transcript.trim() !== '') form.set('transcript', transcript.trim());
             form.set('reference', reference, reference.name);
             return unwrap<Voice>(await sdk.public.createVoice(engine, form));
         },

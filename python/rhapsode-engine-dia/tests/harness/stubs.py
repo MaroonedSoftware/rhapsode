@@ -21,6 +21,7 @@ import hashlib
 import random
 import sys
 import types
+import wave
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -221,7 +222,28 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
     hub.snapshot_download = snapshot_download  # type: ignore[attr-defined]
 
-    return {"torch": torch, "transformers": transformers, "huggingface_hub": hub}
+    return {
+        "torch": torch,
+        "transformers": transformers,
+        "huggingface_hub": hub,
+        "soundfile": soundfile_module(),
+    }
+
+
+def soundfile_module() -> types.ModuleType:
+    """soundfile, for WAV only, through the standard library. Anything else is unreadable, as a file
+    libsndfile could not decode is."""
+    soundfile = types.ModuleType("soundfile")
+
+    def read(source: Any, dtype: str = "float64", always_2d: bool = False) -> tuple[np.ndarray, int]:
+        with wave.open(source, "rb") as clip:
+            channels, rate = clip.getnchannels(), clip.getframerate()
+            pcm = np.frombuffer(clip.readframes(clip.getnframes()), dtype="<i2")
+        audio = (pcm.astype(dtype) / 32768.0).reshape(-1, channels)
+        return (audio if always_2d or channels > 1 else audio[:, 0]), rate
+
+    soundfile.read = read  # type: ignore[attr-defined]
+    return soundfile
 
 
 def install(recorder: Recorder | None = None) -> Recorder:

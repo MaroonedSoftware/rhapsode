@@ -93,10 +93,12 @@ export interface CreateVoiceForm {
     id: string;
     label?: string;
     reference: Blob;
+    /** The words spoken in the reference. Required by an engine that continues from it. */
+    transcript?: string;
 }
 
 /**
- * generated from [SpeakRequest](../../../../../../contracts/rhapsode.types.ck#L115)
+ * generated from [SpeakRequest](../../../../../../contracts/rhapsode.types.ck#L116)
  */
 export interface SpeakRequest {
     text: string;
@@ -115,7 +117,7 @@ export interface SpeakRequest {
 }
 
 /**
- * generated from [LoadRequest](../../../../../../contracts/rhapsode.types.ck#L131)
+ * generated from [LoadRequest](../../../../../../contracts/rhapsode.types.ck#L132)
  */
 export interface LoadRequest {
     variant?: string;
@@ -124,7 +126,7 @@ export interface LoadRequest {
 /**
  * Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
  * not loaded yet. protocol.md § 8.
- * generated from [FetchRequest](../../../../../../contracts/rhapsode.types.ck#L137)
+ * generated from [FetchRequest](../../../../../../contracts/rhapsode.types.ck#L138)
  */
 export interface FetchRequest {
     variant: string;
@@ -135,7 +137,7 @@ export interface FetchRequest {
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../../../contracts/rhapsode.types.ck#L149)
+ * generated from [ErrorDetail](../../../../../../contracts/rhapsode.types.ck#L150)
  */
 export interface ErrorDetail {
     /**
@@ -160,7 +162,7 @@ export interface ErrorDetail {
 }
 
 /**
- * generated from [WorkerHealth](../../../../../../contracts/rhapsode.types.ck#L167)
+ * generated from [WorkerHealth](../../../../../../contracts/rhapsode.types.ck#L168)
  */
 export interface WorkerHealth {
     process: 'up' | 'draining';
@@ -171,7 +173,7 @@ export interface WorkerHealth {
 }
 
 /**
- * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L186)
+ * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L187)
  */
 export interface ResidencySummary {
     resident: number;
@@ -182,7 +184,7 @@ export interface ResidencySummary {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L229)
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L230)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -192,7 +194,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L235)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L236)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -221,7 +223,7 @@ export interface Variant {
 }
 
 /**
- * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L175)
+ * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L176)
  */
 export interface EngineSummary {
     id: string;
@@ -237,7 +239,7 @@ export interface EngineSummary {
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L206)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L207)
  */
 export interface CatalogEntry {
     id: string;
@@ -252,21 +254,21 @@ export interface CatalogEntry {
 }
 
 /**
- * generated from [EngineSpeakRequest](../../../../../../contracts/rhapsode.types.ck#L127)
+ * generated from [EngineSpeakRequest](../../../../../../contracts/rhapsode.types.ck#L128)
  */
 export interface EngineSpeakRequest extends SpeakRequest {
     engine: string;
 }
 
 /**
- * generated from [ErrorBody](../../../../../../contracts/rhapsode.types.ck#L159)
+ * generated from [ErrorBody](../../../../../../contracts/rhapsode.types.ck#L160)
  */
 export interface ErrorBody {
     error: ErrorDetail;
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L216)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L217)
  */
 export interface InstallJob {
     id: string;
@@ -285,7 +287,7 @@ export interface InstallJob {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L242)
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L243)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -315,7 +317,7 @@ export interface CurrentVariant extends Variant {
 }
 
 /**
- * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L193)
+ * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L194)
  */
 export interface CoreHealth {
     contract: number;
