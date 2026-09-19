@@ -2,6 +2,15 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.1
+
+- `rhapsode-engine-chatterbox` installs upstream from commit `5de7a54` on resemble-ai/chatterbox's master instead of from PyPI's 0.1.7, because Nano is in no release yet. `turbo`, `original` and `multilingual` load, speak and clone on MPS against it unchanged. An install behind a TLS-intercepting proxy now needs `github.com,codeload.github.com` in `RHAPSODE_PIP_TRUSTED_HOSTS`, and the adapter cannot be published to PyPI until upstream releases, since PyPI refuses a direct reference.
+- `rhapsode-engine-chatterbox` has a fourth build, `nano`: Resemble's 110M-parameter Chatterbox Nano, loaded through upstream's turbo class with `nano=True`. It performs the same eight cues as `turbo`, has no dials, speaks English, and clones from a reference clip. Its weights are a 3.0 GB fetch from `ResembleAI/chatterbox-nano`, of which 1.9 GB is what it loads. `turbo` stays the default.
+- `rhapsode-engine-chatterbox`'s README says what `nano` costs against `turbo`, measured on an Apple M5 Pro: on MPS, 5.0x realtime against 2.7x for the stock voice and 3.7x against 1.3x for a clone.
+- `rhapsode-engine-chatterbox`: a request that names no voice speaks as the build's own voice again after a clone has run. Upstream keeps one set of voice conditionals per model and a clone overwrites it, so every voiceless request after the first clone spoke as that clone.
+- `rhapsode-engine-chatterbox` analyses a cloned voice's reference clip once per resident build and keeps the result, instead of on every request. A warm clone now costs what the stock voice does. Re-recording a voice, changing its file on disk, or loading another build analyses it again, and the 32 most recently used voices are kept, about 1.3 MB each.
+- The client SDK is published as `@maroonedsoftware/rhapsode-sdk`, under the organisation that already publishes ServerKit. `@rhapsode/sdk` never reached npm: nobody owns the `@rhapsode` scope there. Import from the new name.
+
 ## 0.1.0
 
 - `pnpm wizard setup` takes a fresh checkout to a running server: it syncs the Python venv (offering to retry trusting PyPI when a TLS-intercepting proxy breaks pip), builds, writes `rhapsode.config.json` for the tone engine and runs the conformance suite. `pnpm wizard doctor` checks Node, pnpm, Python, the venv, the build, the config, every local engine's venv, the server port and ffmpeg, and `--fix` repairs the venv, the build and a missing config.

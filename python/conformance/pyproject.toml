@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-conform"
-version = "0.1.0"
+version = "0.1.1"
 description = "Point it at a worker and it says whether that worker is one."
 readme = "README.md"
 license = "MIT"
