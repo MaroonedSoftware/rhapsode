@@ -47,6 +47,21 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'https://github.com/resemble-ai/chatterbox',
         },
     },
+    dia: {
+        displayName: 'Dia',
+        module: 'rhapsode_engine_dia',
+        package: 'rhapsode-engine-dia',
+        // The one build, named for its size so that Dia2's can sit beside it.
+        defaultVariant: '1.6b',
+        license: {
+            code: 'Apache-2.0',
+            weights: 'Apache-2.0',
+            weightsCommercialUse: true,
+            // Upstream's README forbids imitating a real person without consent, and deception, in a
+            // section it calls a disclaimer rather than a licence term. Here it is read before install.
+            notes: 'https://huggingface.co/nari-labs/Dia-1.6B-0626, run through transformers. Upstream asks that it not be used to imitate a real person without consent or to deceive.',
+        },
+    },
     kokoro: {
         displayName: 'Kokoro',
         module: 'rhapsode_engine_kokoro',

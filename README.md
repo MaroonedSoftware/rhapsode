@@ -187,6 +187,11 @@ cues, seven of the eight, and the first that streams audio while the model is st
 `pnpm wizard install orpheus` works the same way, and its `q8` build is 3.5 GB with no account
 needed to download it.
 
+[`rhapsode-engine-dia`](python/rhapsode-engine-dia/) is Nari Labs' Dia, which performs all eight
+cues and clones from a clip and the words spoken in it. It wants an NVIDIA card: on a Mac it runs at
+about a tenth of real time, which is enough to hear it and not enough to use it. Its weights are
+6.7 GB.
+
 ## Contributing an engine
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write
