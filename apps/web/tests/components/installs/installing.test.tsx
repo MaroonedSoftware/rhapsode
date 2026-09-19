@@ -66,9 +66,10 @@ describe('installing from the page', () => {
         await user.click(await screen.findByRole('button', { name: 'Install' }));
         const dialog = await screen.findByRole('dialog');
         expect(within(dialog).getByText(/Weights/)).toBeInTheDocument();
+        await user.click(within(dialog).getByRole('checkbox', { name: 'Download the turbo weights too' }));
         await user.click(within(dialog).getByRole('button', { name: 'Install under these licences' }));
 
-        expect(api.installEngine).toHaveBeenCalledWith('chatterbox');
+        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', undefined);
         expect(await screen.findByText('Installing chatterbox')).toBeInTheDocument();
         await waitFor(() => expect(FakeEventSource.latest().url).toBe('/api/installs/j1/events'));
 
@@ -88,6 +89,48 @@ describe('installing from the page', () => {
         expect(await screen.findByText('chatterbox is ready.', { exact: false })).toBeInTheDocument();
         expect(stream.closed).toBe(true);
         expect(await screen.findByRole('button', { name: 'Uninstall' })).toBeInTheDocument();
+    });
+
+    it('downloads the default weights in the same job unless told not to, and shows it as a fifth step', async () => {
+        const user = setupUser();
+        api.installEngine.mockImplementation(async () => {
+            jobs = [job({ variant: 'turbo', step: 'weights' })];
+            return { status: 202, data: jobs[0] };
+        });
+        render(<CatalogPage />);
+
+        await user.click(await screen.findByRole('button', { name: 'Install' }));
+        const dialog = await screen.findByRole('dialog');
+        expect(within(dialog).getByRole('checkbox', { name: 'Download the turbo weights too' })).toBeChecked();
+        await user.click(within(dialog).getByRole('button', { name: 'Install under these licences' }));
+
+        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', { pull: 'turbo' });
+        expect(await screen.findByText('Weights')).toBeInTheDocument();
+
+        jobs = [job({ variant: 'turbo', step: 'weights', state: 'succeeded' })];
+        act(() => {
+            FakeEventSource.latest().emit({
+                kind: 'progress',
+                correlationId: 'j1',
+                progress: { phase: 'weights', index: 5, total: 5, status: 'done' },
+            });
+        });
+        expect(await screen.findByText(/with the turbo weights on this machine/)).toBeInTheDocument();
+    });
+
+    it('says the engine is installed when only its download failed', async () => {
+        jobs = [
+            job({
+                variant: 'turbo',
+                state: 'failed',
+                step: 'weights',
+                error: { code: 'model_unavailable', message: 'the worker did not answer POST /fetch', retryable: true },
+            }),
+        ];
+        render(<CatalogPage />);
+
+        expect(await screen.findByText('Failed at weights')).toBeInTheDocument();
+        expect(screen.getByText(/chatterbox is installed; download the weights again from its card/)).toBeInTheDocument();
     });
 
     it('shows the core’s own reason when a job fails', async () => {

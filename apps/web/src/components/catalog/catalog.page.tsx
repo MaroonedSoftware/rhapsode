@@ -37,14 +37,17 @@ export function CatalogPage() {
         jobs.data?.find(job => job.engine === engine && (job.state === 'queued' || job.state === 'running'));
     const shown = watching ?? jobs.data?.[0]?.id;
 
-    const confirmInstall = () => {
+    const confirmInstall = (pull: string | undefined) => {
         if (installing === undefined) return;
-        install.mutate(installing.id, {
-            onSuccess: job => {
-                setInstalling(undefined);
-                setWatching(job.id);
+        install.mutate(
+            { engine: installing.id, ...(pull === undefined ? {} : { pull }) },
+            {
+                onSuccess: job => {
+                    setInstalling(undefined);
+                    setWatching(job.id);
+                },
             },
-        });
+        );
     };
 
     const startPull = (entry: CatalogEntry) =>
@@ -163,6 +166,8 @@ export function CatalogPage() {
             ) : undefined}
 
             <InstallModal
+                // Keyed, so the next engine's dialog starts with the download ticked again.
+                key={installing?.id}
                 entry={installing}
                 onClose={() => setInstalling(undefined)}
                 onConfirm={confirmInstall}
