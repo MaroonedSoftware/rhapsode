@@ -107,7 +107,7 @@ async def prime(source: AsyncIterator[bytes]) -> tuple[bytes | None, AsyncIterat
             break
 
     if first is None:
-        await _aclose(source)
+        await aclose(source)
         return None, _empty()
 
     return first, _replay(first, source)
@@ -124,7 +124,8 @@ async def _empty() -> AsyncIterator[bytes]:
     yield b""  # pragma: no cover - unreachable, and makes this a generator
 
 
-async def _aclose(source: Any) -> None:
+async def aclose(source: Any) -> None:
+    """Close an async iterator now, if it can be closed, rather than whenever it is collected."""
     closer = getattr(source, "aclose", None)
     if closer is not None:
         await closer()

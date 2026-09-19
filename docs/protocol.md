@@ -642,6 +642,35 @@ on day one costs about forty lines. Retrofitting it costs a client that sniffs y
 to work out what you accept, which is a real thing a real client had to do against a real server, and
 is the specific future this section exists to prevent.
 
+### Package versions are not the contract
+
+Every published package carries one version, on npm and PyPI alike, and they release together:
+`@rhapsode/contract`, `@rhapsode/core`, `@rhapsode/sdk` and `rhapsode` on npm, and on PyPI
+`rhapsode-worker`, `rhapsode-conform` and every engine in the catalog. The first release is 0.1.0.
+
+That version and `contract` answer different questions. `contract` says what a core and a worker
+can say to each other, and moves only by the rules above. The package version says which code this
+is. A release that changes no shape leaves `contract` where it was; a new contract major always
+comes with a new package version, and the reverse is almost never true. A client reads `contract`
+to decide what it may send and never parses a package version to find out.
+
+One version rather than one per package because § 13.5 keeps the protocol and both of its
+implementations in one repository so that they move in one commit, and that holds for a user only
+if they also move in one release. Separate versions would need a hand-kept table of which core goes
+with which engine, and the catalog would have to consult it on every install.
+
+**An engine installed from the package index is pinned to the core's own version.** A core at
+0.3.0 installs `rhapsode-engine-kokoro==0.3.0`, and every engine pins `rhapsode-worker` to its own
+version exactly. Unpinned, pip resolves the newest engine on the index, which may have been built
+for a core this box does not have yet. Negotiation would refuse it, but only at the first spawn,
+after the virtualenv, the install and possibly gigabytes of weights were already paid for. The cost
+of the pin is that an engine fix reaches a server only with a core upgrade, which under one version
+is how every other fix reaches it too.
+
+None of this narrows what the rest of this section allows. A remote worker, or an engine the
+operator configured by hand, is whatever version it is, and negotiation is still what decides
+whether the core will speak to it.
+
 ---
 
 ## 10. Managing engines
@@ -726,9 +755,10 @@ An install is four steps, and a job reports which one it is on:
    interpreter outside the range does not fail. It resolves the newest release that still claims to
    support it: `kokoro-onnx` 0.6.1 declares `<3.14`, and on 3.14 pip quietly installed 0.4.7.
 2. **`packages`**: pip install the adapter. If `<install.sourceDir>/<package>` exists it is
-   installed from there; otherwise it is installed by name from the package index. The first is how
-   a checkout works today, and the second is how it works once adapters are published, with nothing
-   to change in between.
+   installed from there, whatever version the directory holds; otherwise it is installed by name
+   from the package index, pinned to the core's own version (§ 9). The first is how a checkout and
+   the server image work, and the second is how an installed core works once adapters are
+   published.
 3. **`verify`**: import the engine's module with the new interpreter. That is the command the core
    will spawn, minus serving, and it is the check that a virtualenv pip abandoned halfway fails,
    although its `bin/python` runs perfectly well.
@@ -950,16 +980,25 @@ Named so that nobody has to guess whether they were forgotten.
    engine expose a second endpoint? The first pollutes every engine's request shape; the second
    splits the API. Leaning towards a second endpoint declared in capabilities, so engines that do
    not do dialogue are unaffected.
-2. **Does the core ever hold audio?** Buffering enables retry-on-truncation and content-addressed
-   caching; streaming through means constant memory. Probably: stream through by default, buffer
-   only when `stream: false` was asked for.
-3. **Voice namespacing across engines.** A station voice that means "the same person" on three
-   engines is a client concern, not this server's. Resisting it is probably right, and is worth
-   writing down as a decision rather than leaving as an omission.
+2. **Does the core ever hold audio?** Decided: only when `stream: false` was asked for, and only
+   the one response, in memory. § 6 already depends on it: the floor can only become an error
+   envelope if the core has the whole body before it writes a status, and `Content-Length` and the
+   duration header can only be headers if the length is known. A `stream: true` response goes
+   through at constant memory. The buffer is bounded by the variant's `maxCharacters`, not by
+   anything the client sends. Retry-on-truncation and content-addressed caching were the arguments
+   for buffering everything. Neither is in v1, and whichever arrives first reopens this.
+3. **Voice namespacing across engines.** Decided: not this server's job. A voice id is scoped to
+   its engine (§ 7) and names one engine's rendering of one reference. The same clip cloned on two
+   engines gives two voices that sound related, not one voice, and an alias spanning them would
+   promise a sameness the server cannot deliver and add a second id space for the § 7 rules to
+   police. A client that means "the same person" on three engines keeps its own table of
+   `(engine, voice)` pairs, which is also the only place that knows which of those it thinks are
+   close enough.
 4. **In-process ONNX engines.** Decided: no. ONNX engines are Python workers like every other
    engine, for the reasons in § 8, and "engine" in the registry keeps meaning one thing.
-5. **Where the core lives.** `MaroonedSoftware` already publishes ServerKit and ContractKit, which
-   the core builds on, so the provenance line writes itself. Open only on whether the Python worker
-   SDK ships from the same repository or its own: same repo keeps the protocol and both of its
-   implementations in one place and one commit, and separate repos let the SDK version on its own
-   cadence. Leaning towards one repo until the SDK has outside users.
+5. **Where the core lives.** Decided: `MaroonedSoftware/rhapsode`, one repository holding the
+   protocol, the core and the Python worker SDK. `MaroonedSoftware` already publishes ServerKit and
+   ContractKit, which the core builds on. A change to the protocol has to land in both
+   implementations at once or one of them is wrong, and one repository with one `pnpm test` is what
+   makes that a single commit rather than a coordinated pair of releases. The cost is that the SDK
+   cannot version on its own cadence. Revisit when it has outside users who need it to.

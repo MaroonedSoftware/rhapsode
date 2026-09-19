@@ -1,0 +1,212 @@
+name: release
+
+# A pushed `v*` tag publishes. `pnpm release version <x.y.z>` is what makes the commit to tag: it
+# moves every published package to one version and folds the changesets into CHANGELOG.md.
+on:
+    push:
+        tags: ['v*']
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    versions:
+        # First and cheapest. A tag that disagrees with any package would publish something under a
+        # number nobody asked for, and § 9's one-version rule would be false from the first release.
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
+            - run: node scripts/release.mjs check "$GITHUB_REF_NAME"
+
+    build:
+        # The whole of CI, again, on exactly the commit being published.
+        needs: [versions]
+        uses: ./.github/workflows/build.yml
+
+    pypi:
+        # Before npm, because a published core installs its engines from PyPI at its own version
+        # (§ 9), and a core on npm whose engines are not on PyPI yet fails every install.
+        needs: [build]
+        runs-on: ubuntu-latest
+        environment: pypi
+        permissions:
+            contents: read
+            # Trusted publishing: PyPI accepts this workflow's identity in place of a token, and
+            # attestations are made from the same one.
+            id-token: write
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: '3.11'
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
+
+            # The generated contract code is committed, so a plain build of each directory is the
+            # whole package. --strict because PyPI renders what twine would only warn about.
+            #
+            # Two directories, because one upload goes in alphabetical order and puts rhapsode_worker
+            # last. Every engine pins the SDK at its own version exactly (§ 9), so an engine on the
+            # index before its SDK cannot be installed, for seconds normally and until a re-run if the
+            # upload fails between the two.
+            - name: Build
+              run: |
+                  python -m pip install build twine
+                  for dir in $(node scripts/release.mjs list python); do
+                      out=dist/rest
+                      [ "$dir" = python/rhapsode-worker ] && out=dist/sdk
+                      python -m build --outdir "$out" "$dir"
+                  done
+                  python -m twine check --strict dist/sdk/* dist/rest/*
+
+            # skip-existing on both, so a run that died halfway is finished by re-running it.
+            - name: Publish the SDK
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist/sdk/
+                  skip-existing: true
+
+            - name: Publish the conformance suite and the engines
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist/rest/
+                  skip-existing: true
+
+    npm:
+        needs: [pypi]
+        runs-on: ubuntu-latest
+        environment: npm
+        permissions:
+            contents: read
+            # Provenance: npm records that this workflow, on this commit, built what it publishes.
+            id-token: write
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  registry-url: https://registry.npmjs.org
+
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm run build
+
+            # Packed by pnpm, because only pnpm rewrites `workspace:*` into the version being
+            # released, and published by npm, because npm is what attaches provenance. In the order
+            # `release.mjs list` gives, which is dependencies before dependents.
+            #
+            # A version already on the registry is skipped rather than failed, so a run that died
+            # halfway is finished by re-running it, not by cutting a new version.
+            - name: Publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  version="${GITHUB_REF_NAME#v}"
+                  out="$RUNNER_TEMP/npm"
+                  mkdir -p "$out"
+                  for dir in $(node scripts/release.mjs list npm); do
+                      name=$(node -p "require('./$dir/package.json').name")
+                      if npm view "$name@$version" version >/dev/null 2>&1; then
+                          echo "$name@$version is already published"
+                          continue
+                      fi
+                      tarball=$(cd "$dir" && pnpm pack --pack-destination "$out" | tail -n 1)
+                      npm publish "$tarball" --access public --provenance
+                  done
+
+    images:
+        # Independent of both registries: the server image installs engines from the Python sources
+        # baked into it (`install.sourceDir`), so it is consistent with itself whatever PyPI holds.
+        needs: [build]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        strategy:
+            matrix:
+                target: [server, web]
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+
+            # arm64 as well, under emulation, because Docker on an Apple Silicon Mac runs arm64 and
+            # an amd64-only image there is emulated on every request instead of once per release.
+            - uses: docker/setup-qemu-action@v3
+            - uses: docker/setup-buildx-action@v3
+
+            - uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ github.token }}
+
+            # The version, its minor line, and `latest`, which the metadata action moves only for a
+            # plain x.y.z tag. It also labels the image with this repository, which is what links the
+            # package to it on GitHub.
+            - id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ghcr.io/maroonedsoftware/rhapsode-${{ matrix.target }}
+                  tags: |
+                      type=semver,pattern={{version}}
+                      type=semver,pattern={{major}}.{{minor}}
+
+            - uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: docker/Dockerfile
+                  target: ${{ matrix.target }}
+                  platforms: linux/amd64,linux/arm64
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha,scope=${{ matrix.target }}
+                  cache-to: type=gha,scope=${{ matrix.target }},mode=max
+
+    github:
+        needs: [pypi, npm, images]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+                  # No pnpm in this job. setup-node v5 turns caching on by itself when package.json
+                  # names a packageManager, and then fails looking for pnpm before any step runs.
+                  package-manager-cache: false
+            - name: Release notes, from CHANGELOG.md
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  node scripts/release.mjs notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+                  gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

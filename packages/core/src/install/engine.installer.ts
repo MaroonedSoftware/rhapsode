@@ -12,6 +12,7 @@ import { ResidencyManager } from '../residency/residency.manager.js';
 import { WorkerRegistry } from '../workers/worker.registry.js';
 import type { CommandRunner } from './command.runner.js';
 import { InstallJobs, type JobContext } from './install.jobs.js';
+import { CORE_VERSION } from '../core.version.js';
 import { planInstall, SDK_PACKAGE } from './install.plan.js';
 import { onPath, sourceFor, type InstallSettings } from './install.settings.js';
 
@@ -106,7 +107,10 @@ export class EngineInstaller {
             python: this.settings.python,
             uv: await onPath('uv'),
             trustedHosts: this.settings.trustedHosts,
-            sources: { sdk: sourceFor(SDK_PACKAGE, this.settings.sourceDir), adapter: sourceFor(record.package, this.settings.sourceDir) },
+            sources: {
+                sdk: sourceFor(SDK_PACKAGE, this.settings.sourceDir, CORE_VERSION),
+                adapter: sourceFor(record.package, this.settings.sourceDir, CORE_VERSION),
+            },
         });
 
         for (const command of plan.commands) {

@@ -40,7 +40,14 @@ node scripts/python.mjs test        # the Python half alone
 pnpm wizard doctor                  # what is wrong with this checkout, and --fix for what it can mend
 pnpm wizard install kokoro          # with the server running: install an engine through its API
 node scripts/docker.smoke.mjs       # build the images, install through them, and restart them on their volumes
+pnpm release version 0.2.0          # every published package to one version, changesets into CHANGELOG.md
 ```
+
+Every published package, npm and PyPI, carries one version (`docs/protocol.md` § 9). `pnpm release`
+sets it rather than `changeset version`, because a changeset cannot name a Python package. Write a
+changeset as before; pushing a `v*` tag is what publishes, through `.github/workflows/release.yml`:
+PyPI first, by trusted publishing from the `pypi` environment, then npm, with an `NPM_TOKEN` secret
+on the `npm` environment. PyPI goes first because a published core installs its engines from there.
 
 `pnpm wizard` is `packages/cli`, a johnny5 CLI like the ones in signet and kanban. It runs from
 TypeScript source under swc and is never built. `setup` is interactive and drives the same scripts

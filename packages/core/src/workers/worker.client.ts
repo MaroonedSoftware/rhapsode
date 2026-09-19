@@ -163,6 +163,7 @@ export class WorkerClient {
         return {
             contentType: String(response.headers['content-type'] ?? 'application/octet-stream'),
             trailer: typeof response.headers.trailer === 'string' ? response.headers.trailer : undefined,
+            durationMs: typeof response.headers[DURATION_HEADER] === 'string' ? response.headers[DURATION_HEADER] : undefined,
             body: response.body as unknown as Readable,
             trailers: () => response.trailers,
         };
@@ -223,9 +224,14 @@ export class WorkerClient {
     }
 }
 
+/** § 6. A header on a buffered answer, and only there, because only there is it known in time. */
+export const DURATION_HEADER = 'x-rhapsode-duration-ms';
+
 export interface SpokenResponse {
     contentType: string;
     trailer?: string;
+    /** The worker's `X-Rhapsode-Duration-Ms`, verbatim, when it sent one. */
+    durationMs?: string;
     body: Readable;
     trailers: () => Record<string, string | string[] | undefined>;
 }

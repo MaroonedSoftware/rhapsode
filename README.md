@@ -9,8 +9,9 @@ that describes honestly what each engine can actually do.
 > a worker and streams `/speak` through it works end to end, engines install through the API, voices
 > clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,
 > against real weights on Apple Silicon, as does Kokoro, an ONNX engine that needs no GPU and no torch.
-> OpenAI's speech route answers over the same core. What is
-> not here yet: Chatterbox measured on a CUDA card, and the Wyoming shim.
+> What Chatterbox costs on a CUDA card in a container is measured in
+> [`docs/operating.md`](docs/operating.md). OpenAI's speech route answers over the same core. What
+> is not here yet: the Wyoming shim.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -126,9 +127,11 @@ from what its capability document says it can do, and clone a voice from a clip.
 server when its source, the core's, or `rhapsode.config.json` changes. To run the
 built server alone, as you would in production, `node apps/server/dist/main.js`.
 
-With nothing but Docker, `docker compose up` builds and starts the server and the page on the same
-two ports, keeping installed engines and their weights in a volume. [`docs/operating.md`](docs/operating.md)
-§ Docker has what it keeps where, and how to run it on unraid or with a GPU.
+With nothing but Docker, `docker compose up` pulls and starts the server and the page on the same
+two ports, keeping installed engines and their weights in a volume.
+`docker compose -f compose.yaml -f compose.build.yaml up --build` builds them from a checkout
+instead. [`docs/operating.md`](docs/operating.md) § Docker has what it keeps where, and how to run
+it on unraid or with a GPU.
 
 `pnpm wizard setup` builds the Python venv, builds the TypeScript packages, writes a
 `rhapsode.config.json` pointing the `tone` engine at that venv, and runs the conformance suite

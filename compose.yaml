@@ -1,14 +1,15 @@
 # The server and the web page, with config in one volume and every download in another.
 # docs/operating.md § Docker.
+#
+#   docker compose up -d                                                 the published images
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build   built from this checkout
+#
+# RHAPSODE_VERSION pins a release, such as 0.1.0. Every package and both images share one version.
 name: rhapsode
 
 services:
     server:
-        build:
-            context: .
-            dockerfile: docker/Dockerfile
-            target: server
-        image: rhapsode-server
+        image: ghcr.io/maroonedsoftware/rhapsode-server:${RHAPSODE_VERSION:-latest}
         # 99:100 on unraid, to match its shares.
         user: '${PUID:-10001}:${PGID:-10001}'
         environment:
@@ -26,11 +27,7 @@ services:
         restart: unless-stopped
 
     web:
-        build:
-            context: .
-            dockerfile: docker/Dockerfile
-            target: web
-        image: rhapsode-web
+        image: ghcr.io/maroonedsoftware/rhapsode-web:${RHAPSODE_VERSION:-latest}
         volumes:
             # For management.token, which this container presents on the page's behalf.
             - config:/config:ro
