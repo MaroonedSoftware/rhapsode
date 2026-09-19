@@ -27,6 +27,7 @@ Every rule below that looks arbitrary is one somebody already paid for, and says
 | `GET /engines/{id}/capabilities` | `GET /capabilities` |
 | `GET /engines/{id}/voices` | `GET /voices` |
 | `POST /speak` (with `engine`) | `POST /speak` |
+| `POST /engines/{id}/dialogue` (§ 6) | `POST /dialogue` |
 | `GET /health` | `GET /health` |
 | (core policy) | `POST /load`, `POST /unload`, `POST /terminate` |
 | `POST /engines/{id}/pull` (§ 10) | `POST /fetch` |
@@ -247,6 +248,13 @@ same answer as `current` in every case where `current` means anything. It also c
 two-level document exists for: a request that names a variant which is not the one loaded, where
 `current` describes weights that are about to be evicted.
 
+**`dialogue` is declared per variant, and absent where it is not performed.** Dia's `1.6b` says
+`"dialogue": { "maxSpeakers": 2 }`: the variant answers `POST /dialogue` (§ 6), and one request may
+have up to two speakers. It is on the variant rather than the engine for the reason everything else
+is: nothing in the core may depend on `current`, and a second build of the same engine can differ. A
+client that does not know the field ignores it (§ 9), which is the whole of what an engine without
+dialogue asks of anybody.
+
 ### `license` carries code and weights separately
 
 The weights licence is the one that package metadata never reveals, and it is the one that decides
@@ -438,6 +446,55 @@ a caller that conflates them either retries a permanent failure forever or disca
 have succeeded on the next pass. A cold start that ran out of its budget is `model_unavailable`, and
 a client that understands that keeps the job rather than writing it off.
 
+### Dialogue
+
+```http
+POST /engines/{engine}/dialogue          (worker: POST /dialogue)
+Content-Type: application/json
+```
+
+```json
+{
+  "turns": [
+    { "speaker": "a", "text": "Did you hear that? [gasp]" },
+    { "speaker": "b", "text": "[laugh] It's only the cat." },
+    { "speaker": "a", "text": "It is never only the cat." }
+  ],
+  "voices": { "a": "narrator_02" },
+  "variant": "1.6b",
+  "format": "wav",
+  "seed": 7,
+  "stream": false
+}
+```
+
+Some engines make a conversation in one pass, with the timing, the overlaps and the reactions of two
+people in one room, which stitching separate takes together cannot make. Dia is the first. That does
+not fit `/speak`, whose one `voice` is one reader, and it is a second route rather than a second shape
+of `text` so that no engine without it has a request shape it must refuse half of. A variant that
+performs it says so in `dialogue` (§ 4); one that does not answers the route `unsupported`.
+
+**A turn names a speaker, not a voice.** Speakers are labels the request makes up, and `voices` maps
+the ones that should sound like a particular voice to its id. A speaker with no voice is read in one
+the model picks, which a `seed` holds fixed, exactly as `/speak` with no voice is. A `voice` on each
+turn could not say "the same person as turn one, whoever that is", which is the ordinary case for an
+engine with no voices of its own. A voice the engine does not have is `unknown_voice`, as in § 7.
+
+| Field | Notes |
+| --- | --- |
+| `turns` | Required, at least one. Each is `{ speaker, text }`, and `text` has cues stripped per turn to what the variant claims. |
+| `voices` | Optional. Speaker label to voice id. A label no turn uses is `bad_request`. |
+| `variant`, `format`, `language`, `params`, `seed`, `stream` | As for `/speak`. |
+
+- **More distinct speakers than `maxSpeakers` is `unsupported`**, since the variant said it cannot.
+- **The ceiling is `maxCharacters` over the sum of every turn's text.** A dialogue is one take, so it
+  is one budget. Splitting it into turns does not buy a longer one.
+- **There is no `delivery`.** A delivery reads a whole line one way, and a dialogue has more than one
+  reader. It is left out rather than half-defined; a delivery per turn waits for an engine that can
+  perform one.
+- **Everything about the response is `/speak`'s**: the formats, the 256-byte floor, aborting rather
+  than closing when a stream fails after its headers, the duration header or trailer, and the errors.
+
 ---
 
 ## 7. Voices
@@ -573,8 +630,8 @@ serve(ChatterboxEngine())
 
 - Binds the socket, prints the handshake line, captures stray `stdout`, frames logs as JSON on
   stderr.
-- Serves `/health`, `/capabilities`, `/voices`, `/load`, `/unload`, `/terminate`, `/fetch` and
-  `/speak`.
+- Serves `/health`, `/capabilities`, `/voices`, `/load`, `/unload`, `/terminate`, `/fetch`,
+  `/speak` and `/dialogue`.
   `capabilities()` is assembled from `variants()`, `native_format`, `license` and the detected
   device, and `current` is omitted entirely while nothing is loaded.
 - **Encodes.** The engine yields its native PCM; the SDK produces wav, mp3, opus, flac or raw
@@ -596,6 +653,18 @@ that does not override it answers `unsupported`. It exists because the alternati
 `/speak` doing the download: Chatterbox's `turbo` is 3.8 GB and took about 75 seconds on a first
 load, and a caller waiting on one utterance cannot tell that from a hang. An engine whose weights
 ship inside its package, or that has none, leaves it alone.
+
+### `dialogue`, which is declared rather than discovered
+
+`dialogue(request)` speaks a conversation (§ 6) and yields PCM as `speak` does. An adapter that
+overrides it has every variant declare `dialogue` with its `max_speakers`, and one that does not
+answers `/dialogue` with `unsupported` and declares nothing. Whether a variant has it is derived from
+the override, as whether an engine clones is derived from `create_voice`, so an adapter cannot claim
+dialogue it did not write. The SDK checks the speakers, the voices, the ceiling and everything
+`/speak` checks before `dialogue()` is called.
+
+Unlike `fetch`, a client needs to know before it asks, because the answer decides what it offers:
+the web page shows a conversation editor only where a variant declares one.
 
 ### An ONNX engine is an adapter like any other
 
@@ -921,6 +990,9 @@ A cue in `input` is different. Stripping one the variant does not claim is § 5 
 performable, not the shim discarding a field, and it happens silently here exactly as it does in
 `/speak`.
 
+The shim has no dialogue. OpenAI's speech request has one voice, so it translates into `/speak`
+and only ever reaches one reader, on an engine that performs dialogue as on any other.
+
 ### `mp3` by default needs ffmpeg
 
 Because OpenAI's default is `mp3`, a client that says nothing gets `mp3`, which needs an ffmpeg with
@@ -977,9 +1049,8 @@ needs them.
 Named so that nobody has to guess whether they were forgotten.
 
 - **STT.** A different problem wearing a similar hat. Say no once, in the README.
-- **Multi-speaker dialogue.** Dia wants `[S1]`/`[S2]` alternation and produces a two-hander in one
-  pass, with overlaps that stitching separate takes cannot make. It does not fit a `voice` field and
-  half-designing it now would put a bad shape in the contract. Open question, section 13.
+- **A delivery in a dialogue.** § 6 says why it is left out, and it waits for an engine that can
+  perform one per turn.
 - **Word timestamps.** Wanted, cheap enough as an optional sidecar response, and not worth blocking
   v1. Leave room: a `X-Rhapsode-Timings-Url` header or a `timings` field in a multipart response.
 - **Batching.** Adapters declare `concurrency` and that is the whole of it for now.
@@ -990,10 +1061,10 @@ Named so that nobody has to guess whether they were forgotten.
 
 ## 13. Open questions
 
-1. **Dialogue.** Does `text` grow a structured form (`[{voice, text}, ...]`), or does a dialogue
-   engine expose a second endpoint? The first pollutes every engine's request shape; the second
-   splits the API. Leaning towards a second endpoint declared in capabilities, so engines that do
-   not do dialogue are unaffected.
+1. **Dialogue.** Decided: a second endpoint, declared per variant (§ 4, § 6). A structured `text`
+   would have put a shape into every engine's request that most of them must refuse half of; a second
+   route splits the API only for the engines that have something to put there. Turns name speakers
+   rather than voices, because an unvoiced speaker is the ordinary case for Dia.
 2. **Does the core ever hold audio?** Decided: only when `stream: false` was asked for, and only
    the one response, in memory. § 6 already depends on it: the floor can only become an error
    envelope if the core has the whole body before it writes a status, and `Content-Length` and the
