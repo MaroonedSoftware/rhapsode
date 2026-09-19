@@ -4,6 +4,8 @@ on:
     pull_request:
     push:
         branches: [main]
+    # To build the image for both platforms from a branch, before a release depends on it.
+    workflow_dispatch:
 
 concurrency:
     group: pr-${{ github.ref }}
@@ -15,6 +17,14 @@ permissions:
 jobs:
     build:
         uses: ./.github/workflows/build.yml
+
+    image:
+        # Not on pull requests: the build job's docker smoke test covers amd64 there. On main this
+        # fills the cache a release reads, since a tag cannot read another tag's.
+        if: github.event_name != 'pull_request'
+        uses: ./.github/workflows/image.yml
+        with:
+            push: false
 
     ci-ok:
         # One required check, so adding a job later does not mean editing branch protection.

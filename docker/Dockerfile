@@ -9,20 +9,31 @@ ARG UV_VERSION=latest
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
-FROM node:${NODE_VERSION}-bookworm AS build
+# Every package the lockfile names, downloaded before any source is copied, so the layer is reused
+# until the lockfile changes. It was `COPY . .` then install, which re-downloaded everything on any
+# edit: CI exports layers to its cache but not cache mounts, so the store never survived a run.
+FROM node:${NODE_VERSION}-bookworm AS deps
 ARG PNPM_VERSION
 RUN npm install --global pnpm@${PNPM_VERSION}
 WORKDIR /src
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm fetch
+
+FROM deps AS source
 COPY . .
-RUN --mount=type=cache,id=rhapsode-pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --offline
+
+FROM source AS build
 RUN pnpm exec turbo run build --filter=./apps/server...
 # The server and what it imports, with production dependencies only and the workspace packages
-# copied in as real directories rather than links into a tree this stage leaves behind.
-RUN --mount=type=cache,id=rhapsode-pnpm,target=/root/.local/share/pnpm/store \
-    pnpm --filter ./apps/server deploy --prod --legacy /out
+# copied in as real directories rather than links into a tree this stage leaves behind. Not
+# --offline: a legacy deploy resolves again and needs registry metadata that `pnpm fetch` does not
+# keep, though every tarball it links is already in the store.
+RUN pnpm --filter ./apps/server deploy --prod --legacy /out
 
-FROM build AS web-build
+# From `source` rather than `build`, so the page builds beside the server instead of after its
+# deploy. Under arm64 emulation the two builds were 163s and 115s back to back.
+FROM source AS web-build
 RUN pnpm exec turbo run build --filter=./apps/web...
 
 # Debian rather than Alpine: cbor-extract, under ServerKit's authentication package, has no musl
