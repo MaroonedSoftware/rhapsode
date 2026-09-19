@@ -36,6 +36,24 @@ describe('VoicesCard', () => {
         expect(screen.getByText(/no voices yet/)).toBeInTheDocument();
     });
 
+    it('offers no clone form when the variant says it cannot clone', () => {
+        render(<VoicesCard engine="orpheus" voices={[]} cloning={{ supported: false }} onCloned={() => {}} />);
+        expect(screen.queryByText('Clone a voice')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Clone' })).not.toBeInTheDocument();
+        expect(screen.queryByText(/Clone one from a clip/)).not.toBeInTheDocument();
+    });
+
+    it('offers the clone form when nothing says whether the variant clones', () => {
+        // A worker from before § 4 put `cloning` on variants: the worker refuses what it cannot make.
+        render(<VoicesCard engine="chatterbox" voices={[]} onCloned={() => {}} />);
+        expect(screen.getByRole('button', { name: 'Clone' })).toBeInTheDocument();
+    });
+
+    it('asks for the reference length the variant claims', () => {
+        render(<VoicesCard engine="chatterbox" voices={[]} cloning={{ supported: true, referenceSeconds: [5, 10] }} onCloned={() => {}} />);
+        expect(screen.getByText(/5 to 10 seconds/)).toBeInTheDocument();
+    });
+
     it('plays a preview from the URL the core gave, keyed on the spec', async () => {
         const user = setupUser();
         render(<VoicesCard engine="chatterbox" voices={[narrator]} onCloned={() => {}} />);
