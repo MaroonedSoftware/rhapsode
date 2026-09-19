@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,26 @@ import { buildServer } from '../src/server.js';
 import type { RhapsodeConfig } from '../src/config.js';
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+/** An install's step 5 starts a real worker, which needs a unix socket the sandbox may refuse. */
+const canBindUnixSockets = await (async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'rh-probe-'));
+    try {
+        const server = createServer();
+        await new Promise<void>((fulfil, fail) => {
+            server.once('error', fail);
+            server.listen(join(directory, 'p.sock'), fulfil);
+        });
+        await new Promise<void>(fulfil => server.close(() => fulfil()));
+        return true;
+    } catch {
+        return false;
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+})();
 
 describe('planInstall', () => {
     const base = {
@@ -137,15 +158,28 @@ describe('install settings', () => {
     });
 });
 
-/** A runner that makes the venv directory, records what it ran, and can be told to fail or wait. */
-function fakeRunner(options: { failAt?: PlannedCommand['step']; hold?: Promise<void> } = {}) {
+/**
+ * A runner that makes the venv directory, records what it ran, and can be told to fail or wait.
+ * Given `python`, the venv's interpreter runs that one, so a worker spawned from it after
+ * `register` is real: the development venv's has every adapter the catalog names. A script that
+ * execs it rather than a symlink, because Python finds its venv beside the path it was invoked by,
+ * and a symlinked interpreter ran bare, without the adapter.
+ */
+function fakeRunner(options: { failAt?: PlannedCommand['step']; hold?: Promise<void>; python?: string } = {}) {
     const ran: PlannedCommand[] = [];
     const runner: CommandRunner = async (command, onLine) => {
         ran.push(command);
         await options.hold;
         onLine(`ran ${command.step}`, 'stdout');
         if (command.step === options.failAt) throw new Error('pip exited 1: ERROR: No matching distribution found for rhapsode-worker');
-        if (command.step === 'venv') mkdirSync(command.args.at(-1)!, { recursive: true });
+        if (command.step === 'venv') {
+            const venv = command.args.at(-1)!;
+            mkdirSync(join(venv, 'bin'), { recursive: true });
+            if (options.python !== undefined) {
+                writeFileSync(join(venv, 'bin', 'python'), `#!/bin/sh\nexec '${options.python}' "$@"\n`);
+                chmodSync(join(venv, 'bin', 'python'), 0o755);
+            }
+        }
     };
     return { runner, ran };
 }
@@ -173,7 +207,8 @@ describe('the install routes', () => {
             writeFileSync(configPath, JSON.stringify(operator));
         }
         const { settings, managed } = await loadSettings(configPath);
-        const builder = await buildServer({ ...settings, install: { venvDir } }, silent(), { managed, runner });
+        const workers = { socketDir: join(dir, 's'), startupTimeoutSeconds: 30 };
+        const builder = await buildServer({ ...settings, workers, install: { venvDir } }, silent(), { managed, runner });
         running = builder;
         await builder.app.ready();
         return builder.app;
@@ -197,6 +232,8 @@ describe('the install routes', () => {
         const job = await settled(app, InstallJob.parse(accepted.json()).id);
 
         expect(job).toMatchObject({ state: 'succeeded', step: 'register', engine: 'tone', kind: 'install' });
+        // Asked for no weights, so it stops at register and names no variant. § 10.
+        expect(job.variant).toBeUndefined();
         expect(ran.map(command => command.step)).toEqual(['venv', 'packages', 'packages', 'verify']);
 
         const recorded = JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8'));
@@ -306,6 +343,46 @@ describe('the install routes', () => {
         expect((await app.inject({ method: 'DELETE', url: '/engines/tone', ...remote })).statusCode).toBe(403);
         expect((await app.inject({ method: 'GET', url: '/installs', ...remote })).statusCode).toBe(403);
         expect((await app.inject({ method: 'GET', url: '/installs/x', ...remote })).statusCode).toBe(403);
+    });
+
+    const install = (app: Awaited<ReturnType<typeof start>>, engine: string, query = '') =>
+        app.inject({ method: 'POST', url: `/engines/${engine}/install${query}` });
+
+    it('refuses a pull that names no one variant, before a job exists', async () => {
+        const { runner, ran } = fakeRunner();
+        const app = await start(runner);
+
+        const empty = await install(app, 'tone', '?pull=');
+        expect(empty.statusCode).toBe(400);
+        expect(empty.json().error.message).toContain('?pull=turbo');
+        expect((await install(app, 'tone', '?pull=plain&pull=other')).statusCode).toBe(400);
+        expect(ran).toEqual([]);
+    });
+
+    it('fails at weights and leaves the engine installed when the download cannot happen', { timeout: 60_000 }, async () => {
+        // An interpreter that exits at once: the worker never starts, so its fetch cannot either.
+        const broken = join(dir, 'broken-python');
+        writeFileSync(broken, '#!/bin/sh\nexit 1\n');
+        chmodSync(broken, 0o755);
+        const app = await start(fakeRunner({ python: broken }).runner);
+
+        const accepted = await install(app, 'chatterbox', '?pull=turbo');
+        expect(accepted.json()).toMatchObject({ kind: 'install', variant: 'turbo' });
+        const job = await settled(app, accepted.json().id);
+
+        expect(job).toMatchObject({ state: 'failed', step: 'weights', variant: 'turbo' });
+        expect(JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8')).engines).toHaveProperty('chatterbox');
+        const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
+        expect(engines.map((engine: { id: string }) => engine.id)).toEqual(['chatterbox']);
+    });
+
+    it.skipIf(!canBindUnixSockets)('succeeds when the engine has no weights to fetch ahead of time', { timeout: 60_000 }, async () => {
+        const app = await start(fakeRunner({ python: join(REPO, 'python/.venv/bin/python') }).runner);
+
+        const job = await settled(app, (await install(app, 'tone', '?pull=plain')).json().id);
+
+        expect(job.error).toBeUndefined();
+        expect(job).toMatchObject({ state: 'succeeded', step: 'weights', variant: 'plain' });
     });
 
     it('cannot install on a server built without a managed file', async () => {

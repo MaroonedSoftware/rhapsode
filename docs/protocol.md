@@ -710,7 +710,7 @@ what one is built on.
 | Route | Does |
 | --- | --- |
 | `GET /catalog` | Every engine that exists, installed or not, with both licences |
-| `POST /engines/{id}/install` | Starts an install job; `202` with the job |
+| `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too |
 | `DELETE /engines/{id}` | Stops and removes an engine this API installed |
 | `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
 | `GET /installs` | Every job this process knows about, newest first |
@@ -790,6 +790,25 @@ An install is four steps, and a job reports which one it is on:
    although its `bin/python` runs perfectly well.
 4. **`register`**: record the engine in the managed file and add it to the running registry. No
    restart: the next `/speak` for it spawns a worker.
+5. **`weights`**, only when asked: fetch a variant, exactly as a pull does (below).
+
+**An install can fetch its weights.** `POST /engines/chatterbox/install?pull=turbo` adds step 5 for
+the variant named; a client that wants the default reads it from the catalog's `defaultVariant`.
+Without it an install stops at `register`, as it always has. A `pull` that is empty or repeated is
+`bad_request`. It is one job rather than a client queueing a pull behind its install, because a
+client that goes away between the two (a closed browser tab, a terminal that lost its connection)
+leaves an engine whose first `/speak` sits through the whole download: 3.8 GB for Chatterbox's
+`turbo`.
+
+It is a query parameter rather than a body so that a bare `POST`, which is every install so far,
+stays one. ServerKit refuses a request without a body on a route that declares one, with a `411`,
+so a body here could not have been optional. And it names a variant rather than being a flag,
+because the contract's booleans are coerced and `?pull=false` would have read as true.
+
+The engine is registered before step 5 starts, so **a failed download leaves it installed**: the
+job fails at `weights`, and the way on is a pull, not another install. An engine whose worker does
+not implement `fetch` has nothing to do in step 5; the job says so in its output and succeeds, and
+the weights arrive on first load as they would have.
 
 `RHAPSODE_PIP_TRUSTED_HOSTS` is honoured from the server's own environment and cannot be set
 through the API. Weakening certificate verification stays a decision made on the box.
@@ -843,7 +862,8 @@ does not implement `fetch` answers `unsupported`, and its weights arrive on firs
 }
 ```
 
-`kind` is `install` or `pull`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
+`kind` is `install` or `pull`. `variant` is the variant a pull fetches, or an install fetches in
+step 5; an install without it stops at `register`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
 carries `error`, an ordinary error envelope body. Its message names the command and the line of
 its output that says why it failed, not the line it printed last: pip ends a failed build with a
 footer naming the package, and an Orpheus install whose error was `╰─> llama-cpp-python` had its

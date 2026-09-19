@@ -217,7 +217,7 @@ contract mode(loose) InstallJob: {
     id: string
     engine: string
     kind: enum(install, pull)
-    variant?: string                            # For a pull: the variant being fetched.
+    variant?: string                            # What a pull fetches, or an install fetches in step 5.
     state: enum(queued, running, succeeded, failed)
     step?: enum(venv, packages, verify, register, weights)
     createdAt: string                           # ISO 8601, UTC.

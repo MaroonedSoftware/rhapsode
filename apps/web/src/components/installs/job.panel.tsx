@@ -10,15 +10,21 @@ import { isNothingToFetch, jobBadge } from './job.state';
 
 // Labels only: with a description each, four steps wrap onto two lines in the panel's width and
 // read as a grid. The descriptions went into the tooltip of each step instead.
-const STEPS: Record<InstallJob['kind'], { step: NonNullable<InstallJob['step']>; label: string; hint: string }[]> = {
-    install: [
-        { step: 'venv', label: 'Virtualenv', hint: 'Its own, so its dependencies cannot break another engine' },
-        { step: 'packages', label: 'Packages', hint: 'The adapter and what it needs' },
-        { step: 'verify', label: 'Verify', hint: 'Imported by the interpreter that will run it' },
-        { step: 'register', label: 'Register', hint: 'Available without a restart' },
-    ],
-    pull: [{ step: 'weights', label: 'Weights', hint: 'Downloaded, not loaded' }],
-};
+type Step = { step: NonNullable<InstallJob['step']>; label: string; hint: string };
+
+const WEIGHTS: Step = { step: 'weights', label: 'Weights', hint: 'Downloaded, not loaded' };
+const INSTALL: Step[] = [
+    { step: 'venv', label: 'Virtualenv', hint: 'Its own, so its dependencies cannot break another engine' },
+    { step: 'packages', label: 'Packages', hint: 'The adapter and what it needs' },
+    { step: 'verify', label: 'Verify', hint: 'Imported by the interpreter that will run it' },
+    { step: 'register', label: 'Register', hint: 'Available without a restart' },
+];
+
+/** An install that names a variant downloads it as a fifth step. protocol.md § 10. */
+function stepsOf(job: InstallJob): Step[] {
+    if (job.kind === 'pull') return [WEIGHTS];
+    return job.variant === undefined ? INSTALL : [...INSTALL, WEIGHTS];
+}
 
 /** A job's name, in the tense its state calls for. */
 export function jobTitle(job: InstallJob): string {
@@ -43,7 +49,7 @@ export function JobPanel({ jobId }: { jobId: string }) {
     if (job.data === undefined) return <Loader size="sm" />;
 
     const data = job.data;
-    const steps = STEPS[data.kind];
+    const steps = stepsOf(data);
     const current = feed.progress?.phase ?? data.step;
     const index = steps.findIndex(entry => entry.step === current);
     const finished = data.state === 'succeeded' || data.state === 'failed';
@@ -76,9 +82,11 @@ export function JobPanel({ jobId }: { jobId: string }) {
 
                 {data.state === 'succeeded' ? (
                     <Alert color={severityColor.success} title={data.kind === 'install' ? 'Installed' : 'Downloaded'}>
-                        {data.kind === 'install'
-                            ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
-                            : `The ${data.variant ?? 'default'} weights are on this machine, so the first request only has to load them.`}
+                        {data.kind === 'pull'
+                            ? `The ${data.variant ?? 'default'} weights are on this machine, so the first request only has to load them.`
+                            : data.variant === undefined
+                              ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
+                              : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
                     </Alert>
                 ) : noFetch ? (
                     <Alert color={severityColor.info} title="Nothing to download ahead of time">
@@ -87,6 +95,10 @@ export function JobPanel({ jobId }: { jobId: string }) {
                 ) : data.state === 'failed' ? (
                     <ErrorAlert title={`Failed at ${current ?? 'the start'}`} fallback="The job failed and said nothing.">
                         {data.error?.message}
+                        {/* The engine was registered before its weights were asked for, so it is installed. § 10. */}
+                        {data.kind === 'install' && current === 'weights'
+                            ? ` ${data.engine} is installed; download the weights again from its card.`
+                            : undefined}
                     </ErrorAlert>
                 ) : undefined}
 

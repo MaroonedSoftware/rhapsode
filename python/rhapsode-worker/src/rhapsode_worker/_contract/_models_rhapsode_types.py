@@ -197,7 +197,7 @@ class InstallJob(BaseModel):
     id: str
     engine: str
     kind: Literal["install", "pull"]
-    # For a pull: the variant being fetched.
+    # What a pull fetches, or an install fetches in step 5.
     variant: str | None = None
     state: Literal["queued", "running", "succeeded", "failed"]
     step: Literal["venv", "packages", "verify", "register", "weights"] | None = None

@@ -38,7 +38,9 @@ export function invalidateAfterJob(queryClient: QueryClient): Promise<void> {
 export function useInstallEngine() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (engine: string) => unwrap<InstallJob>(await sdk.public.installEngine(engine)),
+        // `pull` names the variant the same job downloads once the engine is registered. § 10.
+        mutationFn: async ({ engine, pull }: { engine: string; pull?: string }) =>
+            unwrap<InstallJob>(await sdk.public.installEngine(engine, pull === undefined ? undefined : { pull })),
         onSettled: () => invalidateAfterJob(queryClient),
     });
 }

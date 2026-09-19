@@ -103,6 +103,14 @@ describe('ManagementClient against a real core', () => {
         expect((await client.catalog()).find(entry => entry.id === 'tone')?.installed).toBe('yes');
     });
 
+    it('asks for the weights in the install itself, as a fifth step', async () => {
+        const client = new ManagementClient(await start());
+
+        const accepted = await client.install('tone', 'plain');
+
+        expect(accepted).toMatchObject({ kind: 'install', variant: 'plain' });
+    });
+
     it('turns a refusal into the protocol’s code and message', async () => {
         const client = new ManagementClient(await start());
         const refused = await client.pull('chatterbox').catch((error: unknown) => error);

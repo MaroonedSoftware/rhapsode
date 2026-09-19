@@ -7,7 +7,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
     "openapi": "3.1.0",
     "info": {
         "title": "Rhapsode",
-        "version": "0.1.2"
+        "version": "0.1.3"
     },
     "paths": {
         "/health": {
@@ -527,6 +527,14 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "name": "engine",
                         "in": "path",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull",
+                        "in": "query",
+                        "required": false,
                         "schema": {
                             "type": "string"
                         }
@@ -1482,7 +1490,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     },
                     "variant": {
                         "type": "string",
-                        "description": "For a pull: the variant being fetched."
+                        "description": "What a pull fetches, or an install fetches in step 5."
                     },
                     "state": {
                         "type": "string",

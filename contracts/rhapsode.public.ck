@@ -197,6 +197,11 @@ operation /engines/{engine}/install: {
     }
     post: {
         sdk: installEngine
+        # A query rather than a body: ServerKit refuses a missing body on a route that declares
+        # one, and an install with nothing else to say has always been a bare POST. protocol.md § 10.
+        query: {
+            pull?: string                       # A variant to fetch once registered, as step 5.
+        }
         response: {
             202: { application/json: InstallJob }
             403: { application/json: ErrorBody }

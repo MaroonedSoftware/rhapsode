@@ -1,5 +1,5 @@
 import type { SdkFetch } from '../sdk-options.js';
-import { bigIntReplacer, parseJson, readContentType } from '../sdk-options.js';
+import { bigIntReplacer, parseJson, buildQueryString, readContentType } from '../sdk-options.js';
 import type {
     Capabilities,
     CatalogEntry,
@@ -214,13 +214,15 @@ export class PublicClient {
 
     async installEngine(
         engine: string,
+        query?: { pull?: string },
     ): Promise<
         | { status: 202; contentType: 'application/json'; data: InstallJob }
         | { status: 403; contentType: 'application/json'; data: ErrorBody }
         | { status: 404; contentType: 'application/json'; data: ErrorBody }
         | { status: 409; contentType: 'application/json'; data: ErrorBody }
     > {
-        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/install`, {
+        const qs = buildQueryString(query);
+        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/install${qs}`, {
             method: 'POST',
             expectStatuses: [403, 404, 409],
         });

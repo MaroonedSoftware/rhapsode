@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 from urllib.parse import quote
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
 from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
+
+
+InstallEngineQuery = TypedDict("InstallEngineQuery", {
+    "pull": NotRequired[str],
+})
 
 
 class EngineCapabilities200Response(TypedDict):
@@ -384,8 +389,8 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 204 }
 
-    async def install_engine(self, engine: str) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409))
+    async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:
