@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One version for every published package, npm and PyPI alike. protocol.md § 9.
+// One version for every released package, npm, PyPI and the image alike. protocol.md § 9.
 //
 //   node scripts/release.mjs version 0.1.0   set it everywhere and fold .changeset/ into CHANGELOG.md
 //   node scripts/release.mjs check v0.1.0    fail unless every versioned package is at that version
@@ -32,7 +32,11 @@ const VERSIONED = ['packages/contract', 'packages/sdk', 'packages/core', 'apps/s
  */
 const NPM = ['packages/sdk'];
 
-/** Published to PyPI: the SDK first, the conformance suite, and every engine the catalog installs by name. */
+/**
+ * Carry the release version: the SDK first, the conformance suite, and every engine the catalog
+ * installs. Versioned although none is published yet, so that publishing one later is a line in
+ * PYPI below and not a renumbering, and every engine's `rhapsode-worker` pin stays exact (§ 9).
+ */
 const PYTHON = [
     'python/rhapsode-worker',
     'python/conformance',
@@ -41,6 +45,13 @@ const PYTHON = [
     'python/rhapsode-engine-orpheus',
     'python/rhapsode-engine-tone',
 ];
+
+/**
+ * Published to PyPI, in publishing order, the SDK first. None yet: every way to run the core installs
+ * engines from the sources it ships with (`install.sourceDir`), so nothing reads the index. The first
+ * package here needs a pending trusted publisher on pypi.org, and the `pypi` job back in release.yml.
+ */
+const PYPI = [];
 
 const CHANGESETS = join(root, '.changeset');
 const CHANGELOG = join(root, 'CHANGELOG.md');
@@ -154,5 +165,5 @@ const [command, argument] = process.argv.slice(2);
 if (command === 'version') commandVersion(argument);
 else if (command === 'check') commandCheck(argument);
 else if (command === 'notes') commandNotes(argument?.replace(/^v/, ''));
-else if (command === 'list' && (argument === 'npm' || argument === 'python')) console.log((argument === 'npm' ? NPM : PYTHON).join('\n'));
+else if (command === 'list' && (argument === 'npm' || argument === 'python')) console.log((argument === 'npm' ? NPM : PYPI).join('\n'));
 else fail('usage: release.mjs version <x.y.z> | check <vX.Y.Z> | notes <x.y.z> | list npm|python');

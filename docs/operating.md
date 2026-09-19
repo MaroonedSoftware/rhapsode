@@ -132,8 +132,11 @@ A Linux box with no NVIDIA card gets no variant it can run. Install the GGUF bui
 engine's virtualenv by hand, which needs a C++ compiler, then restart the engine:
 
 ```bash
-~/.rhapsode/venvs/orpheus/bin/pip install 'rhapsode-engine-orpheus[llama]'
+~/.rhapsode/venvs/orpheus/bin/pip install './python/rhapsode-engine-orpheus[llama]'
 ```
+
+That is from a checkout. In the Docker image the sources are under `/app/python` instead. The engine
+is not on PyPI, so pip needs a path, not a name.
 
 ## The web page
 

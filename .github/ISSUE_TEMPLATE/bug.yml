@@ -21,7 +21,7 @@ body:
       id: version
       attributes:
           label: Version
-          description: 'Every package carries one version: the image tag, the PyPI version, or the commit if from source.'
+          description: 'Every package carries one version: the image tag, the npm SDK version, or the commit if from source.'
       validations:
           required: true
     - type: dropdown
