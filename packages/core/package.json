@@ -1,6 +1,7 @@
 {
     "name": "@rhapsode/core",
     "version": "0.0.0",
+    "private": true,
     "description": "Routing, worker supervision and model residency. Never imports torch and holds no engine knowledge.",
     "type": "module",
     "main": "./dist/index.js",
@@ -49,8 +50,5 @@
         "@types/luxon": "^3.7.1",
         "openai": "^7.17.0",
         "vitest": "^4.1.11"
-    },
-    "publishConfig": {
-        "access": "public"
     }
 }

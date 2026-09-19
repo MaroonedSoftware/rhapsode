@@ -1,6 +1,7 @@
 {
     "name": "@rhapsode/contract",
     "version": "0.0.0",
+    "private": true,
     "description": "The rhapsode contract: generated schemas and types, plus the standard cue and delivery vocabulary as pure functions.",
     "type": "module",
     "main": "./dist/index.js",
@@ -33,8 +34,5 @@
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "vitest": "^4.1.11"
-    },
-    "publishConfig": {
-        "access": "public"
     }
 }

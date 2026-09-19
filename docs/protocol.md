@@ -645,8 +645,10 @@ is the specific future this section exists to prevent.
 ### Package versions are not the contract
 
 Every published package carries one version, on npm and PyPI alike, and they release together:
-`@rhapsode/contract`, `@rhapsode/core`, `@rhapsode/sdk` and `rhapsode` on npm, and on PyPI
-`rhapsode-worker`, `rhapsode-conform` and every engine in the catalog. The first release is 0.1.0.
+`@rhapsode/sdk` on npm, and on PyPI `rhapsode-worker`, `rhapsode-conform` and every engine in the
+catalog. The server ships as a Docker image tagged with the same version, and its workspace packages
+(`@rhapsode/contract`, `@rhapsode/core` and `rhapsode`) carry that version without being published,
+because the core reads its own to pin engines, below. The first release is 0.1.0.
 
 That version and `contract` answer different questions. `contract` says what a core and a worker
 can say to each other, and moves only by the rules above. The package version says which code this

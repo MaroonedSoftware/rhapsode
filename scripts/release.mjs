@@ -2,7 +2,7 @@
 // One version for every published package, npm and PyPI alike. protocol.md § 9.
 //
 //   node scripts/release.mjs version 0.1.0   set it everywhere and fold .changeset/ into CHANGELOG.md
-//   node scripts/release.mjs check v0.1.0    fail unless every published package is at that version
+//   node scripts/release.mjs check v0.1.0    fail unless every versioned package is at that version
 //   node scripts/release.mjs notes 0.1.0     print that version's CHANGELOG section
 //   node scripts/release.mjs list npm|python  the published package directories, in publishing order
 //
@@ -19,10 +19,18 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * Published to npm, dependencies before dependents, so no published package ever names one that is
- * not on the registry yet. The private workspace packages (cli, web, eslint and tsconfig) keep 0.0.0.
+ * Carry the release version. The core is not published, but it still has to be at the release's
+ * number: it reads its own `package.json` to pin the engines it installs (§ 9), so a core left at
+ * 0.0.0 inside a 0.3.0 image would ask PyPI for `rhapsode-engine-kokoro==0.0.0`. The remaining
+ * workspace packages (cli, web, eslint and tsconfig) keep 0.0.0.
  */
-const NPM = ['packages/contract', 'packages/sdk', 'packages/core', 'apps/server'];
+const VERSIONED = ['packages/contract', 'packages/sdk', 'packages/core', 'apps/server'];
+
+/**
+ * Published to npm. Only the client SDK: the server ships as a Docker image, and nothing outside this
+ * repository needs the core or the contract from a registry. The SDK depends on neither at run time.
+ */
+const NPM = ['packages/sdk'];
 
 /** Published to PyPI: the SDK first, the conformance suite, and every engine the catalog installs by name. */
 const PYTHON = [
@@ -49,10 +57,10 @@ function fail(message) {
     process.exit(1);
 }
 
-/** Every published package and the version it is at now. */
+/** Every versioned package and the version it is at now. */
 function current() {
     return [
-        ...NPM.map(dir => ({ where: `${dir}/package.json`, version: JSON.parse(read(`${dir}/package.json`)).version })),
+        ...VERSIONED.map(dir => ({ where: `${dir}/package.json`, version: JSON.parse(read(`${dir}/package.json`)).version })),
         ...PYTHON.flatMap(dir => {
             const text = read(`${dir}/pyproject.toml`);
             const pins = [...text.matchAll(WORKER_PIN)].map(match => ({
@@ -65,7 +73,7 @@ function current() {
 }
 
 function setVersions(version) {
-    for (const dir of NPM) {
+    for (const dir of VERSIONED) {
         const path = `${dir}/package.json`;
         // Replaced in place rather than re-serialised, so the file's own layout survives.
         write(path, read(path).replace(/^(\s*"version":\s*)"[^"]*"/m, `$1"${version}"`));
@@ -117,7 +125,9 @@ function commandVersion(version) {
     writeFileSync(CHANGELOG, `${heading}\n${section(version, entries)}${previous === '' ? '' : `\n${previous}\n`}`);
     for (const entry of entries) rmSync(entry.path);
 
-    console.log(`${version}: ${NPM.length} npm and ${PYTHON.length} Python packages, ${entries.length} changesets folded into CHANGELOG.md.`);
+    console.log(
+        `${version}: ${VERSIONED.length} workspace and ${PYTHON.length} Python packages, ${entries.length} changesets folded into CHANGELOG.md.`,
+    );
     console.log(`Next: commit, then tag v${version} and push the tag, which is what publishes.`);
 }
 
@@ -128,7 +138,7 @@ function commandCheck(tag) {
     const wrong = current().filter(entry => entry.version !== version);
     if (wrong.length > 0)
         fail(`${tag} does not match what would be published:\n${wrong.map(entry => `  ${entry.where} is ${entry.version}`).join('\n')}`);
-    console.log(`every published package is at ${version}`);
+    console.log(`every versioned package is at ${version}`);
 }
 
 function commandNotes(version) {

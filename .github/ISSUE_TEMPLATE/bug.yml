@@ -21,7 +21,7 @@ body:
       id: version
       attributes:
           label: Version
-          description: Every package carries one version. The npm or PyPI version, the image tag, or the commit if from source.
+          description: 'Every package carries one version: the image tag, the PyPI version, or the commit if from source.'
       validations:
           required: true
     - type: dropdown
@@ -30,7 +30,6 @@ body:
           label: Where it runs
           options:
               - Docker image
-              - npm install
               - From source
       validations:
           required: true
