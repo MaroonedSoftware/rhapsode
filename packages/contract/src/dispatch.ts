@@ -91,6 +91,13 @@ export function assertKnownDials(params: Record<string, number> | undefined, dia
     return { ...params };
 }
 
+/**
+ * A bracketed word, for reporting which cues were dropped. `[` is excluded inside as well as `]`, so a
+ * match can end at the next `[`: with only `]` excluded, 40,000 `[` and no `]` took 5.6 s to scan,
+ * since every `[` read to the end of the text. Flagged by CodeQL as js/polynomial-redos.
+ */
+const BRACKETED = /\[[^[\]]+\]/g;
+
 /** What a request becomes once the variant it is going to has had its say. */
 export interface Performable {
     text: string;
@@ -112,9 +119,9 @@ export function performable(
     claims: Claims,
     variant: string,
 ): Performable {
-    const asked = new Set(request.text.match(/\[([^\]]+)\]/g) ?? []);
+    const asked = new Set(request.text.match(BRACKETED) ?? []);
     const text = withoutCues(request.text, claims.cues);
-    const kept = new Set(text.match(/\[([^\]]+)\]/g) ?? []);
+    const kept = new Set(text.match(BRACKETED) ?? []);
 
     const deliveryClaimed = request.delivery !== undefined && claims.deliveries.includes(request.delivery);
 

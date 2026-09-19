@@ -110,6 +110,18 @@ describe('assertWithinCeiling', () => {
     });
 });
 
+describe('performable, on hostile text', () => {
+    it('scans text of nothing but opening brackets in linear time', () => {
+        const started = performance.now();
+        performable({ text: '['.repeat(40_000) }, turbo, 'turbo');
+        expect(performance.now() - started).toBeLessThan(500);
+    });
+
+    it('still reports the cue inside doubled brackets as the one dropped', () => {
+        expect(performable({ text: 'x [[sigh]] y' }, { ...turbo, cues: [] }, 'turbo').dropped.cues).toEqual(['[sigh]']);
+    });
+});
+
 describe('performableDialogue', () => {
     const dia: Claims = {
         cues: ['laugh'],
