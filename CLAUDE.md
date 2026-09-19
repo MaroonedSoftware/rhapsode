@@ -45,7 +45,9 @@ pnpm release version 0.2.0          # every published package to one version, ch
 
 Every released package, npm, Python and the image, carries one version (`docs/protocol.md` § 9).
 `pnpm release` sets it rather than `changeset version`, because a changeset cannot name a Python
-package. Write a changeset as before; pushing a `v*` tag is what publishes, through
+package. Write a changeset as before, and `.github/workflows/release-pr.yml` keeps a "Release x.y.z"
+pull request open on `release/next` while any are waiting: the next patch, or another version when
+that workflow is run by hand with one. Merging it tags the release. The tag is what publishes, through
 `.github/workflows/release.yml`: the Docker image, and the client SDK to npm by trusted publishing
 from the `npm` environment with no token. The Python packages are versioned but not published, since
 every way to run the core installs engines from source; `PYPI` in `scripts/release.mjs` says how to
