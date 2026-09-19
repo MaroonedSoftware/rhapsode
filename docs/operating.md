@@ -179,8 +179,24 @@ page's requests as coming from a site it does not know.
 docker compose up -d --build     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-`docker/Dockerfile` builds two images from one build: `server`, the core, and `web`, the page behind
-nginx proxying `/api` as above. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
+`docker/Dockerfile`'s `server` target is the whole install: the core, and the page behind nginx in the
+same container, proxying `/api` as above. The entrypoint starts nginx beside the server and stops it
+only once the server has drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published
+ports.
+
+It was two containers, and one is less to run for nothing lost: unraid needed a network and a
+second template so the page could find the server, the token crossed between them through a file in
+`/config`, and nginx had to re-ask Docker's DNS or lose the core whenever its container was
+recreated. The core still serves no page of its own (protocol.md § 12). nginx is a second process
+beside it, reaching it over loopback like any other proxy on the same machine. The `web` target, the
+page alone, is still built for anyone running it in front of a separate server.
+
+Coming from the two-container compose, the old page container still holds port 8081, so replace it
+along with the server:
+
+```bash
+docker compose up -d --build --remove-orphans
+```
 
 ### Two volumes
 
@@ -206,8 +222,7 @@ the wizard. Lose `/config` and the downloads survive, but the engines and voices
 On first boot, with an empty `/config`, the server writes a config there and never touches it
 again. It differs from an empty one in four things: `install.sourceDir` names the Python sources in
 the image, `install.python` is `3.12`, `workers.voiceDir` is `/config/voices`, and there is a
-generated `management.token`. Leave `server.port` at 8080: the healthcheck and the page both expect
-it inside the container.
+generated `management.token`. Leave `server.port` at 8080, the port compose publishes.
 
 ### No Python in the image
 
@@ -224,9 +239,10 @@ interpreter you mount in instead.
 ### Installing from the page
 
 A published port is never loopback to the core: a request through one arrives from Docker's bridge.
-So the install routes answer only the management token, and the `web` container presents it on the
-page's behalf, reading it from `/config`. It follows an edit to the token once both containers have
-restarted.
+So the install routes answer only the management token, and nginx presents it on the page's behalf.
+It follows an edit to the token once the container restarts. A token that is not a valid bearer
+token, by RFC 6750's alphabet, is not presented and the log says so, since nginx would read a `$` or
+`"` in it as its own syntax.
 
 That makes the page's port the key to the install routes, which run pip, and it is why compose
 publishes both ports on `127.0.0.1` only. Publishing the page to your LAN gives everyone on it that
@@ -269,7 +285,7 @@ fails every load without a C compiler. It is C only; nothing in the image compil
 
 Measured on an RTX 4070 Ti SUPER through `compose.gpu.yaml`: installing Chatterbox took 93 seconds
 and 6.2 GB in `/data`, the first `turbo` sentence 50 seconds while 3.8 GB of weights arrived, and
-the next 0.45 seconds, holding 3.1 GB of VRAM. After both containers were replaced, the first
+the next 0.45 seconds, holding 3.1 GB of VRAM. After the containers were replaced, the first
 sentence took 9 seconds, loading from the volume with nothing fetched.
 
 Docker's default ten-second stop kills a worker before the core has drained it. Compose waits 30
@@ -277,21 +293,15 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 ### unraid
 
-No image is published yet, so build both on the box from a checkout:
+No image is published yet, so build it on the box from a checkout:
 
 ```bash
 docker build -f docker/Dockerfile --target server -t rhapsode-server .
-docker build -f docker/Dockerfile --target web -t rhapsode-web .
-docker network create rhapsode
 ```
 
-Then two containers on that network, so that the page can find the server by name:
-
-- `rhapsode-server`: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
-  `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own `nobody:users`, port
-  8080, and `--stop-timeout 30` in Extra Parameters.
-- `rhapsode-web`: the same `/config` mapping, read-only, `RHAPSODE_UPSTREAM=rhapsode-server:8080`,
-  port 8081 to 80.
+Then one container: `/config` to `/mnt/user/appdata/rhapsode`, `/data` to a share such as
+`/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own `nobody:users`, ports 8080
+and 8081, and `--stop-timeout 30` in Extra Parameters.
 
 Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
 so add it to `management.origins`. That is also the moment the page reaches the install routes from

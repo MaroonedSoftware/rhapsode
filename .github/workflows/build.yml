@@ -60,8 +60,8 @@ jobs:
               with:
                   node-version: 22
 
-            # Builds both images from scratch, which is also the check that the Dockerfile still
-            # matches the workspace. The install it makes has to survive its containers being
+            # Builds the image from scratch, which is also the check that the Dockerfile still
+            # matches the workspace. The install it makes has to survive its container being
             # replaced, because that is the only reason the volumes exist.
-            - name: The images, and an install that outlives its containers
+            - name: The image, and an install that outlives its container
               run: node scripts/docker.smoke.mjs
