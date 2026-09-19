@@ -1,5 +1,5 @@
 import { Alert, Button, Group, Modal, Stack, Text } from '@mantine/core';
-import type { CatalogEntry } from '@rhapsode/sdk';
+import type { CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
 import { LicenseLine } from '../catalog/license.line';
 import { ErrorAlert } from '../shared/error.alert';

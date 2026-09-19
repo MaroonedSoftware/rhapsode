@@ -39,7 +39,7 @@ A link uses `renderRoot={(props: object) => <Link to="..." {...props} />}` and n
 
 ## Talking to the core
 
-**One client, the generated `@rhapsode/sdk`, in `src/api/client.ts`, at `/api`.** The page and the
+**One client, the generated `@maroonedsoftware/rhapsode-sdk`, in `src/api/client.ts`, at `/api`.** The page and the
 core share an origin through a proxy (Vite's in development), so the core needs no CORS, and the
 page's `Origin` is one the management guard admits. The proxy sets `X-Forwarded-For`, which is how
 the core knows a page opened from another machine is remote; keep `xfwd` on.

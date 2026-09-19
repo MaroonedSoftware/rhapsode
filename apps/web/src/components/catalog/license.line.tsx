@@ -1,6 +1,6 @@
 import { Group, Text, Tooltip } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
-import type { License } from '@rhapsode/sdk';
+import type { License } from '@maroonedsoftware/rhapsode-sdk';
 
 /**
  * Both licences, the weights one named separately, because it is the one package metadata never

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Card, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
 import { IconDownload, IconPackage, IconTrash } from '@tabler/icons-react';
-import type { CatalogEntry, InstallJob } from '@rhapsode/sdk';
+import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useCatalog } from '../../api/catalog.queries';
 import { useInstallEngine, useInstallJobs, usePullEngine, useUninstallEngine } from '../../api/installs.queries';

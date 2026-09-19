@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type { InstallJob } from '@rhapsode/sdk';
+import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { sdk } from './client';
 import { queryKeys } from './query.keys';

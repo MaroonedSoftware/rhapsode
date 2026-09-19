@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Capabilities, EngineSpeakRequest, Voice } from '@rhapsode/sdk';
+import type { Capabilities, EngineSpeakRequest, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { sdk } from './client';
 import { queryKeys } from './query.keys';

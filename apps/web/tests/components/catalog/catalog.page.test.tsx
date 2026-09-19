@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CatalogEntry } from '@rhapsode/sdk';
+import type { CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
 import { CatalogPage } from '../../../src/components/catalog/catalog.page';
 import { render, screen } from '../../utils/render';

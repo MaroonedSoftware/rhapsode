@@ -1,4 +1,4 @@
-import type { InstallJob } from '@rhapsode/sdk';
+import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { severityColor } from '../shared/status';
 

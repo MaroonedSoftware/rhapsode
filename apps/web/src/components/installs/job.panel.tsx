@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Alert, Badge, Card, Code, Group, Loader, ScrollArea, Stack, Stepper, Text, Title } from '@mantine/core';
-import type { InstallJob } from '@rhapsode/sdk';
+import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useInstallJob } from '../../api/installs.queries';
 import { useJobFeed } from '../../api/job.feed';

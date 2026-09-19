@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { FeedEvent, FeedProgress } from '@rhapsode/sdk';
+import type { FeedEvent, FeedProgress } from '@maroonedsoftware/rhapsode-sdk';
 
 import { BASE_URL } from './client';
 import { invalidateAfterJob } from './installs.queries';

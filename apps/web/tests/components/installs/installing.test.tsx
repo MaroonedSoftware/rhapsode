@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CatalogEntry, InstallJob } from '@rhapsode/sdk';
+import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { CatalogPage } from '../../../src/components/catalog/catalog.page';
 import { FakeEventSource } from '../../utils/event.source';

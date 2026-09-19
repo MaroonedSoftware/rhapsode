@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Anchor, Badge, Card, Group, Stack, Text, Title } from '@mantine/core';
-import type { CatalogEntry } from '@rhapsode/sdk';
+import type { CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
 import { LicenseLine } from './license.line';
 

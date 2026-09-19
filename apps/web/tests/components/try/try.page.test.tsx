@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Capabilities, CatalogEntry } from '@rhapsode/sdk';
+import type { Capabilities, CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
 import { TryPanel } from '../../../src/components/try/try.panel';
 import { render, screen, setupUser, waitFor, within } from '../../utils/render';
