@@ -1,4 +1,4 @@
-# Both images from this checkout rather than from the registry. docs/operating.md § Docker.
+# The image from this checkout rather than from the registry. docs/operating.md § Docker.
 #
 #   docker compose -f compose.yaml -f compose.build.yaml up -d --build
 #
@@ -6,15 +6,7 @@
 # number, and `docker compose pull` cannot replace what you built with what was published.
 services:
     server:
-        image: ghcr.io/maroonedsoftware/rhapsode-server:local
+        image: ghcr.io/maroonedsoftware/rhapsode:local
         build:
             context: .
             dockerfile: docker/Dockerfile
-            target: server
-
-    web:
-        image: ghcr.io/maroonedsoftware/rhapsode-web:local
-        build:
-            context: .
-            dockerfile: docker/Dockerfile
-            target: web
