@@ -974,6 +974,44 @@ None of this narrows what the rest of this section allows. A remote worker, or a
 operator configured by hand, is whatever version it is, and negotiation is still what decides
 whether the core will speak to it.
 
+### The pin is made at install and broken by an upgrade
+
+An install pins, and nothing re-pins. The virtualenvs outlive the core that made them, deliberately:
+they are gigabytes, they sit on the volume an upgrade is careful to keep, and rebuilding them on
+every release would make upgrading cost what installing cost. So a core that has been upgraded is
+talking to workers pinned to the version it replaced, and **that is the ordinary state of an
+upgraded box**, not an error.
+
+Negotiation does not catch it and is not supposed to. It refuses a worker whose `contract` is too
+**new**, because that one cannot be spoken to at all; a worker that is too old speaks a contract
+this core still supports, which is exactly what additive-only evolution promises. What the operator
+loses is quieter: every field added inside the contract major since that worker was built is a field
+it never sends, and an optional field nobody sends is indistinguishable from one nobody could answer.
+A core two releases ahead of its worker reported no `modelBytes` (§ 3) and read as a card that could
+not be measured.
+
+So the core reports, per engine, **the version of `rhapsode-worker` installed in that engine's
+virtualenv**, as `workerVersion` on the engine summary of `GET /engines` and `GET /health`.
+
+- It is **a diagnostic and never an input to negotiation**. Nothing in the core or in a client may
+  branch on it, and the paragraph above stands unchanged: a client reads `contract` to decide what
+  it may send and still never parses a package version to find out. This field exists so that a
+  human, or a doctor acting for one, can see a pin that an upgrade has broken.
+- It is **read from the virtualenv, not asked of the worker**. A worker would have to be running to
+  answer, and the normal state of an engine is `down` — a model loads when something speaks and
+  leaves when nothing does (§ 3). A version visible only while an engine happens to be loaded would
+  be absent exactly when the question is asked. Reading the installed distribution's metadata needs
+  no process, so it answers for a `down` engine, which is the case that matters.
+- It is **absent rather than guessed**. A remote engine has no virtualenv here, an operator-configured
+  `command` may point anywhere, and a virtualenv whose metadata cannot be read is one the core should
+  not invent a number for. Absent means "not something this core can say", the same way a missing
+  `modelBytes` means "nothing measured it".
+
+A `workerVersion` that differs from the core's own version is the signal, and the remedy is to
+reinstall that engine. It is worth a warning and never a refusal: the worker is contract-legal, it
+works, and an operator who has reasons to run an engine at another version is inside what this
+section allows.
+
 ### The core describes its own API
 
 `GET /openapi.json` answers with the public API as an OpenAPI 3.1 document, generated from

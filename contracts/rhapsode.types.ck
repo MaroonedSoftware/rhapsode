@@ -236,6 +236,11 @@ contract mode(loose) EngineSummary: {
     variant?: string
     lastError?: string
     restarts: int
+    # `rhapsode-worker` as installed in this engine's venv, read from the venv rather than asked of
+    # the worker so that a `down` engine still answers. A diagnostic, never negotiation: one that
+    # differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
+    # includes every remote engine. protocol.md § 9.
+    workerVersion?: string
 }
 
 contract mode(loose) ResidencySummary: {

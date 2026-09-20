@@ -219,7 +219,7 @@ export interface WorkerHealth {
 }
 
 /**
- * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L241)
+ * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L246)
  */
 export interface ResidencySummary {
     resident: number;
@@ -231,7 +231,7 @@ export interface ResidencySummary {
 
 /**
  * One model on the card, and what the core knows about it. protocol.md § 3.
- * generated from [ResidentModel](../../../../../../contracts/rhapsode.types.ck#L249)
+ * generated from [ResidentModel](../../../../../../contracts/rhapsode.types.ck#L254)
  */
 export interface ResidentModel {
     engine: string;
@@ -249,7 +249,7 @@ export interface ResidentModel {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L299)
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L304)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -259,7 +259,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L305)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L310)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -307,12 +307,19 @@ export interface EngineSummary {
     variant?: string;
     lastError?: string;
     restarts: number;
+    /**
+     * `rhapsode-worker` as installed in this engine's venv, read from the venv rather than asked of
+     * the worker so that a `down` engine still answers. A diagnostic, never negotiation: one that
+     * differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
+     * includes every remote engine. protocol.md § 9.
+     */
+    workerVersion?: string;
 }
 
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L276)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L281)
  */
 export interface CatalogEntry {
     id: string;
@@ -362,7 +369,7 @@ export interface ErrorBody {
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L286)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L291)
  */
 export interface InstallJob {
     id: string;
@@ -381,14 +388,14 @@ export interface InstallJob {
 }
 
 /**
- * generated from [ResidencyDetail](../../../../../../contracts/rhapsode.types.ck#L259)
+ * generated from [ResidencyDetail](../../../../../../contracts/rhapsode.types.ck#L264)
  */
 export interface ResidencyDetail extends ResidencySummary {
     models: ResidentModel[];
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L312)
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L317)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -420,7 +427,7 @@ export interface CurrentVariant extends Omit<Variant, 'cloning' | 'blending'> {
 }
 
 /**
- * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L263)
+ * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L268)
  */
 export interface CoreHealth {
     contract: number;

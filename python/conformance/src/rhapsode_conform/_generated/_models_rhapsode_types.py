@@ -230,6 +230,11 @@ class EngineSummary(BaseModel):
     variant: str | None = None
     last_error: str | None = Field(alias="lastError", default=None)
     restarts: int
+    # `rhapsode-worker` as installed in this engine's venv, read from the venv rather than asked of
+    # the worker so that a `down` engine still answers. A diagnostic, never negotiation: one that
+    # differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
+    # includes every remote engine. protocol.md § 9.
+    worker_version: str | None = Field(alias="workerVersion", default=None)
 
 # What exists, installed or not. `/engines` is what this box has; this is what it could have, with
 # both licences, because the weights licence is only worth reading before the install.
