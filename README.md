@@ -197,7 +197,9 @@ runs at about a tenth of that, which is enough to hear it and not enough to use 
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write
 Python and never open a TypeScript file. The SDK handles the socket, the handshake, the error
-taxonomy, format encoding from your native PCM, and the load-retry rules.
+taxonomy, format encoding from your native PCM, the load-retry rules, and splitting text too long
+for one generation: declare how much your model reads at a time and `speak()` stays a function
+about saying one thing.
 
 ```bash
 rhapsode-conform unix:/run/rhapsode/workers/your-engine.sock
@@ -206,7 +208,7 @@ rhapsode-conform unix:/run/rhapsode/workers/your-engine.sock
 Point it at your worker and it says whether that worker is one. Each check names the section of the
 protocol it comes from, and the exit code is the verdict you wire into your own CI. How many run
 depends on the worker: one check per variant and per format it declares, so the reference engine gets
-59 on a machine without ffmpeg and 62 on one with it. Some of them compare audio with and without a cue, with the seed held fixed, which is the
+60 on a machine without ffmpeg and 63 on one with it. Some of them compare audio with and without a cue, with the seed held fixed, which is the
 closest a machine can get to the one thing an adapter has to get right by hand. On an engine a seed
 does not reproduce, those are reported as undecided rather than passed.
 

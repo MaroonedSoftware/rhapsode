@@ -285,6 +285,13 @@ class TestFull:
         with pytest.raises(Unsupported, match=r"CUDA card.*\[vllm\]"):
             engine(tmp_path, "mps").load("full")
 
+    def test_the_split_is_declared_and_kept(self, orpheus: Recorder, tmp_path: Path) -> None:
+        """This adapter splits its own text, so the SDK declares the split and leaves the loop
+        alone. protocol.md § 8."""
+        built = engine(tmp_path, "cuda")
+        assert built.segment_characters == SEGMENT_CHARACTERS
+        assert built.splits_own_text is True
+
     def test_it_claims_what_the_ggufs_claim(self, orpheus: Recorder, tmp_path: Path) -> None:
         declared = engine(tmp_path, "cuda").variants()
         assert declared["full"] == declared["q8"]

@@ -2,6 +2,10 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.5
+
+- The worker SDK splits long text where a reader would pause, so an adapter's `speak()` says one thing and `maxCharacters` stops being every client's problem. An adapter declares `segment_characters` and the SDK breaks the request on sentences, then clauses, then words, calls `speak()` once per piece, seeds each piece from the request's seed plus its index, and joins the audio with whatever silence the adapter declares in `segment_pause_ms`. Three adapters had written this privately and two had written it identically: `_fit` and `_pack` in the Dia and Orpheus adapters were the same twenty lines character for character, and Kokoro's third copy had no clause fallback and a sentence pattern missing the ellipsis, so a long sentence reached the model whole. All three now call `rhapsode_worker.segments`, and Kokoro's loop is gone entirely because it carried nothing across the joint. The capability document declares the split as `segmentation`, beside `cloning` and `blending`, because a client cannot see it and is affected by it: a seed reproduces a generation, so a request split four ways is four seeded generations, and prosody carries across a joint only where the engine carries it. The shared splitter also keeps a two-word cue such as `[clear throat]` whole, which the adapters' own copies only managed because they translated cues into a space-free spelling first.
+
 ## 0.1.4
 
 - `docs/openapi.yaml` describes the public API alone, and at the release version rather than `1.0.0`. It used to merge in the worker protocol, whose `/health` and `/speak` replaced the public ones: the document described a `/speak` that takes no `engine`. The worker protocol has its own document, `docs/openapi.worker.yaml`.

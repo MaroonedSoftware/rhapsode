@@ -22,6 +22,7 @@ import { speakBody, useCapabilities, useDialogue, useSpeak, useVoices, type Spok
 import { ErrorAlert } from '../shared/error.alert';
 import { PageSkeleton } from '../shared/page.skeleton';
 import { DialogueEditor, SAMPLE_TURNS, speakerLabel, type EditedTurn } from './dialogue.editor';
+import { LineLength } from './line.length';
 import { RequestSnippet } from './request.snippet';
 import { VoicesCard } from './voices.card';
 
@@ -289,6 +290,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                                     autosize
                                     minRows={4}
                                 />
+                                <LineLength text={text} variant={variant} claims={claims} current={current} />
                                 {claims.cues.length > 0 ? (
                                     <Stack gap={4}>
                                         <Text size="xs" c="dimmed">

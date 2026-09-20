@@ -7,7 +7,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
     "openapi": "3.1.0",
     "info": {
         "title": "Rhapsode",
-        "version": "0.1.4"
+        "version": "0.1.5"
     },
     "paths": {
         "/health": {
@@ -1157,6 +1157,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "$ref": "#/components/schemas/Blending",
                         "description": "Beside cloning, for the same reason: it needs no model. § 7."
                     },
+                    "segmentation": {
+                        "$ref": "#/components/schemas/Segmentation",
+                        "description": "Whether long text is split into several generations. § 8."
+                    },
                     "dialogue": {
                         "$ref": "#/components/schemas/Dialogue",
                         "description": "Present only where this build answers /dialogue. § 6."
@@ -1217,6 +1221,22 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "supported"
                 ],
                 "description": "Whether a create may carry a `blend` recipe instead of a `reference`. § 7."
+            },
+            "Segmentation": {
+                "type": "object",
+                "properties": {
+                    "supported": {
+                        "type": "boolean"
+                    },
+                    "segmentCharacters": {
+                        "type": "integer",
+                        "description": "The most one generation gets. Absent where nothing splits."
+                    }
+                },
+                "required": [
+                    "supported"
+                ],
+                "description": "Whether text longer than one generation is split rather than refused. protocol.md § 8.\n\nDeclared because a client cannot see the split and is affected by it: a `seed` reproduces a\ngeneration, so a request split four ways is four seeded generations, and prosody carries across a\njoint only where the engine carries it."
             },
             "Streaming": {
                 "type": "object",

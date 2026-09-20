@@ -26,7 +26,7 @@ from .builds import (
 )
 from .codes import Framer
 from .decoder import SnacDecoder
-from .prompt import MAX_TOKENS, prompt, segments, translate_cues
+from .prompt import MAX_TOKENS, SEGMENT_CHARACTERS, prompt, segments, translate_cues
 
 #: SNAC 24 kHz, mono.
 SAMPLE_RATE = 24_000
@@ -76,6 +76,12 @@ class OrpheusEngine(Engine):
     concurrency = 1
 
     max_characters = 4096
+
+    #: Declared, not delegated: this adapter splits its own text because a piece that runs out of
+    #: decoder tokens is logged as the evidence for tuning the number. protocol.md § 8.
+    segment_characters = SEGMENT_CHARACTERS
+    splits_own_text = True
+
     upstream_version = _installed("llama-cpp-python")
 
     _source: TokenSource | None = None

@@ -31,6 +31,18 @@ class Cloning(BaseModel):
 class Blending(BaseModel):
     supported: bool
 
+# Whether text longer than one generation is split rather than refused. protocol.md § 8.
+# 
+# Declared because a client cannot see the split and is affected by it: a `seed` reproduces a
+# generation, so a request split four ways is four seeded generations, and prosody carries across a
+# joint only where the engine carries it.
+class Segmentation(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    supported: bool
+    # The most one generation gets. Absent where nothing splits.
+    segment_characters: int | None = Field(alias="segmentCharacters", default=None)
+
 class Streaming(BaseModel):
     supported: bool
     granularity: Literal["chunk", "sentence"] | None = None
@@ -202,6 +214,8 @@ class Variant(BaseModel):
     cloning: Cloning | None = None
     # Beside cloning, for the same reason: it needs no model. § 7.
     blending: Blending | None = None
+    # Whether long text is split into several generations. § 8.
+    segmentation: Segmentation | None = None
     # Present only where this build answers /dialogue. § 6.
     dialogue: Dialogue | None = None
 

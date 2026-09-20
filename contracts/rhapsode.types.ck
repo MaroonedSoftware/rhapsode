@@ -29,6 +29,7 @@ contract mode(loose) Variant: {
     maxCharacters?: int                 # Overrides the engine's own ceiling for this build.
     cloning?: Cloning                   # Optional only because contract 1 shipped without it. § 4.
     blending?: Blending                 # Beside cloning, for the same reason: it needs no model. § 7.
+    segmentation?: Segmentation         # Whether long text is split into several generations. § 8.
     dialogue?: Dialogue                 # Present only where this build answers /dialogue. § 6.
 }
 
@@ -46,6 +47,16 @@ contract mode(loose) Cloning: {
 # Whether a create may carry a `blend` recipe instead of a `reference`. § 7.
 contract mode(loose) Blending: {
     supported: boolean
+}
+
+# Whether text longer than one generation is split rather than refused. protocol.md § 8.
+#
+# Declared because a client cannot see the split and is affected by it: a `seed` reproduces a
+# generation, so a request split four ways is four seeded generations, and prosody carries across a
+# joint only where the engine carries it.
+contract mode(loose) Segmentation: {
+    supported: boolean
+    segmentCharacters?: int             # The most one generation gets. Absent where nothing splits.
 }
 
 contract mode(loose) Streaming: {

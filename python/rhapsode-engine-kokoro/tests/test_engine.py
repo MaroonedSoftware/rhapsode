@@ -25,10 +25,10 @@ from rhapsode_engine_kokoro import engine as module
 from rhapsode_engine_kokoro import styles
 from rhapsode_engine_kokoro.engine import (
     ENGLISH_VOICES,
-    SENTENCE_PAUSE_SAMPLES,
+    GROUP_CHARACTERS,
+    SEGMENT_PAUSE_MS,
     KokoroEngine,
     chunked_pcm,
-    sentence_groups,
 )
 
 
@@ -134,19 +134,21 @@ class TestSpeaking:
         spoken(loaded, params={"speed": 1.5})
         assert [call.speed for call in loaded._model.calls] == [1.0, 1.5]
 
-    def test_long_text_is_spoken_a_group_at_a_time_with_the_pause_put_back(
-        self, loaded: KokoroEngine
-    ) -> None:
+    def test_one_call_says_one_piece(self, loaded: KokoroEngine) -> None:
+        """The SDK splits long text and joins the pieces (protocol.md § 8), so this adapter is one
+        `create` per request and the loop it used to carry is gone."""
         text = " ".join(f"Sentence number {n} is here." for n in range(20))
         audio = spoken(loaded, text=text)
 
         calls = loaded._model.calls
-        assert len(calls) > 1
-        assert " ".join(call.text for call in calls) == text
-        expected = sum(max(2_400, len(call.text) * 1_200) for call in calls) + SENTENCE_PAUSE_SAMPLES * (
-            len(calls) - 1
-        )
-        assert len(audio) == expected * 2
+        assert [call.text for call in calls] == [text]
+        assert len(audio) == max(2_400, len(text) * 1_200) * 2
+
+    def test_the_split_is_declared_for_the_sdk_to_make(self, engine: KokoroEngine) -> None:
+        """The numbers are this engine's; the splitting is not. protocol.md § 8."""
+        assert engine.segment_characters == GROUP_CHARACTERS
+        assert engine.segment_pause_ms == SEGMENT_PAUSE_MS
+        assert engine.splits_own_text is False
 
     def test_speaking_with_nothing_loaded_is_refused(self, engine: KokoroEngine) -> None:
         with pytest.raises(Unsupported, match="no model"):
@@ -272,18 +274,6 @@ class TestCreatedVoices:
         made.load("fp16")
         with pytest.raises(UnknownVoice):
             spoken(made, voice="gurney")
-
-
-class TestSentenceGroups:
-    def test_gathers_short_sentences_up_to_the_limit(self) -> None:
-        assert list(sentence_groups("One. Two. Three.", limit=10)) == ["One. Two.", "Three."]
-
-    def test_a_sentence_longer_than_the_limit_goes_alone_and_whole(self) -> None:
-        long = "This sentence is much longer than the limit."
-        assert list(sentence_groups(f"Hi. {long} Bye.", limit=10)) == ["Hi.", long, "Bye."]
-
-    def test_text_with_no_sentence_end_is_one_group(self) -> None:
-        assert list(sentence_groups("  no full stop at all  ")) == ["no full stop at all"]
 
 
 class TestPcm:
