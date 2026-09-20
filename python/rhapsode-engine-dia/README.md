@@ -57,7 +57,15 @@ Each generation is whole before any of it is sent, so a long request streams pie
 
 ## Measured
 
-On an Apple Silicon laptop, in float32 on Metal: a 10.3 s line took 105 s to make, so about a tenth
-of real time, and two requests with the same seed were bit-identical. Upstream measured bfloat16 on
-an RTX 4090 at 1.5 times real time in 4.4 GB of VRAM, which is what this build loads on an NVIDIA
-card.
+On an RTX 4070 Ti SUPER, bfloat16: the model loads in 2.5 s and holds 3.3 GiB, speaking peaks at
+4.0 GiB and a cloned voice at 4.9 GiB. It speaks at 1.2 to 1.4 times real time. A 9.2 s line was
+ready in 7.5 s; a 26.5 s text arrived piece by piece, the first after 5.2 s. `rhapsode-conform`
+passes all 47 checks it can decide, and the 48th is blending, which Dia has no voices to do.
+
+On an Apple Silicon laptop, in float32 on Metal, it runs at about a tenth of real time: enough to
+hear it, not enough to use it. A seed reproduces a request bit for bit on both.
+
+By ear, on that card: `[laugh]` is performed rather than read out, one voice holds across a 26.5 s
+reading made of several generations, the two speakers of a dialogue are two people, and a voice
+cloned from one of Dia's own lines is recognisably the same person, speaking alone and in a
+conversation. No machine check can answer any of those, which is why § 8 says to listen.

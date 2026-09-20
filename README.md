@@ -188,8 +188,9 @@ cues, seven of the eight, and the first that streams audio while the model is st
 needed to download it.
 
 [`rhapsode-engine-dia`](python/rhapsode-engine-dia/) is Nari Labs' Dia, which performs all eight
-cues and clones from a clip and the words spoken in it. It wants an NVIDIA card: on a Mac it runs at
-about a tenth of real time, which is enough to hear it and not enough to use it. Its weights are
+cues, clones from a clip and the words spoken in it, and speaks two people in one pass through
+`/dialogue`. On an RTX 4070 Ti SUPER it speaks at 1.2 to 1.4 times real time in 4.0 GiB; on a Mac it
+runs at about a tenth of that, which is enough to hear it and not enough to use it. Its weights are
 6.7 GB.
 
 ## Contributing an engine

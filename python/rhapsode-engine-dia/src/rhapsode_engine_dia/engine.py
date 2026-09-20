@@ -47,6 +47,7 @@ from .prompt import (
     script,
     segments,
     take,
+    tokens_for,
     translate_cues,
     windows,
 )
@@ -293,11 +294,12 @@ class DiaEngine(Engine):
             top_p=dials.get("topP", TOP_P_RANGE[2]),
             seed=None if seed is None else seed + index,
         )
-        spoken = generator.generate(text, sampling, prompt)
+        spoken = generator.generate(text, sampling, prompt, tokens_for(len(text)))
         if spoken.exhausted:
-            # The model was still speaking when it ran out, so this piece ends mid-word, which is
-            # what `room` exists to prevent and the evidence for tuning it.
-            self.log.warn("a segment ran out of positions", characters=len(text))
+            # Still speaking when it ran out of room, so this piece ends mid-word. Evidence for
+            # tuning `room` and `tokens_for`, and on a very short text it is the model failing to
+            # stop rather than the text being long.
+            self.log.warn("a piece ran out of room", characters=len(text))
         return spoken
 
     def _cloned(self, voice: str) -> Prompt:

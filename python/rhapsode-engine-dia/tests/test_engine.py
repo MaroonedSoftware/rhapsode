@@ -21,7 +21,7 @@ from rhapsode_engine_dia.builds import (
     REVISION,
 )
 from rhapsode_engine_dia.engine import CHUNK_SAMPLES, DiaEngine, chunked_pcm
-from rhapsode_engine_dia.prompt import ANCHOR_CHARACTERS, room
+from rhapsode_engine_dia.prompt import ANCHOR_CHARACTERS, room, tokens_for
 
 
 class RecordingLog(Log):
@@ -183,11 +183,14 @@ class TestVoice:
 class TestSampling:
     def test_the_checkpoints_defaults_when_no_dial_is_turned(self, dia: Recorder, tmp_path: Path) -> None:
         spoken(loaded(tmp_path))
-        assert dia.generations[0].sampling == {"guidance_scale": 3.0, "temperature": 1.8, "top_p": 0.9}
+        sampling = dia.generations[0].sampling
+        assert sampling["guidance_scale"], sampling["temperature"] == (3.0, 1.8)
+        assert sampling["top_p"] == 0.9
 
     def test_dials_reach_the_model(self, dia: Recorder, tmp_path: Path) -> None:
         spoken(loaded(tmp_path), params={"cfgScale": 2.0, "temperature": 1.2, "topP": 0.95})
-        assert dia.generations[0].sampling == {"guidance_scale": 2.0, "temperature": 1.2, "top_p": 0.95}
+        sampling = dia.generations[0].sampling
+        assert (sampling["guidance_scale"], sampling["temperature"], sampling["top_p"]) == (2.0, 1.2, 0.95)
 
     def test_each_segment_is_seeded_from_the_request(self, dia: Recorder, tmp_path: Path) -> None:
         spoken(loaded(tmp_path), LONG, seed=7)
@@ -213,12 +216,24 @@ class TestOutput:
         audio = spoken(loaded(tmp_path))
         assert len(audio) == dia.generations[0].frames * HOP * 2
 
-    def test_a_segment_that_ran_out_of_positions_is_logged(self, dia: Recorder, tmp_path: Path) -> None:
+    def test_a_piece_that_ran_out_of_room_is_logged(self, dia: Recorder, tmp_path: Path) -> None:
         dia.frames = MAX_POSITIONS
         built = loaded(tmp_path)
         spoken(built)
         assert isinstance(built.log, RecordingLog)
-        assert [message for message, _ in built.log.warnings] == ["a segment ran out of positions"]
+        assert [message for message, _ in built.log.warnings] == ["a piece ran out of room"]
+
+    def test_a_generation_is_given_a_budget_from_its_text_so_it_cannot_run_on(
+        self, dia: Recorder, tmp_path: Path
+    ) -> None:
+        # Measured on an RTX 4070 Ti SUPER: unbounded, "one" ran to 27 s of murmur where a longer
+        # line stopped after 3.8 s, so a shorter text made more audio than a longer one.
+        spoken(loaded(tmp_path), "one")
+        short = dia.generations[0].sampling["max_new_tokens"]
+        spoken(loaded(tmp_path), "one two three four five six seven eight nine ten")
+        longer = dia.generations[-1].sampling["max_new_tokens"]
+        assert 0 < short < longer
+        assert short >= tokens_for(len("[S1] one"))
 
     def test_a_finished_segment_is_not(self, dia: Recorder, tmp_path: Path) -> None:
         built = loaded(tmp_path)

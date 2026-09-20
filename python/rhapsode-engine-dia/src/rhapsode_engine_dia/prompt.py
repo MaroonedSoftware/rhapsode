@@ -79,6 +79,33 @@ def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
     return _pack([piece for piece in pieces if piece], limit)
 
 
+#: Audio tokens a second, upstream's figure and the one GENERATION_SECONDS is derived from.
+TOKENS_PER_SECOND = 86
+
+#: The slowest reading a piece is budgeted for, well under the 9.4 characters a second measured on
+#: real weights, so the budget is never the thing that ends a piece somebody is still listening to.
+SLOWEST_CHARACTERS_PER_SECOND = 8
+
+#: On top of the reading, for a laugh, a pause, or the breath at the end. Two seconds rather than
+#: four because the budget is what stops a text the model will not: measured on an RTX 4070 Ti SUPER,
+#: "one" used every second it was given, so at four it made 4.8 s where a ten-word line made 4.2 s,
+#: and a shorter text still made more audio than a longer one.
+SLACK_SECONDS = 2.0
+
+
+def tokens_for(characters: int) -> int:
+    """How long a generation of this much text may run before it is cut off.
+
+    Dia does not always stop. Measured on an RTX 4070 Ti SUPER: "one" ran to 27 s of murmur, where
+    "one two three four five six seven eight nine ten" stopped by itself after 3.8 s, so a shorter
+    text made more audio than a longer one. Unbounded, that is a request nobody asked for filling a
+    card and a listener's ears; bounded this generously, a piece that ends early is one the model
+    was not going to finish anyway.
+    """
+    seconds = characters / SLOWEST_CHARACTERS_PER_SECOND + SLACK_SECONDS
+    return int(seconds * TOKENS_PER_SECOND)
+
+
 def room(prompt_seconds: float) -> int:
     """How many characters fit in a generation beside a prompt this long, up to a whole piece."""
     seconds = GENERATION_SECONDS - prompt_seconds - SPARE_SECONDS
