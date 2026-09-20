@@ -155,7 +155,8 @@ Each piece is given a budget of decoder tokens from how much text it holds, beca
 always stop: "one" ran to 27 s of murmur unbounded, where a ten-word line stopped by itself after
 3.8 s.
 
-It answers `/dialogue` (protocol.md § 6) with up to two speakers, which is what it was trained for.
+It answers `/dialogue` (protocol.md § 6) with up to two speakers, which is what it was trained for,
+and they come back sounding like two people.
 It has no voices of its own. A request that names none is read in whichever voice the model picks,
 which a `seed` holds fixed; a long one keeps its first piece's voice to the end. A cloned voice needs
 the clip's `transcript` (protocol.md § 7), and clones best from 5 to 10 seconds of it.

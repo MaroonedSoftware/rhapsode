@@ -64,3 +64,8 @@ passes all 47 checks it can decide, and the 48th is blending, which Dia has no v
 
 On an Apple Silicon laptop, in float32 on Metal, it runs at about a tenth of real time: enough to
 hear it, not enough to use it. A seed reproduces a request bit for bit on both.
+
+By ear, on that card: `[laugh]` is performed rather than read out, one voice holds across a 26.5 s
+reading made of several generations, the two speakers of a dialogue are two people, and a voice
+cloned from one of Dia's own lines is recognisably the same person, speaking alone and in a
+conversation. No machine check can answer any of those, which is why § 8 says to listen.
