@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 
+from rhapsode_worker import segments as text_segments
+
 from .builds import CUE_TAGS
 
 #: The special tokens around a prompt, from upstream's `_format_prompt`: start of human, then the
@@ -38,8 +40,6 @@ _NATIVE_TAG = re.compile(r"<[A-Za-z_ ]+>")
 #: `[laugh]`, for each cue this engine claims. The core has already removed the ones it does not.
 _CUE = re.compile(r"\[(" + "|".join(re.escape(cue) for cue in CUE_TAGS) + r")\]")
 
-_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
-_CLAUSE_END = re.compile(r"(?<=[,;:])\s+")
 _WHITESPACE = re.compile(r"\s+")
 
 
@@ -53,13 +53,11 @@ def translate_cues(text: str) -> str:
 def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
     """Text in pieces of at most `limit` characters, broken where a reader would pause.
 
-    Sentences first, then clauses, then words, and packed back together greedily so that a run of
-    short sentences is one generation rather than several. A single word longer than the limit stays
-    whole: splitting it would have the model read two halves of a word. Tags have no spaces once
-    translated, so none is ever split from the text it follows.
+    The SDK's splitter, so that this engine and Dia cannot drift apart on it: `_fit` and `_pack`
+    here and in `rhapsode_engine_dia.prompt` were the same twenty lines, character for character.
+    protocol.md § 8.
     """
-    pieces = [piece for sentence in _SENTENCE_END.split(text) for piece in _fit(sentence, limit)]
-    return _pack([piece for piece in pieces if piece], limit)
+    return text_segments(text, limit)
 
 
 def prompt(voice: str, segment: str) -> str:
@@ -70,26 +68,3 @@ def prompt(voice: str, segment: str) -> str:
 def framed(token_ids: list[int]) -> list[int]:
     """A tokenised prompt with the special tokens the finetune was trained with around it."""
     return [START_OF_HUMAN, *token_ids, *END_OF_PROMPT]
-
-
-def _fit(sentence: str, limit: int) -> list[str]:
-    if len(sentence) <= limit:
-        return [sentence]
-    clauses = _CLAUSE_END.split(sentence)
-    if len(clauses) > 1:
-        return [piece for clause in clauses for piece in _fit(clause, limit)]
-    return _pack(sentence.split(" "), limit)
-
-
-def _pack(pieces: list[str], limit: int) -> list[str]:
-    packed: list[str] = []
-    current = ""
-    for piece in pieces:
-        if current and len(current) + 1 + len(piece) > limit:
-            packed.append(current)
-            current = piece
-        else:
-            current = f"{current} {piece}" if current else piece
-    if current:
-        packed.append(current)
-    return packed

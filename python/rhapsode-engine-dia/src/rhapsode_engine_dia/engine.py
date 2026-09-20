@@ -40,6 +40,7 @@ from .prompt import (
     CHARACTERS_PER_SECOND,
     FEWEST_CHARACTERS,
     GENERATION_SECONDS,
+    SEGMENT_CHARACTERS,
     SPARE_SECONDS,
     line,
     rendered,
@@ -95,6 +96,12 @@ class DiaEngine(Engine):
     concurrency = 1
 
     max_characters = 4096
+
+    #: Declared, not delegated: this adapter splits its own text because every piece continues from
+    #: the audio of the one before, and each is sized to the room its prompt leaves. The number is
+    #: still what a client is told, because a client cannot see the split. protocol.md § 8.
+    segment_characters = SEGMENT_CHARACTERS
+    splits_own_text = True
 
     #: `[S1]` and `[S2]`, which are the only two speakers the model was trained on.
     max_speakers = 2

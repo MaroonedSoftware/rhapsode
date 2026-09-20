@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from rhapsode_worker import segments as text_segments
+
 from .builds import CUE_TAGS, NATIVE_TAGS
 
 #: The first speaker's tag, which upstream says every input must begin with. The tokenizer reads text
@@ -53,8 +55,6 @@ _NATIVE_TAG = re.compile(
 #: `[laugh]`, for each cue this engine claims. The core has already removed the ones it does not.
 _CUE = re.compile(r"\[(" + "|".join(re.escape(cue) for cue in CUE_TAGS) + r")\]")
 
-_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
-_CLAUSE_END = re.compile(r"(?<=[,;:])\s+")
 _WHITESPACE = re.compile(r"\s+")
 
 
@@ -68,15 +68,13 @@ def translate_cues(text: str) -> str:
 def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
     """Text in pieces of at most `limit` characters, broken where a reader would pause.
 
-    Sentences first, then clauses, then words, and packed back together greedily so that a run of
-    short sentences is one generation rather than several, which matters more here than for most
-    engines because a short generation is one Dia reads badly. A single word longer than the limit
-    stays whole. A tag translated to `(clears throat)` has a space in it, so the word pass could part
-    it from itself; the limit is far longer than any tag, so that can only happen to a tag that lands
-    exactly on a boundary, and it is read as the two words it then is.
+    The SDK's splitter. Packing short sentences back together matters more here than for most
+    engines, because a short generation is one Dia reads badly, and that is a property of the
+    packing rather than of this engine: `_fit` and `_pack` here and in
+    `rhapsode_engine_orpheus.prompt` were the same twenty lines, character for character.
+    protocol.md § 8.
     """
-    pieces = [piece for sentence in _SENTENCE_END.split(text) for piece in _fit(sentence, limit)]
-    return _pack([piece for piece in pieces if piece], limit)
+    return text_segments(text, limit)
 
 
 #: Audio tokens a second, upstream's figure and the one GENERATION_SECONDS is derived from.
@@ -176,26 +174,3 @@ def windows(said: list[Said], limit: int) -> list[list[Said]]:
 def rendered(said: list[Said]) -> str:
     """Turns as the model reads them: `[S1] words [S2] words`."""
     return " ".join(f"{tag} {words}" for tag, words in said)
-
-
-def _fit(sentence: str, limit: int) -> list[str]:
-    if len(sentence) <= limit:
-        return [sentence]
-    clauses = _CLAUSE_END.split(sentence)
-    if len(clauses) > 1:
-        return [piece for clause in clauses for piece in _fit(clause, limit)]
-    return _pack(sentence.split(" "), limit)
-
-
-def _pack(pieces: list[str], limit: int) -> list[str]:
-    packed: list[str] = []
-    current = ""
-    for piece in pieces:
-        if current and len(current) + 1 + len(piece) > limit:
-            packed.append(current)
-            current = piece
-        else:
-            current = f"{current} {piece}" if current else piece
-    if current:
-        packed.append(current)
-    return packed
