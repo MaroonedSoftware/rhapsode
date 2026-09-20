@@ -10,6 +10,8 @@ export { DEFAULTS, type RhapsodeConfig } from './config.js';
 export { RhapsodeError, TAXONOMY, type ErrorCode } from './errors/rhapsode.error.js';
 export { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 export { EngineRegistry, type EngineEntry, type EngineState } from './registry/engine.registry.js';
+export { installedWorkerVersion } from './registry/worker.version.js';
+export { CORE_VERSION } from './core.version.js';
 export { CATALOG, type CatalogRecord } from './registry/engines.catalog.js';
 export { managementGuard } from './management/management.module.js';
 export { isLocalCaller, isLoopback, isLoopbackOrigin, MANAGEMENT_ACCESS_POLICY } from './management/management.access.policy.js';
