@@ -13,6 +13,7 @@ from typing import Any, ClassVar
 from rhapsode_worker import (
     BlendRequest,
     CreateVoiceRequest,
+    DialogueRequest,
     Engine,
     NativeFormat,
     SpeakRequest,
@@ -35,6 +36,10 @@ CHUNK_SAMPLES = SAMPLE_RATE // 10
 #: A tone cannot sound like a person, so what cloning proves here is the plumbing, and a clone that
 #: sounded the same whatever it was given would prove none of it.
 CLONED_HZ = (150.0, 450.0)
+
+#: The pitch of each speaker a dialogue gives no voice, in the order they first speak. A fifth above
+#: the last, so two unvoiced speakers are two sounds, which is all a conversation of tones can prove.
+UNVOICED_HZ = (220.0, 330.0)
 
 VOICES = {
     "sine": (220.0, "A steady sine at A3."),
@@ -198,19 +203,44 @@ class ToneEngine(Engine):
         return dials
 
     def speak(self, request: SpeakRequest) -> Iterator[bytes]:
-        frequency = self._frequency(request.voice)
         dials = self.dials_for(request)
+        yield from self._line(
+            request.text, self._frequency(request.voice), dials, request.seed, request.voice
+        )
+
+    def dialogue(self, request: DialogueRequest) -> Iterator[bytes]:
+        """Each turn in its speaker's pitch, one after another.
+
+        A tone cannot overlap two people the way a dialogue model does, so what this proves is the
+        plumbing: a speaker keeps one pitch from turn to turn, a voiced one sounds like its voice, and
+        an unknown voice is refused before any audio.
+        """
+        pitches = {
+            speaker: self._frequency(request.voices[speaker])
+            if speaker in request.voices
+            else UNVOICED_HZ[index % len(UNVOICED_HZ)]
+            for index, speaker in enumerate(request.speakers)
+        }
+        dials = self.dials_for(request)
+        for index, turn in enumerate(request.turns):
+            seed = None if request.seed is None else request.seed + index
+            voice = request.voices.get(turn.speaker)
+            yield from self._line(turn.text, pitches[turn.speaker], dials, seed, voice)
+
+    def _line(
+        self, text: str, frequency: float, dials: dict[str, float], seed: int | None, voice: str | None
+    ) -> Iterator[bytes]:
         frequency *= dials.get("pitch", 1.0)
         amplitude = dials.get("gain", 0.5)
 
-        if request.seed is not None:
+        if seed is not None:
             # Something a caller can actually check for reproducibility, without pretending the
             # tone is a model. The same seed and text give the same detune, every time.
-            digest = hashlib.sha256(f"{request.seed}:{request.text}".encode()).digest()
+            digest = hashlib.sha256(f"{seed}:{text}".encode()).digest()
             frequency *= 1.0 + (digest[0] / 255.0 - 0.5) * 0.02
 
-        total = max(CHUNK_SAMPLES, int(len(request.text) * SECONDS_PER_CHARACTER * SAMPLE_RATE))
-        yield from _tone(frequency, amplitude, total, square=request.voice == "square")
+        total = max(CHUNK_SAMPLES, int(len(text) * SECONDS_PER_CHARACTER * SAMPLE_RATE))
+        yield from _tone(frequency, amplitude, total, square=voice == "square")
 
 
 def _tone(frequency: float, amplitude: float, samples: int, *, square: bool) -> Iterator[bytes]:

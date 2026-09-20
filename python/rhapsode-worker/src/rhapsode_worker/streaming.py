@@ -35,12 +35,17 @@ async def from_blocking(
     make_iterator: Callable[[], Iterator[bytes]],
     *,
     depth: int = QUEUE_DEPTH,
+    on_exit: Callable[[], None] | None = None,
 ) -> AsyncIterator[bytes]:
     """Run a blocking generator on a thread and yield what it produces.
 
     Closing this async generator early, which is what happens when the client goes away, sets the
     stop flag and drains whatever the thread is blocked on, so the engine stops rather than running
     to the end of a line nobody is listening to.
+
+    It stops at the engine's next chunk, which for an engine that makes each chunk in one blocking
+    call is when that call returns, however long after the client left. `on_exit` is called on the
+    loop when the thread has really ended, which is the only moment the device is free again.
     """
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[bytes | _Stop] = asyncio.Queue(maxsize=depth)
@@ -63,6 +68,9 @@ async def from_blocking(
             # is nobody left to tell.
             with contextlib.suppress(RuntimeError):
                 put(_Stop(failure))
+            if on_exit is not None:
+                with contextlib.suppress(RuntimeError):
+                    loop.call_soon_threadsafe(on_exit)
 
     thread = threading.Thread(target=pump, name="rhapsode-speak", daemon=True)
     thread.start()

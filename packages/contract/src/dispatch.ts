@@ -14,6 +14,8 @@ export interface Claims {
     deliveries: string[];
     dials: Record<string, Dial>;
     maxCharacters?: number;
+    /** Present only where the variant answers `/dialogue`. § 4. */
+    dialogue?: { maxSpeakers: number };
 }
 
 /** A refusal that names what was wrong and what to send instead. */
@@ -89,6 +91,13 @@ export function assertKnownDials(params: Record<string, number> | undefined, dia
     return { ...params };
 }
 
+/**
+ * A bracketed word, for reporting which cues were dropped. `[` is excluded inside as well as `]`, so a
+ * match can end at the next `[`: with only `]` excluded, 40,000 `[` and no `]` took 5.6 s to scan,
+ * since every `[` read to the end of the text. Flagged by CodeQL as js/polynomial-redos.
+ */
+const BRACKETED = /\[[^[\]]+\]/g;
+
 /** What a request becomes once the variant it is going to has had its say. */
 export interface Performable {
     text: string;
@@ -110,9 +119,9 @@ export function performable(
     claims: Claims,
     variant: string,
 ): Performable {
-    const asked = new Set(request.text.match(/\[([^\]]+)\]/g) ?? []);
+    const asked = new Set(request.text.match(BRACKETED) ?? []);
     const text = withoutCues(request.text, claims.cues);
-    const kept = new Set(text.match(/\[([^\]]+)\]/g) ?? []);
+    const kept = new Set(text.match(BRACKETED) ?? []);
 
     const deliveryClaimed = request.delivery !== undefined && claims.deliveries.includes(request.delivery);
 
@@ -138,4 +147,60 @@ export function assertWithinCeiling(text: string, claims: Claims, fallback: numb
     if (text.length > ceiling) {
         throw new DispatchError('bad_request', `\`text\` is ${text.length} characters and this variant accepts ${ceiling}`);
     }
+}
+
+/** One speaker's line, as a dialogue request carries it. § 6. */
+export interface Turn {
+    speaker: string;
+    text: string;
+}
+
+/** What a dialogue becomes once the variant it is going to has had its say. */
+export interface PerformableDialogue {
+    turns: Turn[];
+    params: Record<string, number>;
+    dropped: { cues: string[] };
+}
+
+/**
+ * `performable` for a conversation. protocol.md § 6.
+ *
+ * Refuses a variant that does not declare `dialogue`, more speakers than it takes, and a dialogue
+ * over the ceiling, which is the sum of every turn's text: one take is one budget. Cues come out of
+ * each turn as they would out of `/speak`'s text. There is no delivery to drop, because a dialogue
+ * has none.
+ */
+export function performableDialogue(
+    request: { turns: Turn[]; params?: Record<string, number> },
+    claims: Claims,
+    variant: string,
+    fallbackCeiling: number,
+): PerformableDialogue {
+    if (claims.dialogue === undefined) {
+        throw new DispatchError('unsupported', `variant "${variant}" does not speak dialogue`);
+    }
+    if (request.turns.length === 0) throw new DispatchError('bad_request', '`turns` must have at least one turn');
+
+    const speakers = new Set(request.turns.map(turn => turn.speaker));
+    if (speakers.size > claims.dialogue.maxSpeakers) {
+        throw new DispatchError(
+            'unsupported',
+            `this dialogue has ${speakers.size} speakers and variant "${variant}" takes ${claims.dialogue.maxSpeakers}`,
+        );
+    }
+
+    const ceiling = claims.maxCharacters ?? fallbackCeiling;
+    const length = request.turns.reduce((sum, turn) => sum + turn.text.length, 0);
+    if (length > ceiling) {
+        throw new DispatchError('bad_request', `the turns come to ${length} characters and this variant accepts ${ceiling}`);
+    }
+
+    const dropped = new Set<string>();
+    const turns = request.turns.map(turn => {
+        const ready = performable({ text: turn.text }, claims, variant);
+        ready.dropped.cues.forEach(cue => dropped.add(cue));
+        return { speaker: turn.speaker, text: ready.text };
+    });
+
+    return { turns, params: assertKnownDials(request.params, claims.dials, variant), dropped: { cues: [...dropped] } };
 }

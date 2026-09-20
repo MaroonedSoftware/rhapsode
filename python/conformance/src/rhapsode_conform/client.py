@@ -66,6 +66,7 @@ class Worker:
         filename: str = "reference.wav",
         *,
         blend: str | None = None,
+        transcript: str | None = None,
     ) -> tuple[int, Any]:
         """A clone from `reference`, or a mix from a `blend` recipe. protocol.md § 7."""
         if blend is not None:
@@ -76,7 +77,7 @@ class Worker:
         else:
             response = self._client.post(
                 "/voices",
-                data={"id": voice_id},
+                data={"id": voice_id} | ({} if transcript is None else {"transcript": transcript}),
                 files={"reference": (filename, reference or b"", "audio/wav")},
             )
         return response.status_code, _decode(response)
@@ -91,6 +92,10 @@ class Worker:
 
     def speak(self, body: dict[str, Any]) -> tuple[int, bytes]:
         response = self._client.post("/speak", json=body)
+        return response.status_code, response.content
+
+    def dialogue(self, body: dict[str, Any]) -> tuple[int, bytes]:
+        response = self._client.post("/dialogue", json=body)
         return response.status_code, response.content
 
     def speak_with_headers(self, body: dict[str, Any]) -> tuple[int, bytes, dict[str, str]]:

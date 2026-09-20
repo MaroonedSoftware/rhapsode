@@ -327,7 +327,7 @@ describe('the install routes', () => {
     it('names what it has when asked for an engine it does not', async () => {
         const app = await start(fakeRunner().runner);
 
-        const install = await app.inject({ method: 'POST', url: '/engines/dia/install' });
+        const install = await app.inject({ method: 'POST', url: '/engines/nonesuch/install' });
         expect(install.statusCode).toBe(404);
         expect(install.json().error).toMatchObject({ code: 'unknown_engine' });
 

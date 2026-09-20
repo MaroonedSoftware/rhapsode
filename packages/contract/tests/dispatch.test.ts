@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertKnownDials, assertWithinCeiling, DispatchError, effectiveVariant, performable } from '../src/dispatch.js';
+import { assertKnownDials, assertWithinCeiling, DispatchError, effectiveVariant, performable, performableDialogue } from '../src/dispatch.js';
 import type { Claims } from '../src/dispatch.js';
 
 const turbo: Claims = { cues: ['laugh', 'sigh'], deliveries: [], dials: {} };
@@ -107,5 +107,73 @@ describe('assertWithinCeiling', () => {
     it('falls back to the engine ceiling', () => {
         expect(() => assertWithinCeiling('x'.repeat(11), turbo, 10)).toThrow(/accepts 10/);
         expect(() => assertWithinCeiling('x'.repeat(10), turbo, 10)).not.toThrow();
+    });
+});
+
+describe('performable, on hostile text', () => {
+    it('scans text of nothing but opening brackets in linear time', () => {
+        const started = performance.now();
+        performable({ text: '['.repeat(40_000) }, turbo, 'turbo');
+        expect(performance.now() - started).toBeLessThan(500);
+    });
+
+    it('still reports the cue inside doubled brackets as the one dropped', () => {
+        expect(performable({ text: 'x [[sigh]] y' }, { ...turbo, cues: [] }, 'turbo').dropped.cues).toEqual(['[sigh]']);
+    });
+});
+
+describe('performableDialogue', () => {
+    const dia: Claims = {
+        cues: ['laugh'],
+        deliveries: [],
+        dials: { temperature: { min: 0.5, max: 2, default: 1.8 } },
+        maxCharacters: 40,
+        dialogue: { maxSpeakers: 2 },
+    };
+    const turns = [
+        { speaker: 'a', text: 'Hi [laugh] there' },
+        { speaker: 'b', text: 'Oh [sigh] you' },
+    ];
+
+    it('strips from each turn the cues the variant does not claim, and keeps the rest', () => {
+        const ready = performableDialogue({ turns }, dia, '1.6b', 4096);
+        expect(ready.turns).toEqual([
+            { speaker: 'a', text: 'Hi [laugh] there' },
+            { speaker: 'b', text: 'Oh you' },
+        ]);
+        expect(ready.dropped.cues).toEqual(['[sigh]']);
+    });
+
+    it('refuses a variant that does not declare it', () => {
+        expect(() => performableDialogue({ turns }, turbo, 'turbo', 4096)).toThrow(/does not speak dialogue/);
+    });
+
+    it('refuses more speakers than the variant takes, as unsupported', () => {
+        const crowd = [...turns, { speaker: 'c', text: 'Me too' }];
+        try {
+            performableDialogue({ turns: crowd }, dia, '1.6b', 4096);
+            expect.unreachable();
+        } catch (error) {
+            expect((error as DispatchError).code).toBe('unsupported');
+            expect((error as DispatchError).message).toMatch(/3 speakers/);
+        }
+    });
+
+    it('holds the whole conversation to one ceiling, however it is split', () => {
+        // Each turn is under 40 characters; together they are not.
+        const long = [
+            { speaker: 'a', text: 'x'.repeat(25) },
+            { speaker: 'b', text: 'y'.repeat(25) },
+        ];
+        expect(() => performableDialogue({ turns: long }, dia, '1.6b', 4096)).toThrow(/come to 50 characters/);
+    });
+
+    it('checks the dials once, as for speaking', () => {
+        expect(() => performableDialogue({ turns, params: { speed: 1 } }, dia, '1.6b', 4096)).toThrow(/no dial "speed"/);
+        expect(performableDialogue({ turns, params: { temperature: 1.2 } }, dia, '1.6b', 4096).params).toEqual({ temperature: 1.2 });
+    });
+
+    it('refuses an empty conversation', () => {
+        expect(() => performableDialogue({ turns: [] }, dia, '1.6b', 4096)).toThrow(DispatchError);
     });
 });

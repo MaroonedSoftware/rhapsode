@@ -118,11 +118,47 @@ class SpeakRequest:
 
 
 @dataclass(frozen=True)
+class DialogueTurn:
+    #: A label the request made up, not a voice. The same label is the same person. protocol.md § 6.
+    speaker: str
+    text: str
+
+
+@dataclass(frozen=True)
+class DialogueRequest:
+    """A conversation in one take, already validated against what this variant claims.
+
+    `/speak`'s fields except `text`, `voice` and `delivery`. A delivery reads a whole line one way,
+    and a dialogue has more than one reader.
+    """
+
+    turns: tuple[DialogueTurn, ...]
+    #: Speaker label to voice id, for the speakers that should sound like a particular voice. A
+    #: speaker missing from it is read in whichever voice the engine picks.
+    voices: dict[str, str] = field(default_factory=dict)
+    variant: str | None = None
+    format: str = "wav"
+    language: str = "en"
+    params: dict[str, float] = field(default_factory=dict)
+    seed: int | None = None
+    stream: bool = True
+
+    @property
+    def speakers(self) -> tuple[str, ...]:
+        """Each distinct speaker, in the order they first speak."""
+        return tuple(dict.fromkeys(turn.speaker for turn in self.turns))
+
+
+@dataclass(frozen=True)
 class CreateVoiceRequest:
     id: str
     reference: bytes
     label: str | None = None
     filename: str | None = None
+    #: The words spoken in the reference, when the client sent them. An engine that clones by
+    #: continuing from the clip needs them and refuses a create without them as `BadRequest`, naming
+    #: the field; one that does not read them ignores them. protocol.md § 7.
+    transcript: str | None = None
 
 
 @dataclass(frozen=True)
@@ -191,6 +227,8 @@ class Engine:
     #: genuinely batch raises this and takes responsibility for what happens.
     concurrency: int = 1
     max_characters: int = DEFAULT_MAX_CHARACTERS
+    #: How many speakers one conversation may have, where this engine overrides `dialogue`.
+    max_speakers: int = 2
     adapter_version: str = "0.0.0"
     upstream_version: str | None = None
     default_variant: str | None = None
@@ -244,6 +282,19 @@ class Engine:
         """
         raise Unsupported("this engine does not fetch weights ahead of loading them")
 
+    def dialogue(self, request: DialogueRequest) -> Iterator[bytes]:
+        """A conversation in one take, as native PCM. protocol.md § 6.
+
+        Optional, and declared rather than discovered: overriding this is what puts `dialogue` on
+        every variant in the capability document, so a client knows before it asks.
+        """
+        raise Unsupported("this engine does not speak dialogue")
+
+    @property
+    def supports_dialogue(self) -> bool:
+        """Derived, so an adapter cannot advertise dialogue it did not implement, or the reverse."""
+        return type(self).dialogue is not Engine.dialogue
+
     def preview(self, voice_id: str) -> Iterator[bytes]:
         """A fixed line in the named voice, so `previewUrl` works for every engine for free."""
         return self.speak(SpeakRequest(text=PREVIEW_TEXT, voice=voice_id, format="wav", stream=False))
@@ -285,12 +336,14 @@ class Engine:
         """
         return dials
 
-    def dials_for(self, request: SpeakRequest) -> dict[str, float]:
-        """Declared defaults, overlaid with the request's validated params, then the delivery hook."""
+    def dials_for(self, request: SpeakRequest | DialogueRequest) -> dict[str, float]:
+        """Declared defaults, overlaid with the request's validated params, then the delivery hook.
+        A dialogue has no delivery, so for one the hook is asked for none."""
         variant = self.variants()[self.effective_variant(request.variant)]
         dials = {name: default for name, (_, _, default) in variant.dials.items()}
         dials.update(request.params)
-        return self.apply_delivery(request.delivery, dials)
+        delivery = request.delivery if isinstance(request, SpeakRequest) else None
+        return self.apply_delivery(delivery, dials)
 
     def effective_variant(self, requested: str | None) -> str:
         """What the request is actually about. protocol.md § 4, as amended.

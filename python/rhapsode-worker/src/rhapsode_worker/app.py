@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from . import encoding, streaming, trailers
-from .engine import CreateVoiceRequest, check_voice_id
+from .engine import CreateVoiceRequest, DialogueRequest, SpeakRequest, check_voice_id
 from .errors import BadRequest, WorkerError, classify
 from .worker import Worker
 
@@ -58,12 +58,16 @@ def create_app(worker: Worker) -> Starlette:
             return JSONResponse(await worker.blend_voice(voice_id, blend, label), status_code=201)
         if reference is None or isinstance(reference, str):
             raise BadRequest("`reference` must be an uploaded file, or send a `blend` recipe")
+        transcript = form.get("transcript")
         document = await worker.create_voice(
             CreateVoiceRequest(
                 id=voice_id,
                 reference=await reference.read(),
                 label=label,
                 filename=reference.filename,
+                # Blank is absent, because a form field left empty arrives as "" and an engine that
+                # needs the words should be able to refuse a create that gave none.
+                transcript=transcript.strip() or None if isinstance(transcript, str) else None,
             )
         )
         return JSONResponse(document, status_code=201)
@@ -85,8 +89,9 @@ def create_app(worker: Worker) -> Starlette:
 
         native = worker.engine.native_format
         async with worker.slots():
+            await worker.until_synthesising_fewer_than(max(1, worker.engine.concurrency))
             pcm = bytearray()
-            async for chunk in streaming.from_blocking(lambda: worker.engine.preview(voice)):
+            async for chunk in worker.preview(voice):
                 pcm.extend(chunk)
 
         body = encoding.wav_header(native.sample_rate, native.channels, len(pcm)) + bytes(pcm)
@@ -126,7 +131,19 @@ def create_app(worker: Worker) -> Starlette:
     async def speak(request: Request) -> Response:
         worker.reject_if_draining()
         _check_disconnect_assumption(request, worker)
-        spoken = worker.validate(await _json_body(request))
+        return await answer(worker.validate(await _json_body(request)))
+
+    async def dialogue(request: Request) -> Response:
+        # Refused before the body is read by an engine without it, so an old client that sends a
+        # conversation to the wrong engine hears why rather than a validation error about its turns.
+        worker.reject_if_draining()
+        _check_disconnect_assumption(request, worker)
+        return await answer(worker.validate_dialogue(await _json_body(request)))
+
+    async def answer(spoken: SpeakRequest | DialogueRequest) -> Response:
+        """Everything after validation, which `/speak` and `/dialogue` do identically: load on demand,
+        hold a slot for as long as the audio lasts, and fail with a status for as long as one can
+        still be sent. protocol.md § 6."""
         await worker.ensure_loaded(spoken.variant)
 
         native = worker.engine.native_format
@@ -137,6 +154,13 @@ def create_app(worker: Worker) -> Starlette:
         # streaming handler returns long before the audio does.
         await worker.slots().acquire()
         released = False
+        # And until an abandoned synthesis has really ended, since it is still on the device: one
+        # model, one utterance at a time is what `concurrency` promises. protocol.md § 3.
+        try:
+            await worker.until_synthesising_fewer_than(max(1, worker.engine.concurrency))
+        except BaseException:
+            worker.slots().release()
+            raise
 
         def release() -> None:
             nonlocal released
@@ -164,7 +188,7 @@ def create_app(worker: Worker) -> Starlette:
             # priming only the encoded stream primed that header: an unknown voice in wav was an
             # aborted connection. The encoded stream is primed after, so an ffmpeg that cannot start
             # is still a status.
-            first_pcm, pcm = await streaming.prime(streaming.from_blocking(lambda: worker.pcm(spoken)))
+            first_pcm, pcm = await streaming.prime(worker.synthesis(spoken))
             if first_pcm is None:
                 raise WorkerError("the engine produced no audio")
             counted = _Counted(pcm)
@@ -251,6 +275,7 @@ def create_app(worker: Worker) -> Starlette:
             Route("/terminate", answered(terminate), methods=["POST"]),
             Route("/fetch", answered(fetch), methods=["POST"]),
             Route("/speak", answered(speak), methods=["POST"]),
+            Route("/dialogue", answered(dialogue), methods=["POST"]),
         ],
         # Behind `answered`, for anything raised outside an endpoint. Starlette's own 404 and 405
         # are HTTPExceptions and never reach either.
@@ -282,7 +307,7 @@ async def _buffered(worker: Worker, spoken: Any, content_type: str, native: Any)
     only case where a WAV header can carry the real sizes.
     """
     pcm = bytearray()
-    async for chunk in streaming.from_blocking(lambda: worker.pcm(spoken)):
+    async for chunk in worker.synthesis(spoken):
         pcm.extend(chunk)
 
     async def once() -> Any:

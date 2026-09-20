@@ -29,6 +29,12 @@ contract mode(loose) Variant: {
     maxCharacters?: int                 # Overrides the engine's own ceiling for this build.
     cloning?: Cloning                   # Optional only because contract 1 shipped without it. § 4.
     blending?: Blending                 # Beside cloning, for the same reason: it needs no model. § 7.
+    dialogue?: Dialogue                 # Present only where this build answers /dialogue. § 6.
+}
+
+# A build that speaks a conversation in one pass. protocol.md § 6.
+contract mode(loose) Dialogue: {
+    maxSpeakers: int
 }
 
 contract mode(loose) Cloning: {
@@ -115,6 +121,7 @@ contract CreateVoiceForm: {
     label?: string
     reference?: binary      # Exactly one of `reference` and `blend`. § 7.
     blend?: string          # A recipe, `name(weight)+name(weight)`, over voices the engine has.
+    transcript?: string     # The words spoken in the reference. Required by an engine that continues from it.
 }
 
 ############################################################################################
@@ -135,6 +142,25 @@ contract SpeakRequest: {
 
 contract EngineSpeakRequest: SpeakRequest & {
     engine: string
+}
+
+# One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
+contract DialogueTurn: {
+    speaker: string(min=1)
+    text: string(min=1)
+}
+
+# A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
+# `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
+contract DialogueRequest: {
+    turns: array(DialogueTurn)
+    voices?: record(string, string)                     # Speaker label to voice id.
+    variant?: string
+    format?: enum(wav, mp3, opus, flac, pcm)
+    language?: string
+    params?: record(string, number)
+    seed?: int
+    stream?: boolean
 }
 
 contract LoadRequest: {

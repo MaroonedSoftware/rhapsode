@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import RunningWorker
+from conftest import RunningWorker, await_handshake, spawn, stop, url_for
 
 from rhapsode_worker import BadRequest
 from rhapsode_worker.engine import Engine, check_voice_id
@@ -33,15 +34,17 @@ def call(
         return error.code, json.loads(error.read())
 
 
-def multipart(voice_id: str, label: str | None = None) -> tuple[bytes, dict[str, str]]:
+def multipart(
+    voice_id: str, label: str | None = None, transcript: str | None = None
+) -> tuple[bytes, dict[str, str]]:
     boundary = "rhapsodeboundary"
-    labelled = (
-        ""
-        if label is None
-        else f'--{boundary}\r\nContent-Disposition: form-data; name="label"\r\n\r\n{label}\r\n'
+    fields = "".join(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+        for name, value in (("label", label), ("transcript", transcript))
+        if value is not None
     )
     body = (
-        labelled + f'--{boundary}\r\nContent-Disposition: form-data; name="id"\r\n\r\n{voice_id}\r\n'
+        fields + f'--{boundary}\r\nContent-Disposition: form-data; name="id"\r\n\r\n{voice_id}\r\n'
         f'--{boundary}\r\nContent-Disposition: form-data; name="reference"; filename="clip.wav"\r\n'
         "Content-Type: audio/wav\r\n\r\nRIFF\r\n"
         f"--{boundary}--\r\n"
@@ -126,3 +129,45 @@ class TestLabels:
         _, recreated = call(worker, "/voices", method="POST", body=body, headers=headers)
         # Deleting forgets the label, so the same id recreated without one is not named after the old.
         assert json.loads(recreated)["label"] != "The Announcer"
+
+
+class TestTranscripts:
+    """The words spoken in a reference, for an engine that clones by continuing from it. § 7."""
+
+    @pytest.fixture
+    def transcribed(self) -> Iterator[str]:
+        process = spawn(module="engines.transcribed", engine="transcribed")
+        try:
+            yield url_for(await_handshake(process))
+        finally:
+            stop(process)
+
+    @staticmethod
+    def create(base: str, transcript: str | None) -> tuple[int, Any]:
+        body, headers = multipart("narrator", transcript=transcript)
+        request = urllib.request.Request(f"{base}/voices", data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read())
+
+    def test_reaches_the_adapter_as_it_was_written(self, transcribed: str) -> None:
+        status, created = self.create(transcribed, "Hello, this is me.")
+        assert (status, created["description"]) == (201, "Hello, this is me.")
+
+    def test_absent_is_absent(self, transcribed: str) -> None:
+        status, body = self.create(transcribed, None)
+        assert (status, body["error"]["code"]) == (400, "bad_request")
+        assert "transcript" in body["error"]["message"]
+
+    def test_blank_is_absent_too(self, transcribed: str) -> None:
+        # A form field left empty arrives as "". An engine that needs the words must be able to tell.
+        status, body = self.create(transcribed, "   ")
+        assert (status, body["error"]["code"]) == (400, "bad_request")
+
+    def test_an_engine_that_does_not_read_it_ignores_it(self, worker: RunningWorker) -> None:
+        body, headers = multipart("announcer", transcript="Whatever it said.")
+        status, _ = call(worker, "/voices", method="POST", body=body, headers=headers)
+        assert status == 201
+        assert call(worker, "/voices/announcer", method="DELETE")[0] == 204

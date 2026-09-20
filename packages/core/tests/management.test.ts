@@ -212,7 +212,7 @@ describe('GET /catalog', () => {
         const { app } = await start();
         const catalog = (await app.inject({ method: 'GET', url: '/catalog' })).json();
 
-        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['chatterbox', 'kokoro', 'orpheus', 'tone']);
+        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['chatterbox', 'dia', 'kokoro', 'orpheus', 'tone']);
         for (const entry of catalog) CatalogEntry.parse(entry);
         expect(catalog.find((entry: CatalogEntry) => entry.id === 'chatterbox')).toMatchObject({
             package: 'rhapsode-engine-chatterbox',
@@ -230,6 +230,11 @@ describe('GET /catalog', () => {
             package: 'rhapsode-engine-orpheus',
             defaultVariant: 'q8',
             license: { weights: 'Apache-2.0', weightsCommercialUse: true },
+        });
+        expect(catalog.find((entry: CatalogEntry) => entry.id === 'dia')).toMatchObject({
+            package: 'rhapsode-engine-dia',
+            defaultVariant: '1.6b',
+            license: { code: 'Apache-2.0', weights: 'Apache-2.0', weightsCommercialUse: true },
         });
     });
 

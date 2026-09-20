@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconArrowsShuffle, IconMicrophone, IconPlayerPlay, IconTrash, IconUpload } from '@tabler/icons-react';
 import type { Cloning, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -158,6 +158,7 @@ function CloneForm({ engine, cloning, onCloned }: CloneFormProps) {
     const clone = useCloneVoice(engine);
     const [id, setId] = useState('');
     const [label, setLabel] = useState('');
+    const [transcript, setTranscript] = useState('');
     const [file, setFile] = useState<File | null>(null);
 
     const formats = cloning?.formats;
@@ -171,13 +172,14 @@ function CloneForm({ engine, cloning, onCloned }: CloneFormProps) {
     const submit = () => {
         if (file === null || idError || fileError || id === '') return;
         clone.mutate(
-            { id, label, reference: file },
+            { id, label, reference: file, ...(audio ? { transcript } : {}) },
             {
                 onSuccess: voice => {
                     notifySuccess(`${voice.label} was ${audio ? 'cloned' : 'added'}.`);
                     onCloned(voice.id);
                     setId('');
                     setLabel('');
+                    setTranscript('');
                     setFile(null);
                 },
             },
@@ -208,6 +210,19 @@ function CloneForm({ engine, cloning, onCloned }: CloneFormProps) {
                 clearable
             />
             <IdFields id={id} label={label} idError={idError} onId={setId} onLabel={setLabel} />
+            {/* With a recording, always: the capability document cannot say which engines need the
+                words, and one that does not read them ignores them. A style vector has none. § 7. */}
+            {audio ? (
+                <Textarea
+                    label="Transcript"
+                    description="What is said in the clip, word for word. Some engines need it to clone."
+                    placeholder="Hello, this is how I sound."
+                    autosize
+                    minRows={2}
+                    value={transcript}
+                    onChange={event => setTranscript(event.currentTarget.value)}
+                />
+            ) : undefined}
             {clone.isError ? (
                 <ErrorAlert title={`That voice was not ${audio ? 'cloned' : 'added'}`} error={clone.error} fallback="The server did not answer." />
             ) : undefined}

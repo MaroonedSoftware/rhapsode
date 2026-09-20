@@ -13,7 +13,15 @@ export interface Dial {
 }
 
 /**
- * generated from [Cloning](../../../../../../contracts/rhapsode.types.ck#L34)
+ * A build that speaks a conversation in one pass. protocol.md § 6.
+ * generated from [Dialogue](../../../../../../contracts/rhapsode.types.ck#L36)
+ */
+export interface Dialogue {
+    maxSpeakers: number;
+}
+
+/**
+ * generated from [Cloning](../../../../../../contracts/rhapsode.types.ck#L40)
  */
 export interface Cloning {
     supported: boolean;
@@ -25,14 +33,14 @@ export interface Cloning {
 
 /**
  * Whether a create may carry a `blend` recipe instead of a `reference`. § 7.
- * generated from [Blending](../../../../../../contracts/rhapsode.types.ck#L41)
+ * generated from [Blending](../../../../../../contracts/rhapsode.types.ck#L47)
  */
 export interface Blending {
     supported: boolean;
 }
 
 /**
- * generated from [Streaming](../../../../../../contracts/rhapsode.types.ck#L45)
+ * generated from [Streaming](../../../../../../contracts/rhapsode.types.ck#L51)
  */
 export interface Streaming {
     supported: boolean;
@@ -40,7 +48,7 @@ export interface Streaming {
 }
 
 /**
- * generated from [NativeFormat](../../../../../../contracts/rhapsode.types.ck#L50)
+ * generated from [NativeFormat](../../../../../../contracts/rhapsode.types.ck#L56)
  */
 export interface NativeFormat {
     /** v1 accepts pcm_s16le and nothing else. */
@@ -50,7 +58,7 @@ export interface NativeFormat {
 }
 
 /**
- * generated from [EngineIdentity](../../../../../../contracts/rhapsode.types.ck#L67)
+ * generated from [EngineIdentity](../../../../../../contracts/rhapsode.types.ck#L73)
  */
 export interface EngineIdentity {
     id: string;
@@ -63,7 +71,7 @@ export interface EngineIdentity {
  * Code and weights separately, because the weights licence is the one package metadata never reveals
  * and the one that decides whether a commercial user may ship. A scanner reads the package, reports
  * the code licence, and is wrong in the way that matters.
- * generated from [License](../../../../../../contracts/rhapsode.types.ck#L77)
+ * generated from [License](../../../../../../contracts/rhapsode.types.ck#L83)
  */
 export interface License {
     code: string;
@@ -73,7 +81,7 @@ export interface License {
 }
 
 /**
- * generated from [Device](../../../../../../contracts/rhapsode.types.ck#L84)
+ * generated from [Device](../../../../../../contracts/rhapsode.types.ck#L90)
  */
 export interface Device {
     type: 'cuda' | 'rocm' | 'mps' | 'cpu';
@@ -82,7 +90,7 @@ export interface Device {
 }
 
 /**
- * generated from [Voice](../../../../../../contracts/rhapsode.types.ck#L104)
+ * generated from [Voice](../../../../../../contracts/rhapsode.types.ck#L110)
  */
 export interface Voice {
     id: string;
@@ -96,7 +104,7 @@ export interface Voice {
 }
 
 /**
- * generated from [CreateVoiceForm](../../../../../../contracts/rhapsode.types.ck#L113)
+ * generated from [CreateVoiceForm](../../../../../../contracts/rhapsode.types.ck#L119)
  */
 export interface CreateVoiceForm {
     id: string;
@@ -105,10 +113,12 @@ export interface CreateVoiceForm {
     reference?: Blob;
     /** A recipe, `name(weight)+name(weight)`, over voices the engine has. */
     blend?: string;
+    /** The words spoken in the reference. Required by an engine that continues from it. */
+    transcript?: string;
 }
 
 /**
- * generated from [SpeakRequest](../../../../../../contracts/rhapsode.types.ck#L124)
+ * generated from [SpeakRequest](../../../../../../contracts/rhapsode.types.ck#L131)
  */
 export interface SpeakRequest {
     text: string;
@@ -127,7 +137,16 @@ export interface SpeakRequest {
 }
 
 /**
- * generated from [LoadRequest](../../../../../../contracts/rhapsode.types.ck#L140)
+ * One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
+ * generated from [DialogueTurn](../../../../../../contracts/rhapsode.types.ck#L148)
+ */
+export interface DialogueTurn {
+    speaker: string;
+    text: string;
+}
+
+/**
+ * generated from [LoadRequest](../../../../../../contracts/rhapsode.types.ck#L166)
  */
 export interface LoadRequest {
     variant?: string;
@@ -136,7 +155,7 @@ export interface LoadRequest {
 /**
  * Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
  * not loaded yet. protocol.md § 8.
- * generated from [FetchRequest](../../../../../../contracts/rhapsode.types.ck#L146)
+ * generated from [FetchRequest](../../../../../../contracts/rhapsode.types.ck#L172)
  */
 export interface FetchRequest {
     variant: string;
@@ -147,7 +166,7 @@ export interface FetchRequest {
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../../../contracts/rhapsode.types.ck#L158)
+ * generated from [ErrorDetail](../../../../../../contracts/rhapsode.types.ck#L184)
  */
 export interface ErrorDetail {
     /**
@@ -172,7 +191,7 @@ export interface ErrorDetail {
 }
 
 /**
- * generated from [WorkerHealth](../../../../../../contracts/rhapsode.types.ck#L176)
+ * generated from [WorkerHealth](../../../../../../contracts/rhapsode.types.ck#L202)
  */
 export interface WorkerHealth {
     process: 'up' | 'draining';
@@ -183,7 +202,7 @@ export interface WorkerHealth {
 }
 
 /**
- * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L195)
+ * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L221)
  */
 export interface ResidencySummary {
     resident: number;
@@ -194,7 +213,7 @@ export interface ResidencySummary {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L238)
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L264)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -204,7 +223,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L244)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L270)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -234,10 +253,12 @@ export interface Variant {
     cloning?: Cloning;
     /** Beside cloning, for the same reason: it needs no model. § 7. */
     blending?: Blending;
+    /** Present only where this build answers /dialogue. § 6. */
+    dialogue?: Dialogue;
 }
 
 /**
- * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L184)
+ * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L210)
  */
 export interface EngineSummary {
     id: string;
@@ -253,7 +274,7 @@ export interface EngineSummary {
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L215)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L241)
  */
 export interface CatalogEntry {
     id: string;
@@ -268,21 +289,38 @@ export interface CatalogEntry {
 }
 
 /**
- * generated from [EngineSpeakRequest](../../../../../../contracts/rhapsode.types.ck#L136)
+ * generated from [EngineSpeakRequest](../../../../../../contracts/rhapsode.types.ck#L143)
  */
 export interface EngineSpeakRequest extends SpeakRequest {
     engine: string;
 }
 
 /**
- * generated from [ErrorBody](../../../../../../contracts/rhapsode.types.ck#L168)
+ * A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
+ * `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
+ * generated from [DialogueRequest](../../../../../../contracts/rhapsode.types.ck#L155)
+ */
+export interface DialogueRequest {
+    turns: DialogueTurn[];
+    /** Speaker label to voice id. */
+    voices?: Record<string, string>;
+    variant?: string;
+    format?: 'wav' | 'mp3' | 'opus' | 'flac' | 'pcm';
+    language?: string;
+    params?: Record<string, number>;
+    seed?: number;
+    stream?: boolean;
+}
+
+/**
+ * generated from [ErrorBody](../../../../../../contracts/rhapsode.types.ck#L194)
  */
 export interface ErrorBody {
     error: ErrorDetail;
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L225)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L251)
  */
 export interface InstallJob {
     id: string;
@@ -301,7 +339,7 @@ export interface InstallJob {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L251)
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L277)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -321,7 +359,7 @@ export interface FeedEvent {
  * The resident build, and everything true only while it is resident. Absent from the capability
  * document entirely when nothing is loaded, because a worker in up(unloaded) has nothing to
  * describe and an invented answer is worse than no answer.
- * generated from [CurrentVariant](../../../../../../contracts/rhapsode.types.ck#L59)
+ * generated from [CurrentVariant](../../../../../../contracts/rhapsode.types.ck#L65)
  */
 export interface CurrentVariant extends Omit<Variant, 'cloning' | 'blending'> {
     variant: string;
@@ -333,7 +371,7 @@ export interface CurrentVariant extends Omit<Variant, 'cloning' | 'blending'> {
 }
 
 /**
- * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L202)
+ * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L228)
  */
 export interface CoreHealth {
     contract: number;
@@ -343,7 +381,7 @@ export interface CoreHealth {
 }
 
 /**
- * generated from [Capabilities](../../../../../../contracts/rhapsode.types.ck#L90)
+ * generated from [Capabilities](../../../../../../contracts/rhapsode.types.ck#L96)
  */
 export interface Capabilities {
     /** The contract major this worker settled on. § 9. */

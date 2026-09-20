@@ -18,9 +18,10 @@ import {
 import { IconPlayerPlay } from '@tabler/icons-react';
 import type { CurrentVariant, EngineSpeakRequest, Variant, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
-import { speakBody, useCapabilities, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
+import { speakBody, useCapabilities, useDialogue, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
 import { PageSkeleton } from '../shared/page.skeleton';
+import { DialogueEditor, SAMPLE_TURNS, speakerLabel, type EditedTurn } from './dialogue.editor';
 import { RequestSnippet } from './request.snippet';
 import { VoicesCard } from './voices.card';
 
@@ -69,7 +70,11 @@ interface ControlsProps {
 
 function Controls({ engine, variants, initial, voices, current }: ControlsProps) {
     const speak = useSpeak();
+    const converse = useDialogue();
     const [variant, setVariant] = useState(initial);
+    const [mode, setMode] = useState<'line' | 'dialogue'>('line');
+    const [turns, setTurns] = useState<EditedTurn[]>(SAMPLE_TURNS);
+    const [speakerVoices, setSpeakerVoices] = useState<Record<number, string>>({});
     const [voice, setVoice] = useState<string | undefined>(undefined);
     const [text, setText] = useState(SAMPLE);
     const [delivery, setDelivery] = useState<string>('');
@@ -86,6 +91,10 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
     const cloning = claims.cloning ?? current?.cloning;
     // The same for blending, which a worker that predates it never claims: absent is no. § 4.
     const blending = (claims.blending ?? current?.blending)?.supported === true;
+    // Offered only where the variant declares it, which is the whole of how the page knows. § 4.
+    const dialogue = mode === 'dialogue' && claims.dialogue !== undefined;
+    const asking = dialogue ? converse : speak;
+    const spokenTurns = turns.filter(turn => turn.text.trim() !== '');
 
     // The previous line's URL is released when it is replaced, and the last when the panel goes.
     useEffect(
@@ -102,6 +111,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
         setDelivery('');
         setDials({});
         setLanguage(undefined);
+        if (variants[next]?.dialogue === undefined) setMode('line');
     };
 
     const insertCue = (cue: string) => {
@@ -131,13 +141,36 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
     const say = () => {
         setSlow(false);
         const timer = setTimeout(() => setSlow(true), SLOW_MS);
-        speak.mutate(request, {
-            onSuccess: spoken => setPlayed(spoken),
+        const settle = {
+            onSuccess: (spoken: Spoken) => setPlayed(spoken),
             onSettled: () => {
                 clearTimeout(timer);
                 setSlow(false);
             },
-        });
+        };
+        if (dialogue) {
+            // A voice only for a speaker who has a turn: the core refuses one for anybody else.
+            const speaking = new Set(spokenTurns.map(turn => turn.speaker));
+            const voices = Object.fromEntries(
+                Object.entries(speakerVoices)
+                    .filter(([speaker]) => speaking.has(Number(speaker)))
+                    .map(([speaker, id]) => [speakerLabel(Number(speaker)), id]),
+            );
+            converse.mutate(
+                {
+                    engine,
+                    variant,
+                    turns: spokenTurns.map(turn => ({ speaker: speakerLabel(turn.speaker), text: turn.text })),
+                    ...(Object.keys(voices).length === 0 ? {} : { voices }),
+                    ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
+                    ...(language === undefined ? {} : { language }),
+                    ...(seed === undefined ? {} : { seed }),
+                },
+                settle,
+            );
+            return;
+        }
+        speak.mutate(request, settle);
     };
 
     return (
@@ -153,14 +186,31 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                             onChange={value => value && changeVariant(value)}
                             allowDeselect={false}
                         />
-                        <Select
-                            label="Voice"
-                            placeholder="The engine's default"
-                            data={voices.map(entry => ({ value: entry.id, label: entry.label }))}
-                            value={voice !== undefined && voices.some(entry => entry.id === voice) ? voice : null}
-                            onChange={value => setVoice(value ?? undefined)}
-                            clearable
-                        />
+                        {claims.dialogue !== undefined ? (
+                            <Stack gap={4}>
+                                <Text size="sm" fw={500}>
+                                    Speak
+                                </Text>
+                                <SegmentedControl
+                                    data={[
+                                        { value: 'line', label: 'A line' },
+                                        { value: 'dialogue', label: `A conversation, up to ${claims.dialogue.maxSpeakers}` },
+                                    ]}
+                                    value={mode}
+                                    onChange={value => setMode(value as 'line' | 'dialogue')}
+                                />
+                            </Stack>
+                        ) : undefined}
+                        {dialogue ? undefined : (
+                            <Select
+                                label="Voice"
+                                placeholder="The engine's default"
+                                data={voices.map(entry => ({ value: entry.id, label: entry.label }))}
+                                value={voice !== undefined && voices.some(entry => entry.id === voice) ? voice : null}
+                                onChange={value => setVoice(value ?? undefined)}
+                                clearable
+                            />
+                        )}
                         {languages.length > 1 ? (
                             <Select
                                 label="Language"
@@ -169,7 +219,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                                 onChange={value => setLanguage(value ?? undefined)}
                             />
                         ) : undefined}
-                        {claims.deliveries.length > 0 ? (
+                        {claims.deliveries.length > 0 && !dialogue ? (
                             <Stack gap={4}>
                                 <Text size="sm" fw={500}>
                                     Delivery
@@ -217,66 +267,94 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                 <Card>
                     <Stack gap="md">
                         <Title order={2} size="h4">
-                            Line
+                            {dialogue ? 'Conversation' : 'Line'}
                         </Title>
-                        <Textarea
-                            ref={textarea}
-                            aria-label="Line"
-                            value={text}
-                            onChange={event => setText(event.currentTarget.value)}
-                            autosize
-                            minRows={4}
-                        />
-                        {claims.cues.length > 0 ? (
-                            <Stack gap={4}>
-                                <Text size="xs" c="dimmed">
-                                    Cues this variant performs. Click to insert at the cursor.
-                                </Text>
-                                <Group gap={6}>
-                                    {claims.cues.map(cue => (
-                                        <Button key={cue} variant="light" size="compact-xs" radius="xl" onClick={() => insertCue(cue)}>
-                                            {cue}
-                                        </Button>
-                                    ))}
-                                </Group>
-                            </Stack>
+                        {dialogue ? (
+                            <DialogueEditor
+                                turns={turns}
+                                onTurns={setTurns}
+                                voices={speakerVoices}
+                                onVoices={setSpeakerVoices}
+                                maxSpeakers={claims.dialogue!.maxSpeakers}
+                                engineVoices={voices}
+                                cues={claims.cues}
+                            />
                         ) : (
-                            <Text size="xs" c="dimmed">
-                                This variant performs no cues. Any in the line are removed before it is spoken, so it never reads one out.
-                            </Text>
+                            <>
+                                <Textarea
+                                    ref={textarea}
+                                    aria-label="Line"
+                                    value={text}
+                                    onChange={event => setText(event.currentTarget.value)}
+                                    autosize
+                                    minRows={4}
+                                />
+                                {claims.cues.length > 0 ? (
+                                    <Stack gap={4}>
+                                        <Text size="xs" c="dimmed">
+                                            Cues this variant performs. Click to insert at the cursor.
+                                        </Text>
+                                        <Group gap={6}>
+                                            {claims.cues.map(cue => (
+                                                <Button key={cue} variant="light" size="compact-xs" radius="xl" onClick={() => insertCue(cue)}>
+                                                    {cue}
+                                                </Button>
+                                            ))}
+                                        </Group>
+                                    </Stack>
+                                ) : (
+                                    <Text size="xs" c="dimmed">
+                                        This variant performs no cues. Any in the line are removed before it is spoken, so it never reads one out.
+                                    </Text>
+                                )}
+                            </>
                         )}
                         <Group>
-                            <Button leftSection={<IconPlayerPlay size={16} />} onClick={say} loading={speak.isPending} disabled={text.trim() === ''}>
+                            <Button
+                                leftSection={<IconPlayerPlay size={16} />}
+                                onClick={say}
+                                loading={asking.isPending}
+                                disabled={dialogue ? spokenTurns.length === 0 : text.trim() === ''}
+                            >
                                 Speak
                             </Button>
                         </Group>
-                        {slow && speak.isPending ? (
+                        {slow && asking.isPending ? (
                             <Alert color="blue" title="Loading the model">
                                 A first request, or one for a different variant, loads the model before it speaks. That can take a while, and longer
                                 still if its weights have not been downloaded.
                             </Alert>
                         ) : undefined}
-                        {speak.isError ? (
-                            <ErrorAlert title="That was not spoken" error={speak.error} fallback="The server did not answer." />
+                        {asking.isError ? (
+                            <ErrorAlert title="That was not spoken" error={asking.error} fallback="The server did not answer." />
                         ) : undefined}
                         {played ? (
                             <Stack gap={4}>
-                                <audio controls autoPlay src={played.url} style={{ width: '100%' }} aria-label="Spoken line" />
+                                <audio
+                                    controls
+                                    autoPlay
+                                    src={played.url}
+                                    style={{ width: '100%' }}
+                                    aria-label={dialogue ? 'Spoken conversation' : 'Spoken line'}
+                                />
                                 <Text size="xs" c="dimmed" className="rh-num">
                                     {(played.milliseconds / 1000).toFixed(1)} s to speak, {Math.round(played.bytes / 1024)} KB
                                 </Text>
                             </Stack>
                         ) : undefined}
-                        <Accordion variant="contained" radius="md">
-                            <Accordion.Item value="code">
-                                <Accordion.Control>
-                                    <Text size="sm">As code</Text>
-                                </Accordion.Control>
-                                <Accordion.Panel>
-                                    <RequestSnippet body={speakBody(request)} />
-                                </Accordion.Panel>
-                            </Accordion.Item>
-                        </Accordion>
+                        {/* The snippet writes a /speak call; a conversation is not one. */}
+                        {dialogue ? undefined : (
+                            <Accordion variant="contained" radius="md">
+                                <Accordion.Item value="code">
+                                    <Accordion.Control>
+                                        <Text size="sm">As code</Text>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <RequestSnippet body={speakBody(request)} />
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
+                        )}
                     </Stack>
                 </Card>
             </SimpleGrid>

@@ -447,6 +447,119 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/engines/{engine}/dialogue": {
+            "post": {
+                "operationId": "dialogue",
+                "description": "A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per",
+                "parameters": [
+                    {
+                        "name": "engine",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DialogueRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "audio/wav": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "audio/mpeg": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "audio/opus": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "audio/flac": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "audio/l16": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Response 429",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Response 503",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/catalog": {
             "get": {
                 "operationId": "catalog",
@@ -955,6 +1068,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "blending": {
                         "$ref": "#/components/schemas/Blending",
                         "description": "Beside cloning, for the same reason: it needs no model. § 7."
+                    },
+                    "dialogue": {
+                        "$ref": "#/components/schemas/Dialogue",
+                        "description": "Present only where this build answers /dialogue. § 6."
                     }
                 },
                 "required": [
@@ -963,6 +1080,18 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "dials"
                 ],
                 "description": "What one build of an engine can perform. Capabilities depend on which build is loaded, which is\nthe whole reason this document has two levels: chatterbox `turbo` performs the paralinguistic\ntags and discards the dials, while `original` is the other way round."
+            },
+            "Dialogue": {
+                "type": "object",
+                "properties": {
+                    "maxSpeakers": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "maxSpeakers"
+                ],
+                "description": "A build that speaks a conversation in one pass. protocol.md § 6."
             },
             "Cloning": {
                 "type": "object",
@@ -1234,6 +1363,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "blend": {
                         "type": "string",
                         "description": "A recipe, `name(weight)+name(weight)`, over voices the engine has."
+                    },
+                    "transcript": {
+                        "type": "string",
+                        "description": "The words spoken in the reference. Required by an engine that continues from it."
                     }
                 },
                 "required": [
@@ -1311,6 +1444,74 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         ]
                     }
                 ]
+            },
+            "DialogueTurn": {
+                "type": "object",
+                "properties": {
+                    "speaker": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "text": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "speaker",
+                    "text"
+                ],
+                "description": "One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice."
+            },
+            "DialogueRequest": {
+                "type": "object",
+                "properties": {
+                    "turns": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DialogueTurn"
+                        }
+                    },
+                    "voices": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Speaker label to voice id."
+                    },
+                    "variant": {
+                        "type": "string"
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": [
+                            "wav",
+                            "mp3",
+                            "opus",
+                            "flac",
+                            "pcm"
+                        ]
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "params": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "number"
+                        }
+                    },
+                    "seed": {
+                        "type": "integer"
+                    },
+                    "stream": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "turns"
+                ],
+                "description": "A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and\n`delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader."
             },
             "ErrorDetail": {
                 "type": "object",

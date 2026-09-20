@@ -187,6 +187,11 @@ cues, seven of the eight, and the first that streams audio while the model is st
 `pnpm wizard install orpheus` works the same way, and its `q8` build is 3.5 GB with no account
 needed to download it.
 
+[`rhapsode-engine-dia`](python/rhapsode-engine-dia/) is Nari Labs' Dia, which performs all eight
+cues and clones from a clip and the words spoken in it. It wants an NVIDIA card: on a Mac it runs at
+about a tenth of real time, which is enough to hear it and not enough to use it. Its weights are
+6.7 GB.
+
 ## Contributing an engine
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write
@@ -200,7 +205,7 @@ rhapsode-conform unix:/run/rhapsode/workers/your-engine.sock
 Point it at your worker and it says whether that worker is one. Each check names the section of the
 protocol it comes from, and the exit code is the verdict you wire into your own CI. How many run
 depends on the worker: one check per variant and per format it declares, so the reference engine gets
-36 on a machine without ffmpeg and 39 on one with it. Some of them compare audio with and without a cue, with the seed held fixed, which is the
+59 on a machine without ffmpeg and 62 on one with it. Some of them compare audio with and without a cue, with the seed held fixed, which is the
 closest a machine can get to the one thing an adapter has to get right by hand. On an engine a seed
 does not reproduce, those are reported as undecided rather than passed.
 

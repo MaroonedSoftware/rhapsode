@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Capabilities, EngineSpeakRequest, Voice } from '@maroonedsoftware/rhapsode-sdk';
+import type { Capabilities, DialogueRequest, EngineSpeakRequest, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { sdk } from './client';
 import { queryKeys } from './query.keys';
@@ -67,10 +67,36 @@ export function useSpeak() {
     });
 }
 
+/** A conversation, and the engine to have it on. § 6. */
+export interface DialogueAsk extends Omit<DialogueRequest, 'format' | 'stream'> {
+    engine: string;
+}
+
+/**
+ * A conversation in one take, as a playable URL. Buffered for the reason `useSpeak` is, and it
+ * invalidates the same documents, since it loads a model the same way.
+ */
+export function useDialogue() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ engine, ...request }: DialogueAsk): Promise<Spoken> => {
+            const started = performance.now();
+            const audio = unwrap<Blob>(await sdk.public.dialogue(engine, { ...request, format: 'wav', stream: false }));
+            return { url: URL.createObjectURL(audio), bytes: audio.size, milliseconds: Math.round(performance.now() - started) };
+        },
+        onSettled: (_data, _error, request) => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.engine.capabilities(request.engine) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.engines() });
+        },
+    });
+}
+
 export interface CloneRequest {
     id: string;
     label?: string;
     reference: File;
+    /** The words spoken in the clip. An engine that clones by continuing from it needs them. § 7. */
+    transcript?: string;
 }
 
 /**
@@ -80,10 +106,11 @@ export interface CloneRequest {
 export function useCloneVoice(engine: string) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ id, label, reference }: CloneRequest) => {
+        mutationFn: async ({ id, label, reference, transcript }: CloneRequest) => {
             const form = new FormData();
             form.set('id', id);
             if (label !== undefined && label !== '') form.set('label', label);
+            if (transcript !== undefined && transcript.trim() !== '') form.set('transcript', transcript.trim());
             form.set('reference', reference, reference.name);
             return unwrap<Voice>(await sdk.public.createVoice(engine, form));
         },

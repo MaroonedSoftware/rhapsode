@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, DialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
 
 
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
@@ -145,6 +145,42 @@ class Speak429Response(TypedDict):
 
 
 class Speak503Response(TypedDict):
+    status: Literal[503]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class Dialogue200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["audio/wav", "audio/mpeg", "audio/opus", "audio/flac", "audio/l16"]
+    data: bytes
+
+
+class Dialogue400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class Dialogue404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class Dialogue422Response(TypedDict):
+    status: Literal[422]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class Dialogue429Response(TypedDict):
+    status: Literal[429]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class Dialogue503Response(TypedDict):
     status: Literal[503]
     content_type: Literal["application/json"]
     data: ErrorBody
@@ -349,6 +385,31 @@ class RhapsodePublicClient(BaseClient):
         The one endpoint that matters. Cues the effective variant does not claim are stripped
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/speak", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 422:
+            return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 429:
+            return { "status": 429, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 503:
+            return { "status": 503, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _content_type == "audio/mpeg":
+            return { "status": 200, "content_type": "audio/mpeg", "data": result }
+        if _content_type == "audio/opus":
+            return { "status": 200, "content_type": "audio/opus", "data": result }
+        if _content_type == "audio/flac":
+            return { "status": 200, "content_type": "audio/flac", "data": result }
+        if _content_type == "audio/l16":
+            return { "status": 200, "content_type": "audio/l16", "data": result }
+        return { "status": 200, "content_type": "audio/wav", "data": result }
+
+    async def dialogue(self, engine: str, body: DialogueRequest) -> Dialogue200Response | Dialogue400Response | Dialogue404Response | Dialogue422Response | Dialogue429Response | Dialogue503Response:
+        """
+        A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/dialogue", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:
