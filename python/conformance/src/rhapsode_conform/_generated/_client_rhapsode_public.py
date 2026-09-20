@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, Voice
 
 
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
@@ -318,6 +318,13 @@ class RhapsodePublicClient(BaseClient):
         """
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
+
+    async def residency(self) -> ResidencyDetail:
+        """
+        What is on the card, for an operator asking where their memory went. Reads the core's own
+        """
+        result = await self._fetch("/residency", method="GET")
+        return ResidencyDetail.model_validate(result)
 
     async def openapi(self) -> OpenApiDocument:
         """

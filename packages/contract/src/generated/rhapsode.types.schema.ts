@@ -238,7 +238,29 @@ export const ResidencySummary = z.looseObject({
 export type ResidencySummary = z.infer<typeof ResidencySummary>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L273)
+ * One model on the card, and what the core knows about it. protocol.md § 3.
+ * generated from [ResidentModel](../../../../contracts/rhapsode.types.ck#L238)
+ */
+export const ResidentModel = z.looseObject({
+    engine: z.string(),
+    variant: z.string(),
+    leases: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .describe('Requests still speaking it. A model with leases is not evictable.'),
+    lastUsedAt: z.string().describe('ISO 8601, UTC.'),
+    expiresAt: z.string().optional().describe('Absent while it is speaking, or when its keep-alive says never.'),
+    keepAliveSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .describe('The one in force here: request, then engine, then server.'),
+    sizeBytes: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .optional()
+        .describe('What the worker measured the model taking, where it could.'),
+});
+export type ResidentModel = z.infer<typeof ResidentModel>;
+
+/**
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L288)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -248,7 +270,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L279)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L294)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -297,7 +319,7 @@ export type EngineSummary = z.infer<typeof EngineSummary>;
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L250)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L265)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -357,7 +379,7 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L260)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L275)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
@@ -374,7 +396,15 @@ export const InstallJob = z.looseObject({
 export type InstallJob = z.infer<typeof InstallJob>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L286)
+ * generated from [ResidencyDetail](../../../../contracts/rhapsode.types.ck#L248)
+ */
+export const ResidencyDetail = ResidencySummary.extend({
+    models: z.array(ResidentModel),
+});
+export type ResidencyDetail = z.infer<typeof ResidencyDetail>;
+
+/**
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L301)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -405,7 +435,7 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L237)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L252)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),

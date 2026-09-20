@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { ResidencyDetail } from '@rhapsode/contract';
+
 import { buildServer } from '../src/server.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import type { RhapsodeConfig } from '../src/config.js';
@@ -38,6 +40,27 @@ describe('GET /health', () => {
             max: 2,
             waiting: 0,
         });
+    });
+});
+
+describe('GET /residency', () => {
+    it('answers with nothing resident, and spawns nothing to do it', async () => {
+        // The route an operator reads when a card is full. Asking each worker would make "what is
+        // loaded" a reason to start processes that are not, which is the opposite of the question.
+        const builder = await start({ engines: { tone: { venv: '/nowhere' } }, residency: { maxResidentModels: 2 } });
+        const residency = response(await builder.app.inject({ method: 'GET', url: '/residency' }));
+
+        expect(residency).toEqual({ resident: 0, max: 2, waiting: 0, models: [] });
+
+        const engines = response(await builder.app.inject({ method: 'GET', url: '/engines' }));
+        expect(engines[0]).toMatchObject({ process: 'down', model: 'unloaded' });
+    });
+
+    it('parses against the contract', async () => {
+        const builder = await start();
+        const parsed = ResidencyDetail.safeParse(response(await builder.app.inject({ method: 'GET', url: '/residency' })));
+
+        expect(parsed.success).toBe(true);
     });
 });
 

@@ -23,6 +23,22 @@ operation /health: {
     }
 }
 
+operation /residency: {
+    get: {
+        # What is on the card, for an operator asking where their memory went. Reads the core's own
+        # state: it spawns nothing, loads nothing and never blocks on a worker, exactly as /health
+        # and /engines do not. Separate from /health because that one is polled by monitors and
+        # carries every engine's licence, and this one is a different question.
+        #
+        # Not a thing to consult before speaking: /speak loads on demand (§ 3), and a client that
+        # reads this first has rebuilt the round trip per utterance that rule exists to remove.
+        sdk: residency
+        response: {
+            200: { application/json: ResidencyDetail }
+        }
+    }
+}
+
 # This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
 # top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
 # already has a library that types it.

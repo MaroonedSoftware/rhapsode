@@ -2,6 +2,8 @@ import { Injectable } from 'injectkit';
 import { Logger } from '@maroonedsoftware/logger';
 import type { DateTime } from 'luxon';
 
+import type { ResidentModel } from '@rhapsode/contract';
+
 import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
 import type { WorkerClient } from '../workers/worker.client.js';
@@ -48,6 +50,8 @@ interface Resident {
     lastUsedAt: DateTime;
     /** What the last request to take a lease asked for, which outranks the engine and the server. */
     keepAliveSeconds?: number;
+    /** What the worker measured this model taking, when it could measure anything. § 3. */
+    sizeBytes?: number;
     /** Absent while the model is speaking, or when its keep-alive says never. */
     expiresAt?: DateTime;
     cancelIdle?: () => void;
@@ -139,14 +143,22 @@ export class ResidencyManager {
 
         const client = await this.workers.client(engineId);
         this.engines.observe(engineId, { model: 'loading', variant });
+        let health;
         try {
-            await client.load(variant);
+            health = await client.load(variant);
         } catch (error) {
             this.engines.observe(engineId, { model: 'unloaded', variant: undefined });
             throw error;
         }
 
-        const resident: Resident = { engineId, variant, leases: 0, lastUsedAt: this.clock.now() };
+        const resident: Resident = {
+            engineId,
+            variant,
+            leases: 0,
+            lastUsedAt: this.clock.now(),
+            // The one moment the core is told, and it used to throw the answer away.
+            ...(typeof health?.modelBytes === 'number' ? { sizeBytes: health.modelBytes } : {}),
+        };
         this.residents.set(engineId, resident);
         this.engines.observe(engineId, { model: 'loaded', variant });
         this.hold(resident, wanted);
@@ -297,6 +309,27 @@ export class ResidencyManager {
         this.blockedBy = undefined;
         const waiter = this.waiters.shift();
         waiter?.();
+    }
+
+    /**
+     * Every model on the card, for an operator asking where their memory went. § 3.
+     *
+     * Read from the core's own state only. Asking each worker instead would make listing what is
+     * loaded a reason to spawn processes that are not, which is the opposite of what somebody
+     * looking at a full card wants.
+     */
+    models(): ResidentModel[] {
+        return [...this.residents.values()]
+            .sort((left, right) => left.engineId.localeCompare(right.engineId))
+            .map(resident => ({
+                engine: resident.engineId,
+                variant: resident.variant,
+                leases: resident.leases,
+                lastUsedAt: resident.lastUsedAt.toISO()!,
+                keepAliveSeconds: this.keepAliveFor(resident),
+                ...(resident.expiresAt === undefined ? {} : { expiresAt: resident.expiresAt.toISO()! }),
+                ...(resident.sizeBytes === undefined ? {} : { sizeBytes: resident.sizeBytes }),
+            }));
     }
 
     summary(): { resident: number; max: number; waiting: number; blockedBy?: string } {

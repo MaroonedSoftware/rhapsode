@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildServer } from '../src/server.js';
@@ -396,6 +397,9 @@ describeWithSockets('residency under contention', () => {
         return builder;
     };
 
+    type Listed = { resident: number; max: number; models: { engine: string; leases: number; keepAliveSeconds: number; expiresAt: string }[] };
+    const residencyOf = (response: { json: () => unknown }) => response.json() as Listed;
+
     const engineState = async (builder: Awaited<ReturnType<typeof buildServer>>, id: string) =>
         (await builder.app.inject({ method: 'GET', url: '/engines' })).json().find((engine: { id: string }) => engine.id === id);
 
@@ -409,6 +413,21 @@ describeWithSockets('residency under contention', () => {
 
         // One resident, and the budget is honest about the ceiling.
         expect(health.residency).toMatchObject({ resident: 1, max: 1 });
+    }, 60_000);
+
+    it('lists what a speak left on the card', async () => {
+        const builder = await startTwo();
+        expect(residencyOf(await builder.app.inject({ method: 'GET', url: '/residency' })).models).toEqual([]);
+
+        await speak(builder, { engine: 'tone', text: 'first', stream: false, keepAliveSeconds: 900 });
+        const residency = residencyOf(await builder.app.inject({ method: 'GET', url: '/residency' }));
+
+        expect(residency).toMatchObject({ resident: 1, max: 1 });
+        expect(residency.models).toHaveLength(1);
+        expect(residency.models[0]).toMatchObject({ engine: 'tone', leases: 0, keepAliveSeconds: 900 });
+        // The request said 900, so the deadline is fifteen minutes out rather than five.
+        const expiresIn = DateTime.fromISO(residency.models[0].expiresAt).diffNow().as('seconds');
+        expect(expiresIn).toBeGreaterThan(600);
     }, 60_000);
 
     it('evicts the idle one by the verb, and does not count its exit as a crash', async () => {

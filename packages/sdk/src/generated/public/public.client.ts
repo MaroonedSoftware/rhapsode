@@ -10,6 +10,7 @@ import type {
     ErrorBody,
     InstallJob,
     PullRequest,
+    ResidencyDetail,
     Voice,
 } from '../rhapsode/types/rhapsode.types.js';
 import type { OpenApiDocument } from './types/rhapsode.public.js';
@@ -21,6 +22,12 @@ export class PublicClient {
     async health(): Promise<CoreHealth> {
         const result = await this.fetch(`/health`, { method: 'GET' });
         return await parseJson<CoreHealth>(result);
+    }
+
+    /** @description What is on the card, for an operator asking where their memory went. Reads the core's own */
+    async residency(): Promise<ResidencyDetail> {
+        const result = await this.fetch(`/residency`, { method: 'GET' });
+        return await parseJson<ResidencyDetail>(result);
     }
 
     /** @description Open to every caller, like /health. The public API only: never a worker route. */

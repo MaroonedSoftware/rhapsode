@@ -153,6 +153,23 @@ class ResidencySummary(BaseModel):
     # Named, because a wait at maxResidentModels 1 looks exactly like a hang.
     blocked_by: str | None = Field(alias="blockedBy", default=None)
 
+# One model on the card, and what the core knows about it. protocol.md § 3.
+class ResidentModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    engine: str
+    variant: str
+    # Requests still speaking it. A model with leases is not evictable.
+    leases: int
+    # ISO 8601, UTC.
+    last_used_at: str = Field(alias="lastUsedAt")
+    # Absent while it is speaking, or when its keep-alive says never.
+    expires_at: str | None = Field(alias="expiresAt", default=None)
+    # The one in force here: request, then engine, then server.
+    keep_alive_seconds: int = Field(alias="keepAliveSeconds")
+    # What the worker measured the model taking, where it could.
+    size_bytes: int | None = Field(alias="sizeBytes", default=None)
+
 class PullRequest(BaseModel):
     # Absent means the engine's default variant.
     variant: str | None = None
@@ -256,6 +273,9 @@ class InstallJob(BaseModel):
     finished_at: str | None = Field(alias="finishedAt", default=None)
     # Present exactly when `state` is `failed`.
     error: ErrorDetail | None = None
+
+class ResidencyDetail(ResidencySummary):
+    models: list[ResidentModel]
 
 class FeedEvent(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

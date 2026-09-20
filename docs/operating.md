@@ -421,6 +421,37 @@ continuously for `restartDecaySeconds`, so an engine that crashes on every third
 rather than resetting. At `maxRestarts` the engine is reported `failed` and stops being restarted
 automatically: a version mismatch or a broken virtualenv does not get better with backoff.
 
+`GET /residency` is the one to read when a card is full and you want to know what is holding it.
+
+```json
+{
+    "resident": 1,
+    "max": 1,
+    "waiting": 0,
+    "models": [
+        {
+            "engine": "dia",
+            "variant": "full",
+            "leases": 0,
+            "lastUsedAt": "2026-09-20T11:04:02.118Z",
+            "expiresAt": "2026-09-20T11:09:02.118Z",
+            "keepAliveSeconds": 300,
+            "sizeBytes": 3355443200
+        }
+    ]
+}
+```
+
+`leases` is how many requests are still speaking that model, so a row with leases above zero is one
+nothing can evict yet. `expiresAt` is absent while it is speaking and when its keep-alive is `-1`.
+`keepAliveSeconds` is the value actually in force, which may have come from the request rather than
+from your configuration. `sizeBytes` is what the worker measured the load taking and is absent where
+nothing could measure it; it is a device-wide delta, so treat it as approximate.
+
+Like `/health` and `/engines`, it starts no worker and waits on none. It is also not something a
+client should call before speaking: `/speak` loads on demand, and a client checking here first has
+added a round trip per utterance to ask what the server already knows.
+
 ## Logs
 
 One JSON object per line on stdout. A worker's own lines are forwarded with `engine` attached as a

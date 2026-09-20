@@ -62,6 +62,8 @@ type Call = `${string}:${'load' | 'unload' | 'stop'}${string}`;
 class FakeWorkers implements ResidentWorkers {
     readonly calls: Call[] = [];
     failNextLoad: string | undefined;
+    /** What a worker reports the load cost, or nothing where it could not measure. */
+    modelBytes: number | undefined;
 
     async client(id: string) {
         return {
@@ -72,7 +74,12 @@ class FakeWorkers implements ResidentWorkers {
                     this.failNextLoad = undefined;
                     throw new Error(failure);
                 }
-                return { process: 'up', model: 'loaded', ...(variant === undefined ? {} : { variant }) };
+                return {
+                    process: 'up',
+                    model: 'loaded',
+                    ...(variant === undefined ? {} : { variant }),
+                    ...(this.modelBytes === undefined ? {} : { modelBytes: this.modelBytes }),
+                };
             },
             unload: async (): Promise<WorkerHealth> => {
                 this.calls.push(`${id}:unload`);
@@ -382,6 +389,66 @@ describe('the residency manager', () => {
             expect(clock.armed).toBe(0);
             await clock.advance(600);
             expect(workers.calls).toEqual(['tone:load:fast']);
+        });
+    });
+
+    describe('what is on the card', () => {
+        it('lists a resident with its expiry, and keeps the size the worker measured', async () => {
+            const residency = build({ keepAliveSeconds: 60 });
+            workers.modelBytes = 3_355_443_200;
+
+            const speaking = await residency.acquire('tone', 'fast');
+
+            // No expiry while it is speaking: the deadline starts when the last request lets go.
+            expect(residency.models()).toEqual([
+                {
+                    engine: 'tone',
+                    variant: 'fast',
+                    leases: 1,
+                    lastUsedAt: clock.now().toISO(),
+                    keepAliveSeconds: 60,
+                    sizeBytes: 3_355_443_200,
+                },
+            ]);
+
+            speaking.release();
+            expect(residency.models()[0]!.expiresAt).toBe(clock.now().plus({ seconds: 60 }).toISO());
+        });
+
+        it('leaves the size out when the worker could not measure one', async () => {
+            const residency = build();
+            (await residency.acquire('tone', 'fast')).release();
+
+            expect(residency.models()[0]).not.toHaveProperty('sizeBytes');
+        });
+
+        it('has no expiry for a model that never expires', async () => {
+            const residency = build({ keepAliveSeconds: -1 });
+            (await residency.acquire('tone', 'fast')).release();
+
+            expect(residency.models()[0]).toMatchObject({ keepAliveSeconds: -1 });
+            expect(residency.models()[0]).not.toHaveProperty('expiresAt');
+        });
+
+        it('reports the keep-alive actually in force, not the server default', async () => {
+            const residency = build({ keepAliveSeconds: 600 });
+            engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: 120 });
+
+            (await residency.acquire('tone', 'fast')).release();
+            expect(residency.models()[0]).toMatchObject({ keepAliveSeconds: 120 });
+
+            (await residency.acquire('tone', 'fast', { keepAliveSeconds: 5 })).release();
+            expect(residency.models()[0]).toMatchObject({ keepAliveSeconds: 5 });
+        });
+
+        it('is empty once the last model has gone', async () => {
+            const residency = build({ keepAliveSeconds: 30 });
+
+            (await residency.acquire('tone', 'fast')).release();
+            expect(residency.models()).toHaveLength(1);
+
+            await clock.advance(30);
+            expect(residency.models()).toEqual([]);
         });
     });
 

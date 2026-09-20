@@ -28,6 +28,24 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/residency": {
+            "get": {
+                "operationId": "residency",
+                "description": "What is on the card, for an operator asking where their memory went. Reads the core's own",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResidencyDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/openapi.json": {
             "get": {
                 "operationId": "openapi",
@@ -1649,6 +1667,66 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "resident",
                     "max",
                     "waiting"
+                ]
+            },
+            "ResidentModel": {
+                "type": "object",
+                "properties": {
+                    "engine": {
+                        "type": "string"
+                    },
+                    "variant": {
+                        "type": "string"
+                    },
+                    "leases": {
+                        "type": "integer",
+                        "description": "Requests still speaking it. A model with leases is not evictable."
+                    },
+                    "lastUsedAt": {
+                        "type": "string",
+                        "description": "ISO 8601, UTC."
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "description": "Absent while it is speaking, or when its keep-alive says never."
+                    },
+                    "keepAliveSeconds": {
+                        "type": "integer",
+                        "description": "The one in force here: request, then engine, then server."
+                    },
+                    "sizeBytes": {
+                        "type": "integer",
+                        "description": "What the worker measured the model taking, where it could."
+                    }
+                },
+                "required": [
+                    "engine",
+                    "variant",
+                    "leases",
+                    "lastUsedAt",
+                    "keepAliveSeconds"
+                ],
+                "description": "One model on the card, and what the core knows about it. protocol.md § 3."
+            },
+            "ResidencyDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ResidencySummary"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "models": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/ResidentModel"
+                                }
+                            }
+                        },
+                        "required": [
+                            "models"
+                        ]
+                    }
                 ]
             },
             "CoreHealth": {

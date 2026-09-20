@@ -216,7 +216,26 @@ export interface ResidencySummary {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L273)
+ * One model on the card, and what the core knows about it. protocol.md § 3.
+ * generated from [ResidentModel](../../../../../../contracts/rhapsode.types.ck#L238)
+ */
+export interface ResidentModel {
+    engine: string;
+    variant: string;
+    /** Requests still speaking it. A model with leases is not evictable. */
+    leases: number;
+    /** ISO 8601, UTC. */
+    lastUsedAt: string;
+    /** Absent while it is speaking, or when its keep-alive says never. */
+    expiresAt?: string;
+    /** The one in force here: request, then engine, then server. */
+    keepAliveSeconds: number;
+    /** What the worker measured the model taking, where it could. */
+    sizeBytes?: number;
+}
+
+/**
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L288)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -226,7 +245,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L279)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L294)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -277,7 +296,7 @@ export interface EngineSummary {
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L250)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L265)
  */
 export interface CatalogEntry {
     id: string;
@@ -327,7 +346,7 @@ export interface ErrorBody {
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L260)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L275)
  */
 export interface InstallJob {
     id: string;
@@ -346,7 +365,14 @@ export interface InstallJob {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L286)
+ * generated from [ResidencyDetail](../../../../../../contracts/rhapsode.types.ck#L248)
+ */
+export interface ResidencyDetail extends ResidencySummary {
+    models: ResidentModel[];
+}
+
+/**
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L301)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -378,7 +404,7 @@ export interface CurrentVariant extends Omit<Variant, 'cloning' | 'blending'> {
 }
 
 /**
- * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L237)
+ * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L252)
  */
 export interface CoreHealth {
     contract: number;

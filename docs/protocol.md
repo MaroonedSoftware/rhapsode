@@ -202,6 +202,34 @@ that pays it can see; a card held by nothing is a cost that lands on somebody el
 Putting this in the core rather than in each worker is what stops every adapter author reinventing
 an idle timer, and it is the only component that can see the whole card.
 
+### `GET /residency`, for the operator asking where the memory went
+
+```json
+{
+  "resident": 1, "max": 1, "waiting": 0,
+  "models": [{
+    "engine": "dia", "variant": "full", "leases": 0,
+    "lastUsedAt": "2026-09-20T11:04:02.118Z", "expiresAt": "2026-09-20T11:09:02.118Z",
+    "keepAliveSeconds": 300, "sizeBytes": 3355443200
+  }]
+}
+```
+
+`expiresAt` is absent while a model is speaking, because the deadline starts when the last request
+lets go, and absent when its keep-alive says never. `keepAliveSeconds` is the one actually in force
+after the precedence below, not the server's default. `sizeBytes` is what the worker measured and is
+absent where it could not.
+
+It reads the core's own state: it spawns no worker, loads nothing and never blocks on one, which is
+the promise `/health` and `/engines` already make. Asking each worker instead would make listing
+what is loaded a reason to start processes that are not, which is the opposite of what somebody
+looking at a full card wants.
+
+It is separate from `/health` because they answer different questions to different readers: a
+monitor polls `/health` and gets every engine's licence with it. **And it is not a route to consult
+before speaking.** `/speak` loads on demand, and a client that reads this first to decide whether it
+needs to has rebuilt the round trip per utterance that rule 1 exists to remove.
+
 ### A request may say how long it wants its model kept
 
 `POST /speak` and `POST /engines/{engine}/dialogue` take `keepAliveSeconds`, meaning the same thing

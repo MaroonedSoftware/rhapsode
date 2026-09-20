@@ -234,6 +234,21 @@ contract mode(loose) ResidencySummary: {
     blockedBy?: string      # Named, because a wait at maxResidentModels 1 looks exactly like a hang.
 }
 
+# One model on the card, and what the core knows about it. protocol.md § 3.
+contract mode(loose) ResidentModel: {
+    engine: string
+    variant: string
+    leases: int                     # Requests still speaking it. A model with leases is not evictable.
+    lastUsedAt: string              # ISO 8601, UTC.
+    expiresAt?: string              # Absent while it is speaking, or when its keep-alive says never.
+    keepAliveSeconds: int           # The one in force here: request, then engine, then server.
+    sizeBytes?: int                 # What the worker measured the model taking, where it could.
+}
+
+contract mode(loose) ResidencyDetail: ResidencySummary & {
+    models: array(ResidentModel)
+}
+
 contract mode(loose) CoreHealth: {
     contract: int
     status: enum(ok, degraded)
