@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-engine-dia"
-version = "0.1.6"
+version = "0.1.7"
 description = "Dia for rhapsode: two speakers in one pass, and nonverbals written where they happen."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rhapsode-worker==0.1.6",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "rhapsode-worker==0.1.7",  # Its own version, exactly, and bumped with it. protocol.md § 9.
     "numpy>=1.26",
     # The model's code lives in transformers since 4.53. The floor is the release that renamed
     # `torch_dtype` to `dtype`, which is what the backend passes; tested against 5.17.

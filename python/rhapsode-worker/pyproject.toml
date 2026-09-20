@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-worker"
-version = "0.1.6"
+version = "0.1.7"
 description = "The SDK an engine author subclasses: one class, and the worker protocol is handled."
 readme = "README.md"
 license = "MIT"
