@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-engine-tone"
-version = "0.1.5"
+version = "0.1.6"
 description = "A rhapsode engine with no weights. It makes a tone, so that the protocol can be tested without a model."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["rhapsode-worker==0.1.5"]  # Its own version, exactly. protocol.md § 9.
+dependencies = ["rhapsode-worker==0.1.6"]  # Its own version, exactly. protocol.md § 9.
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rhapsode_engine_tone"]

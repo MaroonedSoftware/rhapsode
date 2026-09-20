@@ -2,6 +2,91 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.6
+
+- An eviction now asks the worker to end its own process with `POST /terminate` and signals only when
+  that does not land, which is the order `protocol.md` § 2 and § 3 always described and the code had
+  backwards. The fix that matters is for a remote worker: evicting one used to destroy its connection
+  pool, and because the core keeps the handle, every later request to that engine failed until the
+  core restarted. A remote worker now gets the verb and keeps its connection, a local one gets the
+  verb before the signal with the same `SIGKILL` backstop as before, and a shutdown still signals
+  without asking. § 2 Stop gains the paragraph saying which is reached for when.
+- A model with nothing left to do now leaves the card after five minutes, where before it stayed until
+  something else needed the room. `residency.keepAliveSeconds` is the one setting for it and replaces
+  the `idleUnloadSeconds` and `idleTerminateSeconds` pair: two deadlines were needed when there were
+  two verbs to choose between, and an expiry now always terminates, because `protocol.md` § 3 measured
+  an unload leaving roughly 30% behind and a deadline that runs every few minutes would give a card
+  away 30% at a time. **This is on by default and it is a behaviour change**: set `keepAliveSeconds` to
+  `-1` for what this server did before. Both old names are still read when the new one is absent, with
+  a line in the log saying which was found, so no configuration file stops a server from starting.
+  Note that `null` is not `-1`: the sample in `operating.md` documented `"idleUnloadSeconds": null` to
+  mean off, and a null is read as "not set", so a file copied from it gets the five-minute default.
+  An expiry also no longer terminates a model that was picked up again while its timer was already on
+  its way, which was a race that could only get worse with a deadline running by default.
+- An engine entry can carry its own `keepAliveSeconds`, overriding the server-wide one for that engine
+  alone (`protocol.md` § 3). The deadline trades a cold start against a held card, and a cold start is
+  per engine: a model that takes forty seconds to load has earned a longer stay than one that takes
+  two, and the server-wide setting cannot tell them apart. `-1` on an engine pins its model where the
+  rest of the server expires.
+- `POST /speak` and `POST /engines/{engine}/dialogue` take `keepAliveSeconds`, saying how long the
+  model that request loads should stay once it is done: `-1` never expires, `0` gives the card back as
+  the audio ends, and anything else is a deadline in seconds (`protocol.md` § 3). It is the one thing
+  the server cannot know and the caller often does, which is whether more is coming. Precedence is
+  request, then engine, then server, and the last request to take a lease wins, because two requests
+  sharing a model cannot both be right about how long it stays. A keep-alive is not a reservation: an
+  eviction under a full budget still takes a pinned model, which is what keeps § 3's load-on-demand
+  rule true for everybody else. The field is on the public request shapes only and is never forwarded
+  to a worker, since an adapter that can see a keep-alive will eventually act on one. The OpenAI shim
+  does not take it, as it takes none of the native fields (§ 11). The client SDK and the OpenAPI
+  document carry it, from the same contract.
+- A worker measures what a load cost and reports it as `WorkerHealth.modelBytes` (`protocol.md` § 3).
+  `vramBytes` is what the card holds and has always been its capacity rather than its use, so a core
+  choosing what to evict has been working from a count of models and the assumption that they are all
+  the same size: Kokoro is 82M parameters and Dia is 1.6B. The SDK takes a device-wide delta across
+  `load()` and clears it on unload, so an adapter gets the figure for nothing; `rhapsode-worker` gains
+  an optional `Engine.memory_bytes()` for an adapter that knows the real number, which wins over the
+  measurement. The measurement is card-wide on purpose, counting the runtime's context and an ONNX or
+  vLLM allocation nobody attributes to a model, and torch is imported inside the function as
+  `detect_device` already does, so an ONNX or pure-CPU adapter can still install the SDK. A worker
+  that cannot measure reports nothing rather than `0`, since a core adding up a card reads zero as a
+  model that is free, and the conformance suite now checks exactly that.
+- `GET /residency` lists what is on the card: engine, variant, how many requests are still speaking
+  it, when it was last used, when it expires, the keep-alive actually in force and what the worker
+  measured it taking (`protocol.md` § 3). `/health` only ever gave counts, so an operator whose card
+  was full could see that one model was resident and nothing about which, how large, or when it would
+  go. `expiresAt` is absent while a model is speaking, because the deadline starts when the last
+  request lets go, and absent when its keep-alive says never. Like `/health` and `/engines` it reads
+  the core's own state: it starts no worker and waits on none, since listing what is loaded should not
+  be a reason to load anything. It is deliberately not a route to call before speaking, as `/speak`
+  loads on demand and § 3 spends a rule on why a client should not ask first. The client SDK gains
+  `residency()` from the same contract.
+- `POST /engines/{engine}/unload` frees a model now rather than waiting out its keep-alive
+  (`protocol.md` § 3 and § 10). `?mode=terminate` is the default and ends the worker process, which is
+  the only way to get back the roughly 30% an unload strands; `?mode=unload` keeps the process for a
+  faster next load. It is behind the management guard, because somebody who can empty a card can make
+  every synthesis on the box pay a cold start, and it is idempotent: an engine holding nothing is
+  already in the state the request asks for, and a soft unload of nothing starts no worker to discover
+  that. A terminate still ends a process holding no model, which is how an operator reclaims what a
+  variant switch left behind. It is refused with `409` while the engine is speaking, for the reason an
+  uninstall is: cutting off a stream hands that caller a truncated file for something they could not
+  have predicted. The wizard and the web page get the same verb in the releases after this one.
+- `pnpm wizard ps` shows what the running server has loaded, how big each model is and when it
+  expires, and `pnpm wizard unload <engine>` gives that memory back now (`protocol.md` § 3). Both are
+  clients of the API and hold no logic of their own, which is what keeps the wizard and the web page
+  from drifting. `unload` terminates by default, since somebody at a terminal asking for memory back
+  means all of it, and `--keep-process` is the soft verb that trades the roughly 30% an unload strands
+  for a faster next load. A size that nothing could measure prints as a dash rather than as zero, and
+  a model with a request still speaking it shows what is holding it instead of a countdown that has
+  not started.
+- The Engines page gains "On the card": what this server has loaded, how big each model is, when it
+  expires, and a button to unload it now (`protocol.md` § 3). It is the one polled query in the page,
+  because a keep-alive runs out without anything here asking it to, and a row left on screen minutes
+  after its model has gone is worse than no row. A model with a request still speaking it shows what
+  is holding it and its button is disabled rather than offered and refused, since the core answers a
+  `409` there. A size nothing could measure shows as a dash, never as zero. A page opened from another
+  machine reads the panel and is not offered the buttons, which is the same rule the install actions
+  already follow.
+
 ## 0.1.5
 
 - The worker SDK splits long text where a reader would pause, so an adapter's `speak()` says one thing and `maxCharacters` stops being every client's problem. An adapter declares `segment_characters` and the SDK breaks the request on sentences, then clauses, then words, calls `speak()` once per piece, seeds each piece from the request's seed plus its index, and joins the audio with whatever silence the adapter declares in `segment_pause_ms`. Three adapters had written this privately and two had written it identically: `_fit` and `_pack` in the Dia and Orpheus adapters were the same twenty lines character for character, and Kokoro's third copy had no clause fallback and a sentence pattern missing the ellipsis, so a long sentence reached the model whole. All three now call `rhapsode_worker.segments`, and Kokoro's loop is gone entirely because it carried nothing across the joint. The capability document declares the split as `segmentation`, beside `cloning` and `blending`, because a client cannot see it and is affected by it: a seed reproduces a generation, so a request split four ways is four seeded generations, and prosody carries across a joint only where the engine carries it. The shared splitter also keeps a two-word cue such as `[clear throat]` whole, which the adapters' own copies only managed because they translated cues into a space-free spelling first.
