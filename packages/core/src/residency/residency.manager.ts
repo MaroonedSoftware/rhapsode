@@ -1,10 +1,12 @@
 import { Injectable } from 'injectkit';
 import { Logger } from '@maroonedsoftware/logger';
-import { DateTime } from 'luxon';
+import type { DateTime } from 'luxon';
 
 import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
-import { WorkerRegistry } from '../workers/worker.registry.js';
+import type { WorkerClient } from '../workers/worker.client.js';
+import type { WorkerHandle } from '../workers/worker.handle.js';
+import { type ResidencyClock, systemClock } from './residency.clock.js';
 import { Mutex } from './mutex.js';
 
 export interface ResidencyPolicy {
@@ -16,12 +18,24 @@ export interface ResidencyPolicy {
     idleTerminateSeconds?: number;
 }
 
+/**
+ * The two things residency asks of a worker, which is far less than `WorkerRegistry` offers.
+ *
+ * Declared here rather than imported because a test for an eviction rule should not have to build a
+ * supervisor and spawn a Python process to get at one. `WorkerRegistry` satisfies it structurally,
+ * so nothing at the wiring end changes.
+ */
+export interface ResidentWorkers {
+    client(id: string): Promise<Pick<WorkerClient, 'load' | 'unload'>>;
+    handle(id: string): Pick<WorkerHandle, 'stop'>;
+}
+
 interface Resident {
     engineId: string;
     variant: string;
     leases: number;
     lastUsedAt: DateTime;
-    idleTimer?: NodeJS.Timeout;
+    cancelIdle?: () => void;
 }
 
 /** Held for the duration of the audio, not the duration of the handler. */
@@ -45,10 +59,11 @@ export class ResidencyManager {
     private readonly waiters: (() => void)[] = [];
 
     constructor(
-        private readonly workers: WorkerRegistry,
+        private readonly workers: ResidentWorkers,
         private readonly engines: EngineRegistry,
         private readonly logger: Logger,
         private readonly policy: ResidencyPolicy,
+        private readonly clock: ResidencyClock = systemClock,
     ) {}
 
     waiting = 0;
@@ -61,7 +76,7 @@ export class ResidencyManager {
      * that keeps the model alive for the duration.
      */
     async acquire(engineId: string, variant: string): Promise<ResidencyLease> {
-        const deadline = DateTime.utc().plus({ seconds: this.policy.evictionWaitSeconds });
+        const deadline = this.clock.now().plus({ seconds: this.policy.evictionWaitSeconds });
 
         for (;;) {
             const lease = await this.transition.run(() => this.tryAcquire(engineId, variant));
@@ -69,7 +84,7 @@ export class ResidencyManager {
 
             // Every resident is leased, so there is nothing to evict yet. Wait for one to finish
             // rather than refusing immediately: at maxResidentModels 1 that is simply a queue.
-            if (DateTime.utc() > deadline) {
+            if (this.clock.now() > deadline) {
                 throw new RhapsodeError(
                     'model_unavailable',
                     `waited ${this.policy.evictionWaitSeconds}s for a slot and ${this.blockedBy ?? 'another engine'} is still speaking`,
@@ -116,7 +131,7 @@ export class ResidencyManager {
             throw error;
         }
 
-        const resident: Resident = { engineId, variant, leases: 0, lastUsedAt: DateTime.utc() };
+        const resident: Resident = { engineId, variant, leases: 0, lastUsedAt: this.clock.now() };
         this.residents.set(engineId, resident);
         this.engines.observe(engineId, { model: 'loaded', variant });
         this.hold(resident);
@@ -136,7 +151,7 @@ export class ResidencyManager {
             if (resident !== undefined && resident.leases > 0) {
                 throw new RhapsodeError('conflict', `"${engineId}" is speaking; remove it once it has finished`);
             }
-            if (resident?.idleTimer !== undefined) clearTimeout(resident.idleTimer);
+            resident?.cancelIdle?.();
             this.residents.delete(engineId);
             await removal();
         });
@@ -144,11 +159,9 @@ export class ResidencyManager {
 
     private hold(resident: Resident): void {
         resident.leases += 1;
-        resident.lastUsedAt = DateTime.utc();
-        if (resident.idleTimer !== undefined) {
-            clearTimeout(resident.idleTimer);
-            resident.idleTimer = undefined;
-        }
+        resident.lastUsedAt = this.clock.now();
+        resident.cancelIdle?.();
+        resident.cancelIdle = undefined;
     }
 
     /**
@@ -167,7 +180,7 @@ export class ResidencyManager {
                 if (released) return;
                 released = true;
                 resident.leases = Math.max(0, resident.leases - 1);
-                resident.lastUsedAt = DateTime.utc();
+                resident.lastUsedAt = this.clock.now();
                 if (resident.leases === 0) this.armIdleTimers(resident);
                 this.wake();
             },
@@ -181,7 +194,7 @@ export class ResidencyManager {
     }
 
     private async release(resident: Resident, verb: 'unload' | 'terminate'): Promise<void> {
-        if (resident.idleTimer !== undefined) clearTimeout(resident.idleTimer);
+        resident.cancelIdle?.();
         this.residents.delete(resident.engineId);
 
         try {
@@ -215,25 +228,23 @@ export class ResidencyManager {
                   : undefined;
         if (chosen === undefined) return;
 
-        const timer = setTimeout(() => {
-            void this.transition.run(async () => {
+        resident.cancelIdle = this.clock.after(chosen.seconds, async () => {
+            await this.transition.run(async () => {
                 const current = this.residents.get(resident.engineId);
                 if (current === undefined || current.leases > 0) return;
                 await this.release(current, chosen.verb);
             });
-        }, chosen.seconds * 1000);
-        timer.unref();
-        resident.idleTimer = timer;
+        });
     }
 
     private async waitForRelease(deadline: DateTime): Promise<void> {
         this.waiting += 1;
         try {
             await new Promise<void>(fulfil => {
-                const timer = setTimeout(fulfil, Math.max(50, deadline.diffNow().as('milliseconds')));
-                timer.unref();
+                const seconds = Math.max(0.05, deadline.diff(this.clock.now()).as('seconds'));
+                const cancel = this.clock.after(seconds, async () => fulfil());
                 this.waiters.push(() => {
-                    clearTimeout(timer);
+                    cancel();
                     fulfil();
                 });
             });
