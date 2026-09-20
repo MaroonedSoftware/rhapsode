@@ -347,9 +347,14 @@ describeWithSockets('version skew', () => {
 });
 
 describeWithSockets('residency under contention', () => {
-    it('queues a second engine rather than evicting a model that is speaking', async () => {
-        // At maxResidentModels 1 this is simply a queue, and it will look like a hang to an
-        // operator, which is why /health names what is blocking.
+    /**
+     * Two engines and one slot, which is the only way to make the core evict on purpose.
+     *
+     * The second is a genuinely different engine rather than the tone engine under another name: a
+     * worker refuses to start when the core spawned an id it does not answer to, so a second engine
+     * has to be a second engine.
+     */
+    const startTwo = async () => {
         socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
         const builder = await buildServer(
             {
@@ -357,20 +362,23 @@ describeWithSockets('residency under contention', () => {
                 residency: { maxResidentModels: 1, evictionWaitSeconds: 30 },
                 engines: {
                     tone: { venv: join(REPO, 'python/.venv') },
-                    second: {
-                        displayName: 'Second',
-                        license: MIT,
-                        command: PYTHON,
-                        args: ['-m', 'rhapsode_engine_tone'],
-                        cwd: REPO,
-                        env: { RHAPSODE_WORKER_ENGINE_ALIAS: 'second' },
-                    },
+                    noisy: { displayName: 'Noisy', license: MIT, command: PYTHON, args: ['-m', 'engines.noisy'], cwd: WORKER_TESTS },
                 },
             },
             new RhapsodeJsonLogger('error', () => {}),
         );
         running = builder;
         await builder.app.ready();
+        return builder;
+    };
+
+    const engineState = async (builder: Awaited<ReturnType<typeof buildServer>>, id: string) =>
+        (await builder.app.inject({ method: 'GET', url: '/engines' })).json().find((engine: { id: string }) => engine.id === id);
+
+    it('queues a second engine rather than evicting a model that is speaking', async () => {
+        // At maxResidentModels 1 this is simply a queue, and it will look like a hang to an
+        // operator, which is why /health names what is blocking.
+        const builder = await startTwo();
 
         await speak(builder, { engine: 'tone', text: 'first', stream: false });
         const health = (await builder.app.inject({ method: 'GET', url: '/health' })).json();
@@ -378,4 +386,21 @@ describeWithSockets('residency under contention', () => {
         // One resident, and the budget is honest about the ceiling.
         expect(health.residency).toMatchObject({ resident: 1, max: 1 });
     }, 60_000);
+
+    it('evicts the idle one by the verb, and does not count its exit as a crash', async () => {
+        // An exit that follows `/terminate` is not a crash however it is timed (§ 2). Counted as
+        // one, an engine evicted often enough would open its own circuit breaker and stop coming
+        // back, which is exactly what idle freeing would make routine.
+        const builder = await startTwo();
+
+        expect((await speak(builder, { engine: 'tone', text: 'first', stream: false })).statusCode).toBe(200);
+        expect((await speak(builder, { engine: 'noisy', text: 'second', stream: false })).statusCode).toBe(200);
+
+        expect(await engineState(builder, 'tone')).toMatchObject({ process: 'down', model: 'unloaded', restarts: 0 });
+        expect(await engineState(builder, 'noisy')).toMatchObject({ model: 'loaded' });
+
+        // And the evicted engine still works, which is the whole point of reclaiming it cleanly.
+        expect((await speak(builder, { engine: 'tone', text: 'again', stream: false })).statusCode).toBe(200);
+        expect(await engineState(builder, 'tone')).toMatchObject({ model: 'loaded', restarts: 0 });
+    }, 90_000);
 });

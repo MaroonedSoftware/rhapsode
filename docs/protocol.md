@@ -98,6 +98,15 @@ core sends `SIGKILL` after a grace period it owns. `POST /terminate` (§3) is th
 for over HTTP rather than signalled, and is what reclaims a card from a worker the core cannot
 signal.
 
+**Which one the core reaches for, and in what order.** An eviction sends `/terminate` first and
+signals only if the verb does not land, because that is the one reclaim a remote worker can also be
+given: a core that only signals degrades to `unload` over TCP and loses the 30% an unload strands
+(§ 3). A shutdown signals without asking, which is the same sequence by the paragraph above and one
+round trip shorter on a path where every worker is going anyway. Either way the grace period is the
+core's and ends in `SIGKILL`: a worker that took the verb and then hung is not a worker to wait on
+forever. A remote worker gets the verb and keeps its connection, because the process restarting is
+somebody else's supervisor's business and the core will want to talk to its replacement.
+
 An exit the core did not ask for is a crash, and the core restarts it with backoff, holding the
 restart count against it. An exit that follows a `SIGTERM` or a `/terminate` is not, however it is
 timed: a worker that finishes draining a second after the core stopped waiting has done its job.
