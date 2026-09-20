@@ -189,6 +189,33 @@ that pays it can see; a card held by nothing is a cost that lands on somebody el
 Putting this in the core rather than in each worker is what stops every adapter author reinventing
 an idle timer, and it is the only component that can see the whole card.
 
+### A request may say how long it wants its model kept
+
+`POST /speak` and `POST /engines/{engine}/dialogue` take `keepAliveSeconds`, meaning the same thing
+it means in configuration, for the model that request loads. It is a hint about what happens next,
+which is the one thing the server cannot know and the caller often does: a batch about to send
+another two hundred lines says `-1`, and a page that just wants one sentence read aloud says `0` and
+gives the card back.
+
+Precedence is request, then engine, then server. Three rules, because each answers a different
+question: the server knows what the box is for, the engine knows what its own cold start costs, and
+only the request knows whether there is more coming.
+
+**The last request to take a lease wins.** Two requests speaking the same model cannot both be right
+about how long it stays, and the newer one is the one whose caller is still waiting. A request that
+says nothing puts the engine's own answer back rather than leaving the previous request's in place,
+so a `-1` from a batch that has finished does not outlive it.
+
+**A keep-alive is not a reservation.** `-1` means "do not expire this", not "do not evict this": a
+`/speak` for another engine with the budget full still takes it by LRU (rule 1 above would otherwise
+fail for everybody else the moment one caller pinned a card). That is also why the field is safe on
+a public route: the worst a stranger can do with `-1` is what this server did by default before
+there was a deadline at all.
+
+**The worker is never told.** `keepAliveSeconds` is on the public request shapes and not on the ones
+the core forwards, because an adapter that can see a keep-alive is an adapter that will eventually
+act on one, and then there are two idle timers disagreeing about the same card.
+
 ---
 
 ## 4. The capability document
@@ -403,6 +430,7 @@ Content-Type: application/json
 | `delivery` | Only ever one the effective variant claimed; the core drops the rest. |
 | `params` | Against the effective variant's `dials` (§4). Unknown keys are refused, not ignored. |
 | `seed` | Optional. Reproducibility for engines that can. |
+| `keepAliveSeconds` | How long to keep this model once the request is done. §3. Not sent to the worker. |
 | `stream` | `true` streams chunked; `false` buffers and sets `Content-Length`. |
 
 Response: `200`, `Content-Type: audio/opus`, chunked.
@@ -1099,8 +1127,9 @@ variant with no `speed` dial. A `speed` outside the dial's range is `bad_request
 
 A field the shim does not know is `bad_request` naming it. OpenAI's own API refuses an unrecognised
 field with a `400`, so strictness holds a client to nothing it was not already held to. `delivery`,
-`params`, `seed` and `language` are not accepted: the native API takes them, and adding them here
-would make a second native API with a worse name. A multilingual variant speaks the first language
+`params`, `seed`, `language` and `keepAliveSeconds` are not accepted: the native API takes them, and
+adding them here would make a second native API with a worse name. A shim request gets the engine's
+keep-alive, or the server's, as anything that does not ask for one does. A multilingual variant speaks the first language
 it lists, as `/speak` does when `language` is absent.
 
 A cue in `input` is different. Stripping one the variant does not claim is § 5 making the request

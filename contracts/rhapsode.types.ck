@@ -140,8 +140,11 @@ contract SpeakRequest: {
     stream?: boolean
 }
 
+# The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
+# and a worker has no opinion about how long anything stays resident. protocol.md § 3.
 contract EngineSpeakRequest: SpeakRequest & {
     engine: string
+    keepAliveSeconds?: int(min=-1)                      # -1 never expires, 0 frees on release.
 }
 
 # One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
@@ -161,6 +164,11 @@ contract DialogueRequest: {
     params?: record(string, number)
     seed?: int
     stream?: boolean
+}
+
+# As `EngineSpeakRequest` is to `SpeakRequest`, and for the same reason.
+contract EngineDialogueRequest: DialogueRequest & {
+    keepAliveSeconds?: int(min=-1)
 }
 
 contract LoadRequest: {

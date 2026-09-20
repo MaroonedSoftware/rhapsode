@@ -4,7 +4,7 @@ import type {
     Capabilities,
     CatalogEntry,
     CoreHealth,
-    DialogueRequest,
+    EngineDialogueRequest,
     EngineSpeakRequest,
     EngineSummary,
     ErrorBody,
@@ -185,7 +185,7 @@ export class PublicClient {
     /** @description A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per */
     async dialogue(
         engine: string,
-        body: DialogueRequest,
+        body: EngineDialogueRequest,
     ): Promise<
         | { status: 200; contentType: 'audio/wav' | 'audio/mpeg' | 'audio/opus' | 'audio/flac' | 'audio/l16'; data: Blob }
         | { status: 400; contentType: 'application/json'; data: ErrorBody }

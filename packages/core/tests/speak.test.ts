@@ -94,6 +94,29 @@ describe('refusals that happen before anything is committed', () => {
         expect((await speak(builder, { text: 'x' })).statusCode).toBe(400);
     });
 
+    it('refuses a keep-alive that is not a whole number of seconds, or is below never', async () => {
+        // -1 is as low as it goes, and -2 would read as "never expire" to anything testing for a
+        // negative. A caller who fumbled the number gets told, rather than a model kept for good.
+        const builder = await start();
+
+        for (const keepAliveSeconds of [-2, 1.5, '5m', null]) {
+            const response = await speak(builder, { engine: 'tone', text: 'x', keepAliveSeconds });
+            expect(response.statusCode).toBe(400);
+            expect(response.json().error.message).toContain('keepAliveSeconds');
+        }
+    });
+
+    it('takes a keep-alive of -1, 0 and a duration', async () => {
+        const builder = await start();
+
+        for (const keepAliveSeconds of [-1, 0, 30]) {
+            // Past validation is as far as this gets without a worker; what it does with the value
+            // is the residency manager's, and tested there.
+            const response = await speak(builder, { engine: 'tone', text: 'x', keepAliveSeconds });
+            expect(response.statusCode).not.toBe(400);
+        }
+    });
+
     it('refuses a misspelled field and names it, rather than ignoring what the client meant', async () => {
         // `streaming` is not `stream`. Ignored, the caller gets a stream it believes it turned off,
         // which is the silent discard § 6 spends a section arguing against.

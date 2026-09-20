@@ -170,7 +170,7 @@ operation /engines/{engine}/dialogue: {
         # unsupported. Hand-written: ContractKit cannot express a streamed body.
         sdk: dialogue
         request: {
-            application/json: DialogueRequest
+            application/json: EngineDialogueRequest
         }
         response: {
             200: {

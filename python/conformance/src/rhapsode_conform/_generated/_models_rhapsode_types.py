@@ -212,8 +212,14 @@ class CatalogEntry(BaseModel):
     # Installed through the API, so removable by it.
     managed: bool
 
+# The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
+# and a worker has no opinion about how long anything stays resident. protocol.md § 3.
 class EngineSpeakRequest(SpeakRequest):
+    model_config = ConfigDict(populate_by_name=True)
+
     engine: str
+    # -1 never expires, 0 frees on release.
+    keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
 
 # A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
 # `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
@@ -281,6 +287,12 @@ class CoreHealth(BaseModel):
     status: Literal["ok", "degraded"]
     engines: list[EngineSummary]
     residency: ResidencySummary
+
+# As `EngineSpeakRequest` is to `SpeakRequest`, and for the same reason.
+class EngineDialogueRequest(DialogueRequest):
+    model_config = ConfigDict(populate_by_name=True)
+
+    keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
 
 class Capabilities(BaseModel):
     # The contract major this worker settled on. § 9.

@@ -36,11 +36,18 @@ export interface ResidentWorkers {
     handle(id: string): Pick<WorkerHandle, 'stop'>;
 }
 
+/** What a request may say about how long it wants its model kept. § 3. */
+export interface ResidencyRequest {
+    keepAliveSeconds?: number;
+}
+
 interface Resident {
     engineId: string;
     variant: string;
     leases: number;
     lastUsedAt: DateTime;
+    /** What the last request to take a lease asked for, which outranks the engine and the server. */
+    keepAliveSeconds?: number;
     /** Absent while the model is speaking, or when its keep-alive says never. */
     expiresAt?: DateTime;
     cancelIdle?: () => void;
@@ -83,11 +90,11 @@ export class ResidencyManager {
      * The lock is released before the caller synthesises anything. It is the lease, not the lock,
      * that keeps the model alive for the duration.
      */
-    async acquire(engineId: string, variant: string): Promise<ResidencyLease> {
+    async acquire(engineId: string, variant: string, wanted: ResidencyRequest = {}): Promise<ResidencyLease> {
         const deadline = this.clock.now().plus({ seconds: this.policy.evictionWaitSeconds });
 
         for (;;) {
-            const lease = await this.transition.run(() => this.tryAcquire(engineId, variant));
+            const lease = await this.transition.run(() => this.tryAcquire(engineId, variant, wanted));
             if (lease !== undefined) return lease;
 
             // Every resident is leased, so there is nothing to evict yet. Wait for one to finish
@@ -102,11 +109,11 @@ export class ResidencyManager {
         }
     }
 
-    private async tryAcquire(engineId: string, variant: string): Promise<ResidencyLease | undefined> {
+    private async tryAcquire(engineId: string, variant: string, wanted: ResidencyRequest): Promise<ResidencyLease | undefined> {
         const existing = this.residents.get(engineId);
 
         if (existing !== undefined && existing.variant === variant) {
-            this.hold(existing);
+            this.hold(existing, wanted);
             return this.lease(existing);
         }
 
@@ -142,7 +149,7 @@ export class ResidencyManager {
         const resident: Resident = { engineId, variant, leases: 0, lastUsedAt: this.clock.now() };
         this.residents.set(engineId, resident);
         this.engines.observe(engineId, { model: 'loaded', variant });
-        this.hold(resident);
+        this.hold(resident, wanted);
         return this.lease(resident);
     }
 
@@ -165,9 +172,13 @@ export class ResidencyManager {
         });
     }
 
-    private hold(resident: Resident): void {
+    private hold(resident: Resident, wanted: ResidencyRequest): void {
         resident.leases += 1;
         resident.lastUsedAt = this.clock.now();
+        // The last request to take a lease wins, and one that says nothing puts the engine's own
+        // answer back. Two requests cannot both be right about a model they share, and the newer
+        // one is the one whose caller is still waiting.
+        resident.keepAliveSeconds = wanted.keepAliveSeconds;
         resident.cancelIdle?.();
         resident.cancelIdle = undefined;
         resident.expiresAt = undefined;
@@ -247,9 +258,9 @@ export class ResidencyManager {
         });
     }
 
-    /** The engine's own deadline if it has one, and the server's otherwise. § 3. */
+    /** What the request asked for, then the engine's own answer, then the server's. § 3. */
     private keepAliveFor(resident: Resident): number {
-        return this.engines.entry(resident.engineId)?.keepAliveSeconds ?? this.policy.keepAliveSeconds;
+        return resident.keepAliveSeconds ?? this.engines.entry(resident.engineId)?.keepAliveSeconds ?? this.policy.keepAliveSeconds;
     }
 
     /**

@@ -6,6 +6,9 @@ import {
     CONTRACT_MAJOR,
     CUES,
     DELIVERIES,
+    DialogueRequest,
+    EngineDialogueRequest,
+    EngineSpeakRequest,
     ErrorDetail,
     FeedEvent,
     InstallJob,
@@ -23,6 +26,26 @@ describe('the contract', () => {
     it('carries the eight cues and the two deliveries', () => {
         expect(CUES).toEqual(['laugh', 'chuckle', 'sigh', 'gasp', 'cough', 'clear throat', 'sniff', 'groan']);
         expect(DELIVERIES).toEqual(['hushed', 'frantic']);
+    });
+});
+
+describe('residency is the core’s business and not a worker’s', () => {
+    it('keeps the keep-alive out of the shapes a worker is sent', () => {
+        // § 3: the worker obeys and the core decides. `SpeakRequest` and `DialogueRequest` are the
+        // shapes the core sends on to a worker, and a keep-alive arriving there would be an
+        // invitation for an adapter to grow an idle timer of its own.
+        expect(Object.keys(EngineSpeakRequest.shape)).toContain('keepAliveSeconds');
+        expect(Object.keys(EngineDialogueRequest.shape)).toContain('keepAliveSeconds');
+        expect(Object.keys(SpeakRequest.shape)).not.toContain('keepAliveSeconds');
+        expect(Object.keys(DialogueRequest.shape)).not.toContain('keepAliveSeconds');
+    });
+
+    it('takes never and immediately, and nothing below never', () => {
+        expect(EngineSpeakRequest.shape.keepAliveSeconds.safeParse(-1).success).toBe(true);
+        expect(EngineSpeakRequest.shape.keepAliveSeconds.safeParse(0).success).toBe(true);
+        expect(EngineSpeakRequest.shape.keepAliveSeconds.safeParse(undefined).success).toBe(true);
+        expect(EngineSpeakRequest.shape.keepAliveSeconds.safeParse(-2).success).toBe(false);
+        expect(EngineSpeakRequest.shape.keepAliveSeconds.safeParse(1.5).success).toBe(false);
     });
 });
 

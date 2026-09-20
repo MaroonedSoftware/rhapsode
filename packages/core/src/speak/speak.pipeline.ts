@@ -33,6 +33,8 @@ export interface NativeSpeak {
     delivery?: string;
     params?: Record<string, number>;
     seed?: number;
+    /** Core policy, and never sent to the worker: § 3 keeps residency out of an adapter's hands. */
+    keepAliveSeconds?: number;
     stream: boolean;
 }
 
@@ -46,6 +48,7 @@ export interface NativeDialogue {
     language?: string;
     params?: Record<string, number>;
     seed?: number;
+    keepAliveSeconds?: number;
     stream: boolean;
 }
 
@@ -96,7 +99,7 @@ export async function speakThrough(
         });
     }
 
-    return deliver(request, reply, { engineId, variant, stream: native.stream, logger }, signal =>
+    return deliver(request, reply, { engineId, variant, stream: native.stream, keepAliveSeconds: native.keepAliveSeconds, logger }, signal =>
         client.speak(
             {
                 text: ready.text,
@@ -129,7 +132,7 @@ export async function dialogueThrough(request: FastifyRequest, reply: FastifyRep
         logger.debug('made the dialogue performable', { engine: engineId, variant, droppedCues: ready.dropped.cues });
     }
 
-    return deliver(request, reply, { engineId, variant, stream: native.stream, logger }, signal =>
+    return deliver(request, reply, { engineId, variant, stream: native.stream, keepAliveSeconds: native.keepAliveSeconds, logger }, signal =>
         client.dialogue(
             {
                 turns: ready.turns,
@@ -175,11 +178,17 @@ async function resolve(request: FastifyRequest, engineId: string, requested: str
 async function deliver(
     request: FastifyRequest,
     reply: FastifyReply,
-    { engineId, variant, stream, logger }: { engineId: string; variant: string; stream: boolean; logger: Logger },
+    {
+        engineId,
+        variant,
+        stream,
+        keepAliveSeconds,
+        logger,
+    }: { engineId: string; variant: string; stream: boolean; keepAliveSeconds?: number; logger: Logger },
     ask: (signal: AbortSignal) => Promise<SpokenResponse>,
 ): Promise<FastifyReply> {
     const residency = request.container.get(ResidencyManager);
-    const lease = await residency.acquire(engineId, variant);
+    const lease = await residency.acquire(engineId, variant, { keepAliveSeconds });
 
     // One controller for both ways a synthesis should stop early: the client going away, and
     // the server shutting down.

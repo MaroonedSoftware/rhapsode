@@ -466,7 +466,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/DialogueRequest"
+                                "$ref": "#/components/schemas/EngineDialogueRequest"
                             }
                         }
                     }
@@ -1437,6 +1437,11 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "properties": {
                             "engine": {
                                 "type": "string"
+                            },
+                            "keepAliveSeconds": {
+                                "type": "integer",
+                                "minimum": -1,
+                                "description": "-1 never expires, 0 frees on release."
                             }
                         },
                         "required": [
@@ -1512,6 +1517,22 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "turns"
                 ],
                 "description": "A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and\n`delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader."
+            },
+            "EngineDialogueRequest": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/DialogueRequest"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "keepAliveSeconds": {
+                                "type": "integer",
+                                "minimum": -1
+                            }
+                        }
+                    }
+                ]
             },
             "ErrorDetail": {
                 "type": "object",

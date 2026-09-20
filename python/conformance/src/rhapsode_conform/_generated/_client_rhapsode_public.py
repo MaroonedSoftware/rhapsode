@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, DialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
 
 
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
@@ -405,7 +405,7 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 200, "content_type": "audio/l16", "data": result }
         return { "status": 200, "content_type": "audio/wav", "data": result }
 
-    async def dialogue(self, engine: str, body: DialogueRequest) -> Dialogue200Response | Dialogue400Response | Dialogue404Response | Dialogue422Response | Dialogue429Response | Dialogue503Response:
+    async def dialogue(self, engine: str, body: EngineDialogueRequest) -> Dialogue200Response | Dialogue400Response | Dialogue404Response | Dialogue422Response | Dialogue429Response | Dialogue503Response:
         """
         A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per
         """

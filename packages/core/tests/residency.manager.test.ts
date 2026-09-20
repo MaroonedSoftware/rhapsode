@@ -261,6 +261,57 @@ describe('the residency manager', () => {
             expect(workers.calls).toContain('tone:stop:evict');
         });
 
+        it('lets a request outrank the engine and the server', async () => {
+            const residency = build({ keepAliveSeconds: 600 });
+            engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: 300 });
+
+            (await residency.acquire('tone', 'fast', { keepAliveSeconds: 30 })).release();
+            await clock.advance(30);
+
+            expect(workers.calls).toContain('tone:stop:evict');
+        });
+
+        it('lets the last request to ask win, which is the only one still waiting', async () => {
+            const residency = build({ keepAliveSeconds: 600 });
+
+            const first = await residency.acquire('tone', 'fast', { keepAliveSeconds: -1 });
+            const second = await residency.acquire('tone', 'fast', { keepAliveSeconds: 30 });
+            first.release();
+            second.release();
+
+            await clock.advance(30);
+            expect(workers.calls).toContain('tone:stop:evict');
+        });
+
+        it('puts the engine’s own answer back when a request says nothing', async () => {
+            const residency = build({ keepAliveSeconds: 600 });
+            engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: 60 });
+
+            (await residency.acquire('tone', 'fast', { keepAliveSeconds: 5 })).release();
+            await clock.advance(4);
+            (await residency.acquire('tone', 'fast')).release();
+
+            await clock.advance(1);
+            expect(residency.summary().resident).toBe(1);
+            await clock.advance(59);
+            expect(workers.calls).toContain('tone:stop:evict');
+        });
+
+        it('frees a model at zero only once every request has let go', async () => {
+            const residency = build({ keepAliveSeconds: -1 });
+
+            const first = await residency.acquire('tone', 'fast', { keepAliveSeconds: 0 });
+            const second = await residency.acquire('tone', 'fast', { keepAliveSeconds: 0 });
+
+            first.release();
+            await clock.advance(0);
+            expect(residency.summary().resident).toBe(1);
+
+            second.release();
+            await clock.advance(0);
+            expect(residency.summary().resident).toBe(0);
+        });
+
         it('lets an engine pin its model against a server-wide deadline', async () => {
             const residency = build({ keepAliveSeconds: 60 });
             engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: -1 });
