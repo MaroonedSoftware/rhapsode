@@ -4,6 +4,7 @@ import { nodeVersion } from '@maroonedsoftware/johnny5/versions';
 
 import { buildCurrent } from './checks/build.current.js';
 import { configFile } from './checks/config.file.js';
+import { engineFreshness } from './checks/engine.freshness.js';
 import { engineVenvs } from './checks/engine.venvs.js';
 import { ffmpeg } from './checks/ffmpeg.js';
 import { pnpmVersion } from './checks/pnpm.version.js';
@@ -26,7 +27,20 @@ const app = await createCliApp({
         { path: ['unload'], module: unloadCommand as CommandModule },
     ],
     // In the order a fresh checkout has to satisfy them, so the first red line is the one to fix.
-    checks: [nodeVersion({ min: 22 }), pnpmVersion, pythonVersion, pythonVenv, buildCurrent, configFile, engineVenvs, portFree, ffmpeg],
+    checks: [
+        nodeVersion({ min: 22 }),
+        pnpmVersion,
+        pythonVersion,
+        pythonVenv,
+        buildCurrent,
+        configFile,
+        engineVenvs,
+        // After engineVenvs, which answers the stronger question: a venv that cannot run its engine
+        // is a problem before the version in it is worth discussing.
+        engineFreshness,
+        portFree,
+        ffmpeg,
+    ],
 });
 
 process.exit(await app.run(process.argv));

@@ -2,6 +2,8 @@ import { Injectable } from 'injectkit';
 
 import type { EngineSummary, License } from '@rhapsode/contract';
 
+import { installedWorkerVersion } from './worker.version.js';
+
 /** What an engine is, before anything has tried to run it. */
 export interface EngineEntry {
     id: string;
@@ -40,9 +42,19 @@ export interface EngineEntry {
 export class EngineRegistry {
     private readonly entries = new Map<string, EngineEntry>();
     private readonly states = new Map<string, EngineState>();
+    /**
+     * `rhapsode-worker` in each engine's venv, read here rather than in `summaries()`.
+     *
+     * A venv only changes when an install or an uninstall changes it, and both go through this
+     * class, so this is read once per engine instead of once per request. `/health` is what a
+     * container's healthcheck polls; putting a directory listing per engine on that path would
+     * have been a syscall every few seconds to answer a question whose answer cannot have changed.
+     */
+    private readonly workerVersions = new Map<string, string | undefined>();
 
     declare(entry: EngineEntry): void {
         this.entries.set(entry.id, entry);
+        this.workerVersions.set(entry.id, installedWorkerVersion(entry.venv));
         if (!this.states.has(entry.id)) {
             this.states.set(entry.id, { process: 'down', model: 'unloaded', restarts: 0 });
         }
@@ -52,6 +64,12 @@ export class EngineRegistry {
     remove(id: string): void {
         this.entries.delete(id);
         this.states.delete(id);
+        this.workerVersions.delete(id);
+    }
+
+    /** What `rhapsode-worker` this engine's venv holds, for the doctor and for § 9's `workerVersion`. */
+    workerVersion(id: string): string | undefined {
+        return this.workerVersions.get(id);
     }
 
     has(id: string): boolean {
@@ -77,6 +95,7 @@ export class EngineRegistry {
     summaries(): EngineSummary[] {
         return [...this.entries.values()].map(entry => {
             const state = this.state(entry.id);
+            const workerVersion = this.workerVersion(entry.id);
             return {
                 id: entry.id,
                 displayName: entry.displayName,
@@ -86,6 +105,7 @@ export class EngineRegistry {
                 restarts: state.restarts,
                 ...(state.variant === undefined ? {} : { variant: state.variant }),
                 ...(state.lastError === undefined ? {} : { lastError: state.lastError }),
+                ...(workerVersion === undefined ? {} : { workerVersion }),
             };
         });
     }
