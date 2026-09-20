@@ -25,9 +25,12 @@ rather than about the contract.
         // How long a request for a second engine waits for the first to stop speaking before it is
         // told to try again. At maxResidentModels 1 this is simply a queue.
         "evictionWaitSeconds": 30,
-        // Both off by default: they trade a cold start for memory nobody is asking for.
-        "idleUnloadSeconds": null,
-        "idleTerminateSeconds": null
+        // How long a model with nothing to do stays on the card. An expiry terminates the worker,
+        // because an unload leaves roughly 30% stranded (§ 3). -1 keeps the model until something
+        // else needs the room, which is what this server did before this setting existed; 0 frees
+        // it the moment the last request lets go. Replaces idleUnloadSeconds and
+        // idleTerminateSeconds, which are still read when this is not set.
+        "keepAliveSeconds": 300
     },
 
     "workers": {
@@ -68,6 +71,9 @@ rather than about the contract.
         "chatterbox": {
             "venv": "/opt/rhapsode/venvs/chatterbox",
             "autostart": true,
+            // This engine's own keep-alive, overriding residency.keepAliveSeconds. Worth raising
+            // for a model that is slow to load and lowering for one that is quick.
+            "keepAliveSeconds": 900,
             "env": { "CUDA_VISIBLE_DEVICES": "0" }
         },
         "dia": { "url": "http://gpu-02.lan:9310" }
@@ -414,6 +420,37 @@ is correct, and it is worth an alert threshold rather than a page.
 continuously for `restartDecaySeconds`, so an engine that crashes on every third synthesis climbs
 rather than resetting. At `maxRestarts` the engine is reported `failed` and stops being restarted
 automatically: a version mismatch or a broken virtualenv does not get better with backoff.
+
+`GET /residency` is the one to read when a card is full and you want to know what is holding it.
+
+```json
+{
+    "resident": 1,
+    "max": 1,
+    "waiting": 0,
+    "models": [
+        {
+            "engine": "dia",
+            "variant": "full",
+            "leases": 0,
+            "lastUsedAt": "2026-09-20T11:04:02.118Z",
+            "expiresAt": "2026-09-20T11:09:02.118Z",
+            "keepAliveSeconds": 300,
+            "sizeBytes": 3355443200
+        }
+    ]
+}
+```
+
+`leases` is how many requests are still speaking that model, so a row with leases above zero is one
+nothing can evict yet. `expiresAt` is absent while it is speaking and when its keep-alive is `-1`.
+`keepAliveSeconds` is the value actually in force, which may have come from the request rather than
+from your configuration. `sizeBytes` is what the worker measured the load taking and is absent where
+nothing could measure it; it is a device-wide delta, so treat it as approximate.
+
+Like `/health` and `/engines`, it starts no worker and waits on none. It is also not something a
+client should call before speaking: `/speak` loads on demand, and a client checking here first has
+added a round trip per utterance to ask what the server already knows.
 
 ## Logs
 

@@ -1,6 +1,6 @@
 import { Injectable } from 'injectkit';
 
-import type { EngineSummary, License, ResidencySummary } from '@rhapsode/contract';
+import type { EngineSummary, License } from '@rhapsode/contract';
 
 /** What an engine is, before anything has tried to run it. */
 export interface EngineEntry {
@@ -19,6 +19,14 @@ export interface EngineEntry {
     url?: string;
     autostart?: boolean;
     defaultVariant?: string;
+    /**
+     * This engine's own keep-alive, overriding `residency.keepAliveSeconds`. § 3.
+     *
+     * Per engine because the cost of a cold start is per engine: a model that takes forty seconds
+     * to load earns a longer deadline than one that takes two, and a request can only say what it
+     * wants for itself.
+     */
+    keepAliveSeconds?: number;
 }
 
 /**
@@ -81,14 +89,6 @@ export class EngineRegistry {
             };
         });
     }
-
-    residency(): ResidencySummary {
-        const resident = [...this.states.values()].filter(state => state.model === 'loaded' || state.model === 'loading');
-        return { resident: resident.length, max: this.maxResidentModels, waiting: 0 };
-    }
-
-    /** Set by the residency module, which owns the policy. The registry only reports it. */
-    maxResidentModels = 1;
 }
 
 export interface EngineState {

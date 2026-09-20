@@ -151,8 +151,11 @@ contract SpeakRequest: {
     stream?: boolean
 }
 
+# The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
+# and a worker has no opinion about how long anything stays resident. protocol.md § 3.
 contract EngineSpeakRequest: SpeakRequest & {
     engine: string
+    keepAliveSeconds?: int(min=-1)                      # -1 never expires, 0 frees on release.
 }
 
 # One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
@@ -172,6 +175,11 @@ contract DialogueRequest: {
     params?: record(string, number)
     seed?: int
     stream?: boolean
+}
+
+# As `EngineSpeakRequest` is to `SpeakRequest`, and for the same reason.
+contract EngineDialogueRequest: DialogueRequest & {
+    keepAliveSeconds?: int(min=-1)
 }
 
 contract LoadRequest: {
@@ -215,7 +223,8 @@ contract mode(loose) WorkerHealth: {
     model: enum(unloaded, loading, loaded, unloading)
     variant?: string
     device?: string
-    vramBytes?: int
+    vramBytes?: int                                     # What the card holds in total.
+    modelBytes?: int                                    # What the loaded model took of it, measured. § 3.
 }
 
 contract mode(loose) EngineSummary: {
@@ -234,6 +243,21 @@ contract mode(loose) ResidencySummary: {
     max: int
     waiting: int
     blockedBy?: string      # Named, because a wait at maxResidentModels 1 looks exactly like a hang.
+}
+
+# One model on the card, and what the core knows about it. protocol.md § 3.
+contract mode(loose) ResidentModel: {
+    engine: string
+    variant: string
+    leases: int                     # Requests still speaking it. A model with leases is not evictable.
+    lastUsedAt: string              # ISO 8601, UTC.
+    expiresAt?: string              # Absent while it is speaking, or when its keep-alive says never.
+    keepAliveSeconds: int           # The one in force here: request, then engine, then server.
+    sizeBytes?: int                 # What the worker measured the model taking, where it could.
+}
+
+contract mode(loose) ResidencyDetail: ResidencySummary & {
+    models: array(ResidentModel)
 }
 
 contract mode(loose) CoreHealth: {

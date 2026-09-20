@@ -505,6 +505,36 @@ def voices_carry_a_spec_and_a_preview_url(worker: Worker, report: Report) -> Non
 
 
 @check
+def model_bytes_is_honest_where_it_is_reported(worker: Worker, report: Report) -> None:
+    """§ 3. Optional, because nothing can measure every device, but never a number that misleads.
+
+    A core adding up a card treats the figure as real, so 0 or a negative is worse than silence: it
+    reads as a model that is free, or as one giving memory back by being loaded.
+    """
+    status, loaded = worker.post("/load")
+    if status != 200:
+        report.record("modelBytes is positive while loaded", "§ 3", False, f"load answered {status}")
+        return
+
+    held = loaded.get("modelBytes") if isinstance(loaded, dict) else None
+    if held is None:
+        report.record("modelBytes is positive while loaded", "§ 3", True, "not reported, which is allowed")
+    else:
+        report.record(
+            "modelBytes is positive while loaded",
+            "§ 3",
+            isinstance(held, int) and held > 0,
+            f"modelBytes {held}",
+        )
+
+    _, unloaded = worker.post("/unload")
+    gone = not isinstance(unloaded, dict) or unloaded.get("modelBytes") is None
+    report.record(
+        "modelBytes goes when the model does", "§ 3", gone, f"after unload: {unloaded.get('modelBytes')}"
+    )
+
+
+@check
 def unloading_nothing_is_a_success(worker: Worker, report: Report) -> None:
     """§ 3. The core unloads on a schedule it owns and cannot know what a crash left behind."""
     statuses = [worker.post("/unload")[0] for _ in range(3)]

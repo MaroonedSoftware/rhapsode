@@ -23,6 +23,22 @@ operation /health: {
     }
 }
 
+operation /residency: {
+    get: {
+        # What is on the card, for an operator asking where their memory went. Reads the core's own
+        # state: it spawns nothing, loads nothing and never blocks on a worker, exactly as /health
+        # and /engines do not. Separate from /health because that one is polled by monitors and
+        # carries every engine's licence, and this one is a different question.
+        #
+        # Not a thing to consult before speaking: /speak loads on demand (§ 3), and a client that
+        # reads this first has rebuilt the round trip per utterance that rule exists to remove.
+        sdk: residency
+        response: {
+            200: { application/json: ResidencyDetail }
+        }
+    }
+}
+
 # This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
 # top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
 # already has a library that types it.
@@ -170,7 +186,7 @@ operation /engines/{engine}/dialogue: {
         # unsupported. Hand-written: ContractKit cannot express a streamed body.
         sdk: dialogue
         request: {
-            application/json: DialogueRequest
+            application/json: EngineDialogueRequest
         }
         response: {
             200: {
@@ -213,6 +229,30 @@ operation /engines/{engine}: {
         sdk: uninstallEngine
         response: {
             204:
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /engines/{engine}/unload: {
+    params: {
+        engine: string
+    }
+    post: {
+        # Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an
+        # engine holding nothing is already in the state this asks for, and answers 200.
+        #
+        # A query rather than a body, as the install route explains. protocol.md § 3 and § 10.
+        sdk: unloadEngine
+        query: {
+            # `terminate` (the default) ends the worker process, which is the only way to get back
+            # the roughly 30% an unload strands. `unload` keeps the process for a faster next load.
+            mode?: enum(terminate, unload)
+        }
+        response: {
+            200: { application/json: EngineSummary }
             403: { application/json: ErrorBody }
             404: { application/json: ErrorBody }
             409: { application/json: ErrorBody }

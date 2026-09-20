@@ -7,6 +7,8 @@ export const queryKeys = {
     catalog: () => ['catalog'] as const,
     /** What this box has. */
     engines: () => ['engines'] as const,
+    /** What is on the card. Polled while the page is open, because a keep-alive expires on its own. */
+    residency: () => ['residency'] as const,
     /** Per engine. Capabilities change with the loaded variant, voices with every clone. */
     engine: {
         capabilities: (engine: string) => ['engine', engine, 'capabilities'] as const,

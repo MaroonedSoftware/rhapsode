@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 
-import { DialogueRequest } from '@rhapsode/contract';
+import { EngineDialogueRequest } from '@rhapsode/contract';
 
 import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { dialogueThrough } from './speak.pipeline.js';
@@ -14,7 +14,7 @@ import { dialogueThrough } from './speak.pipeline.js';
  */
 export const dialogueRoutes: FastifyPluginAsync = async app => {
     app.post<{ Params: { engine: string } }>('/engines/:engine/dialogue', { config: { body: ['application/json'] } }, async (request, reply) => {
-        const parsed = DialogueRequest.safeParse(request.body ?? {});
+        const parsed = EngineDialogueRequest.safeParse(request.body ?? {});
         if (!parsed.success) {
             const issue = parsed.error.issues[0]!;
             const where = issue.path.length > 0 ? `\`${issue.path.join('.')}\`: ` : '';
@@ -31,6 +31,7 @@ export const dialogueRoutes: FastifyPluginAsync = async app => {
             language: body.language,
             params: body.params,
             seed: body.seed,
+            keepAliveSeconds: body.keepAliveSeconds,
             stream: body.stream !== false,
         });
     });

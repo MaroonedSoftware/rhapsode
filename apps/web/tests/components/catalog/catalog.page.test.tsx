@@ -6,7 +6,16 @@ import { render, screen } from '../../utils/render';
 
 const catalog = vi.fn<() => Promise<CatalogEntry[]>>();
 
-vi.mock('../../../src/api/client', () => ({ sdk: { public: { catalog: () => catalog() } } }));
+vi.mock('../../../src/api/client', () => ({
+    sdk: {
+        public: {
+            catalog: () => catalog(),
+            // The page shows what is on the card beside the catalog, and holding nothing is the
+            // state every test here is about.
+            residency: () => Promise.resolve({ resident: 0, max: 1, waiting: 0, models: [] }),
+        },
+    },
+}));
 
 const chatterbox: CatalogEntry = {
     id: 'chatterbox',

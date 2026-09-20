@@ -169,7 +169,7 @@ export type SpeakRequest = z.infer<typeof SpeakRequest>;
 
 /**
  * One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
- * generated from [DialogueTurn](../../../../contracts/rhapsode.types.ck#L159)
+ * generated from [DialogueTurn](../../../../contracts/rhapsode.types.ck#L162)
  */
 export const DialogueTurn = z.strictObject({
     speaker: z.string().min(1),
@@ -178,7 +178,7 @@ export const DialogueTurn = z.strictObject({
 export type DialogueTurn = z.infer<typeof DialogueTurn>;
 
 /**
- * generated from [LoadRequest](../../../../contracts/rhapsode.types.ck#L177)
+ * generated from [LoadRequest](../../../../contracts/rhapsode.types.ck#L185)
  */
 export const LoadRequest = z.strictObject({
     variant: z.string().optional(),
@@ -188,7 +188,7 @@ export type LoadRequest = z.infer<typeof LoadRequest>;
 /**
  * Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
  * not loaded yet. protocol.md § 8.
- * generated from [FetchRequest](../../../../contracts/rhapsode.types.ck#L183)
+ * generated from [FetchRequest](../../../../contracts/rhapsode.types.ck#L191)
  */
 export const FetchRequest = z.strictObject({
     variant: z.string(),
@@ -200,7 +200,7 @@ export type FetchRequest = z.infer<typeof FetchRequest>;
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L195)
+ * generated from [ErrorDetail](../../../../contracts/rhapsode.types.ck#L203)
  */
 export const ErrorDetail = z.looseObject({
     code: z
@@ -225,19 +225,26 @@ export const ErrorDetail = z.looseObject({
 export type ErrorDetail = z.infer<typeof ErrorDetail>;
 
 /**
- * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L213)
+ * generated from [WorkerHealth](../../../../contracts/rhapsode.types.ck#L221)
  */
 export const WorkerHealth = z.looseObject({
     process: z.enum(['up', 'draining']),
     model: z.enum(['unloaded', 'loading', 'loaded', 'unloading']),
     variant: z.string().optional(),
     device: z.string().optional(),
-    vramBytes: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).optional(),
+    vramBytes: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .optional()
+        .describe('What the card holds in total.'),
+    modelBytes: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .optional()
+        .describe('What the loaded model took of it, measured. § 3.'),
 });
 export type WorkerHealth = z.infer<typeof WorkerHealth>;
 
 /**
- * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L232)
+ * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L241)
  */
 export const ResidencySummary = z.looseObject({
     resident: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -248,7 +255,29 @@ export const ResidencySummary = z.looseObject({
 export type ResidencySummary = z.infer<typeof ResidencySummary>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L275)
+ * One model on the card, and what the core knows about it. protocol.md § 3.
+ * generated from [ResidentModel](../../../../contracts/rhapsode.types.ck#L249)
+ */
+export const ResidentModel = z.looseObject({
+    engine: z.string(),
+    variant: z.string(),
+    leases: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .describe('Requests still speaking it. A model with leases is not evictable.'),
+    lastUsedAt: z.string().describe('ISO 8601, UTC.'),
+    expiresAt: z.string().optional().describe('Absent while it is speaking, or when its keep-alive says never.'),
+    keepAliveSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .describe('The one in force here: request, then engine, then server.'),
+    sizeBytes: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .optional()
+        .describe('What the worker measured the model taking, where it could.'),
+});
+export type ResidentModel = z.infer<typeof ResidentModel>;
+
+/**
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L299)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -258,7 +287,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L281)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L305)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -291,7 +320,7 @@ export const Variant = z.looseObject({
 export type Variant = z.infer<typeof Variant>;
 
 /**
- * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L221)
+ * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L230)
  */
 export const EngineSummary = z.looseObject({
     id: z.string(),
@@ -308,7 +337,7 @@ export type EngineSummary = z.infer<typeof EngineSummary>;
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L252)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L276)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -324,17 +353,23 @@ export const CatalogEntry = z.looseObject({
 export type CatalogEntry = z.infer<typeof CatalogEntry>;
 
 /**
- * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L154)
+ * The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
+ * and a worker has no opinion about how long anything stays resident. protocol.md § 3.
+ * generated from [EngineSpeakRequest](../../../../contracts/rhapsode.types.ck#L156)
  */
 export const EngineSpeakRequest = SpeakRequest.extend({
     engine: z.string(),
+    keepAliveSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(-1))
+        .optional()
+        .describe('-1 never expires, 0 frees on release.'),
 });
 export type EngineSpeakRequest = z.infer<typeof EngineSpeakRequest>;
 
 /**
  * A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
  * `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
- * generated from [DialogueRequest](../../../../contracts/rhapsode.types.ck#L166)
+ * generated from [DialogueRequest](../../../../contracts/rhapsode.types.ck#L169)
  */
 export const DialogueRequest = z.strictObject({
     turns: z.array(DialogueTurn),
@@ -354,7 +389,7 @@ export const DialogueRequest = z.strictObject({
 export type DialogueRequest = z.infer<typeof DialogueRequest>;
 
 /**
- * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L205)
+ * generated from [ErrorBody](../../../../contracts/rhapsode.types.ck#L213)
  */
 export const ErrorBody = z.looseObject({
     error: ErrorDetail,
@@ -362,7 +397,7 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L262)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L286)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
@@ -379,7 +414,15 @@ export const InstallJob = z.looseObject({
 export type InstallJob = z.infer<typeof InstallJob>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L288)
+ * generated from [ResidencyDetail](../../../../contracts/rhapsode.types.ck#L259)
+ */
+export const ResidencyDetail = ResidencySummary.extend({
+    models: z.array(ResidentModel),
+});
+export type ResidencyDetail = z.infer<typeof ResidencyDetail>;
+
+/**
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L312)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -410,7 +453,7 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L239)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L263)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -419,6 +462,15 @@ export const CoreHealth = z.looseObject({
     residency: ResidencySummary,
 });
 export type CoreHealth = z.infer<typeof CoreHealth>;
+
+/**
+ * As `EngineSpeakRequest` is to `SpeakRequest`, and for the same reason.
+ * generated from [EngineDialogueRequest](../../../../contracts/rhapsode.types.ck#L181)
+ */
+export const EngineDialogueRequest = DialogueRequest.extend({
+    keepAliveSeconds: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(-1)).optional(),
+});
+export type EngineDialogueRequest = z.infer<typeof EngineDialogueRequest>;
 
 /**
  * generated from [Capabilities](../../../../contracts/rhapsode.types.ck#L107)

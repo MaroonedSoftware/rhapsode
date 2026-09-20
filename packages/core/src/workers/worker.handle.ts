@@ -58,17 +58,26 @@ export class RemoteWorkerHandle implements WorkerHandle {
     constructor(
         readonly id: string,
         url: string,
+        client?: WorkerClient,
     ) {
-        this.client = new WorkerClient({ url });
+        this.client = client ?? new WorkerClient({ url });
     }
 
     async ensureUp(): Promise<WorkerClient> {
         return this.client;
     }
 
-    async stop(): Promise<void> {
+    async stop(reason: 'shutdown' | 'evict' | 'uninstall'): Promise<void> {
         // Not ours to exit. `terminate` over HTTP is the only reclaim available here, which is why
         // the protocol has that verb at all.
+        if (reason === 'evict') {
+            // And the pool stays open across it. Closing it is what an eviction used to do, which
+            // left `ensureUp` handing out a client whose pool was destroyed: the engine answered
+            // nothing until the core restarted. Idle freeing makes that path routine rather than
+            // rare, so the reclaim and the connection are now separate things.
+            await this.client.terminate();
+            return;
+        }
         await this.client.close();
     }
 }
@@ -299,26 +308,45 @@ export class LocalWorkerHandle implements WorkerHandle {
     async stop(reason: 'shutdown' | 'evict' | 'uninstall'): Promise<void> {
         this.wanted = false;
         const child = this.child;
-        await this.client?.close();
-        this.client = undefined;
 
         if (child === undefined || child.exitCode !== null) {
+            await this.client?.close();
+            this.client = undefined;
             await this.cleanupSocket();
             return;
         }
 
         this.logger.info('stopping worker', { engine: this.id, reason });
         const exited = once(child, 'exit');
-        child.kill('SIGTERM');
         const kill = setTimeout(() => child.kill('SIGKILL'), this.options.drainGraceMs);
         kill.unref();
 
         try {
+            // An eviction reaches for the verb first, because that is the one reclaim a remote
+            // worker can also be given: a core that only signals silently degrades to `unload` over
+            // TCP and loses the 30% an unload strands. § 3. A shutdown keeps signalling, which § 2
+            // describes as the same sequence, and a worker too wedged to answer gets it anyway.
+            if (!(reason === 'evict' && (await this.askToTerminate()))) child.kill('SIGTERM');
             await exited;
         } finally {
             clearTimeout(kill);
+            await this.client?.close();
+            this.client = undefined;
             this.child = undefined;
             await this.cleanupSocket();
+        }
+    }
+
+    /** Whether the worker accepted "end your own process". The signal is the answer when it did not. */
+    private async askToTerminate(): Promise<boolean> {
+        const client = this.client;
+        if (client === undefined) return false;
+        try {
+            await client.terminate();
+            return true;
+        } catch (error) {
+            this.logger.warn('the terminate verb did not land; signalling instead', { engine: this.id, error });
+            return false;
         }
     }
 

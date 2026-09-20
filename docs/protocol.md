@@ -98,6 +98,15 @@ core sends `SIGKILL` after a grace period it owns. `POST /terminate` (§3) is th
 for over HTTP rather than signalled, and is what reclaims a card from a worker the core cannot
 signal.
 
+**Which one the core reaches for, and in what order.** An eviction sends `/terminate` first and
+signals only if the verb does not land, because that is the one reclaim a remote worker can also be
+given: a core that only signals degrades to `unload` over TCP and loses the 30% an unload strands
+(§ 3). A shutdown signals without asking, which is the same sequence by the paragraph above and one
+round trip shorter on a path where every worker is going anyway. Either way the grace period is the
+core's and ends in `SIGKILL`: a worker that took the verb and then hung is not a worker to wait on
+forever. A remote worker gets the verb and keeps its connection, because the process restarting is
+somebody else's supervisor's business and the core will want to talk to its replacement.
+
 An exit the core did not ask for is a crash, and the core restarts it with backoff, holding the
 restart count against it. An exit that follows a `SIGTERM` or a `/terminate` is not, however it is
 timed: a worker that finishes draining a second after the core stopped waiting has done its job.
@@ -122,8 +131,21 @@ down → starting → up(unloaded) → loading → up(loaded)
 `GET /health` reports both:
 
 ```json
-{"process":"up","model":"loaded","variant":"turbo","device":"cuda:0","vramBytes":4831838208}
+{"process":"up","model":"loaded","variant":"turbo","device":"cuda:0","vramBytes":4831838208,"modelBytes":3355443200}
 ```
+
+`vramBytes` is what the card holds and `modelBytes` is what this model took of it, measured across
+the load by the SDK and reported while it stays loaded. They are different questions and only the
+second one helps a core decide what to evict: a budget counted in models assumes every model is the
+same size, and Kokoro is 82M parameters where Dia is 1.6B.
+
+`modelBytes` is optional, because no measurement covers every device, and it is approximate where it
+is given: it is a card-wide delta, so it counts the runtime's own context and anything else that
+allocated during the load, which is the right answer for "can another model fit" and the wrong one
+for "how big are these weights". An adapter that knows the real figure returns it from
+`Engine.memory_bytes` and is believed. What a worker must never report is `0` or a negative: a core
+adding up a card reads those as a model that is free, so a measurement that failed is left out
+instead.
 
 ### Three rules, each paid for
 
@@ -160,11 +182,97 @@ The worker obeys; the core decides. Default policy, all configurable:
 
 - `maxResidentModels` (default 1, which is the right answer for one GPU)
 - LRU eviction when a `/speak` needs a model and the budget is full
-- `idleUnloadSeconds` (default off, because it trades a cold start for memory nobody is asking for)
-- `idleTerminateSeconds` (default off)
+- `keepAliveSeconds` (default 300): how long a model with nothing left to do stays on the card.
+  `-1` keeps it until something else needs the room, `0` frees it as the last request lets go.
+  Settable per engine as well as server-wide, because the cold start it trades against is per
+  engine: a model that takes forty seconds to load has earned a longer deadline than one that takes
+  two.
+
+An expiry terminates rather than unloads, by rule 3 above: an unload leaves roughly 30% behind, and
+a deadline that runs every few minutes would give a card away 30% at a time. This replaces the
+`idleUnloadSeconds` and `idleTerminateSeconds` pair, which was two deadlines for two verbs and is
+one deadline now that there is one verb.
+
+The default is on, which is a reversal. Off was defensible while an expiry was something an operator
+opted into: it trades a cold start for memory nobody asked for. It stops being defensible as the
+default on a box with one card, because the memory *is* being asked for, by whatever wants to run
+next and finds the card held by a model idle since this morning. A cold start is a cost the request
+that pays it can see; a card held by nothing is a cost that lands on somebody else.
 
 Putting this in the core rather than in each worker is what stops every adapter author reinventing
 an idle timer, and it is the only component that can see the whole card.
+
+### `GET /residency`, for the operator asking where the memory went
+
+```json
+{
+  "resident": 1, "max": 1, "waiting": 0,
+  "models": [{
+    "engine": "dia", "variant": "full", "leases": 0,
+    "lastUsedAt": "2026-09-20T11:04:02.118Z", "expiresAt": "2026-09-20T11:09:02.118Z",
+    "keepAliveSeconds": 300, "sizeBytes": 3355443200
+  }]
+}
+```
+
+`expiresAt` is absent while a model is speaking, because the deadline starts when the last request
+lets go, and absent when its keep-alive says never. `keepAliveSeconds` is the one actually in force
+after the precedence below, not the server's default. `sizeBytes` is what the worker measured and is
+absent where it could not.
+
+It reads the core's own state: it spawns no worker, loads nothing and never blocks on one, which is
+the promise `/health` and `/engines` already make. Asking each worker instead would make listing
+what is loaded a reason to start processes that are not, which is the opposite of what somebody
+looking at a full card wants.
+
+It is separate from `/health` because they answer different questions to different readers: a
+monitor polls `/health` and gets every engine's licence with it. **And it is not a route to consult
+before speaking.** `/speak` loads on demand, and a client that reads this first to decide whether it
+needs to has rebuilt the round trip per utterance that rule 1 exists to remove.
+
+### `POST /engines/{engine}/unload`, for giving the memory back now
+
+`?mode=terminate` by default, or `?mode=unload` to keep the process for a faster next load. It is a
+management route (§ 10), behind the same guard as install: somebody who can empty a card can make
+every synthesis on the box pay a cold start.
+
+It is idempotent, like the worker verb it reaches for, and answers `200` with the engine's summary.
+`terminate` ends the process even when no model is loaded, which is how an operator reclaims what a
+variant switch left stranded (rule 3: an unload keeps roughly 30% until the process exits).
+
+**It is refused with `409` while the engine is speaking**, for the reason § 7 gives about uninstall:
+cutting off a stream in progress hands that caller a truncated file for something they could not
+have predicted. On a busy box this can refuse for as long as the box is busy, which is the honest
+answer. Draining instead, unloading once the current request finishes, was considered and left out:
+the next request may set a new keep-alive, so a promise to unload afterwards is one the core cannot
+keep, and a `202` that silently becomes nothing is worse than a `409` that says what is true now.
+
+### A request may say how long it wants its model kept
+
+`POST /speak` and `POST /engines/{engine}/dialogue` take `keepAliveSeconds`, meaning the same thing
+it means in configuration, for the model that request loads. It is a hint about what happens next,
+which is the one thing the server cannot know and the caller often does: a batch about to send
+another two hundred lines says `-1`, and a page that just wants one sentence read aloud says `0` and
+gives the card back.
+
+Precedence is request, then engine, then server. Three rules, because each answers a different
+question: the server knows what the box is for, the engine knows what its own cold start costs, and
+only the request knows whether there is more coming.
+
+**The last request to take a lease wins.** Two requests speaking the same model cannot both be right
+about how long it stays, and the newer one is the one whose caller is still waiting. A request that
+says nothing puts the engine's own answer back rather than leaving the previous request's in place,
+so a `-1` from a batch that has finished does not outlive it.
+
+**A keep-alive is not a reservation.** `-1` means "do not expire this", not "do not evict this": a
+`/speak` for another engine with the budget full still takes it by LRU (rule 1 above would otherwise
+fail for everybody else the moment one caller pinned a card). That is also why the field is safe on
+a public route: the worst a stranger can do with `-1` is what this server did by default before
+there was a deadline at all.
+
+**The worker is never told.** `keepAliveSeconds` is on the public request shapes and not on the ones
+the core forwards, because an adapter that can see a keep-alive is an adapter that will eventually
+act on one, and then there are two idle timers disagreeing about the same card.
 
 ---
 
@@ -381,6 +489,7 @@ Content-Type: application/json
 | `delivery` | Only ever one the effective variant claimed; the core drops the rest. |
 | `params` | Against the effective variant's `dials` (§4). Unknown keys are refused, not ignored. |
 | `seed` | Optional. Reproducibility for engines that can. |
+| `keepAliveSeconds` | How long to keep this model once the request is done. §3. Not sent to the worker. |
 | `stream` | `true` streams chunked; `false` buffers and sets `Content-Length`. |
 
 Response: `200`, `Content-Type: audio/opus`, chunked.
@@ -687,6 +796,9 @@ serve(ChatterboxEngine())
   through ffmpeg. Without this, every adapter reimplements format conversion and they all do it
   differently. This is the single largest reduction in adapter burden in the design.
 - **Applies the unload-then-load-once retry** around `load()`, so the OOM lesson is free.
+- **Measures what a load cost**, as a device-wide delta across `load()`, and reports it as
+  `modelBytes` (§ 3). An adapter that knows better overrides `memory_bytes()`; one that does not
+  gets a figure for free, and one on a device nothing can measure reports nothing rather than zero.
 - Maps exceptions onto the error taxonomy, with `retryable` set correctly, and aborts the connection
   rather than closing it cleanly when `speak()` raises mid-stream.
 - Enforces `maxCharacters` and validates `params` against the declared dials before `speak()` is
@@ -899,6 +1011,7 @@ what one is built on.
 | `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too |
 | `DELETE /engines/{id}` | Stops and removes an engine this API installed |
 | `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
+| `POST /engines/{id}/unload` | Frees the model now (§ 3); `?mode=unload` keeps the process |
 | `GET /installs` | Every job this process knows about, newest first |
 | `GET /installs/{job}` | One job |
 | `GET /installs/{job}/events` | The job's progress as server-sent events |
@@ -1131,8 +1244,9 @@ variant with no `speed` dial. A `speed` outside the dial's range is `bad_request
 
 A field the shim does not know is `bad_request` naming it. OpenAI's own API refuses an unrecognised
 field with a `400`, so strictness holds a client to nothing it was not already held to. `delivery`,
-`params`, `seed` and `language` are not accepted: the native API takes them, and adding them here
-would make a second native API with a worse name. A multilingual variant speaks the first language
+`params`, `seed`, `language` and `keepAliveSeconds` are not accepted: the native API takes them, and
+adding them here would make a second native API with a worse name. A shim request gets the engine's
+keep-alive, or the server's, as anything that does not ask for one does. A multilingual variant speaks the first language
 it lists, as `/speak` does when `language` is absent.
 
 A cue in `input` is different. Stripping one the variant does not claim is § 5 making the request

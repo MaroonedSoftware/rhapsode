@@ -28,6 +28,24 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/residency": {
+            "get": {
+                "operationId": "residency",
+                "description": "What is on the card, for an operator asking where their memory went. Reads the core's own",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResidencyDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/openapi.json": {
             "get": {
                 "operationId": "openapi",
@@ -466,7 +484,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/DialogueRequest"
+                                "$ref": "#/components/schemas/EngineDialogueRequest"
                             }
                         }
                     }
@@ -598,6 +616,76 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 "responses": {
                     "204": {
                         "description": "No content"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/engines/{engine}/unload": {
+            "post": {
+                "operationId": "unloadEngine",
+                "description": "Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an",
+                "parameters": [
+                    {
+                        "name": "engine",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "terminate",
+                                "unload"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EngineSummary"
+                                }
+                            }
+                        }
                     },
                     "403": {
                         "description": "Forbidden",
@@ -1457,6 +1545,11 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "properties": {
                             "engine": {
                                 "type": "string"
+                            },
+                            "keepAliveSeconds": {
+                                "type": "integer",
+                                "minimum": -1,
+                                "description": "-1 never expires, 0 frees on release."
                             }
                         },
                         "required": [
@@ -1532,6 +1625,22 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "turns"
                 ],
                 "description": "A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and\n`delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader."
+            },
+            "EngineDialogueRequest": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/DialogueRequest"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "keepAliveSeconds": {
+                                "type": "integer",
+                                "minimum": -1
+                            }
+                        }
+                    }
+                ]
             },
             "ErrorDetail": {
                 "type": "object",
@@ -1648,6 +1757,66 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "resident",
                     "max",
                     "waiting"
+                ]
+            },
+            "ResidentModel": {
+                "type": "object",
+                "properties": {
+                    "engine": {
+                        "type": "string"
+                    },
+                    "variant": {
+                        "type": "string"
+                    },
+                    "leases": {
+                        "type": "integer",
+                        "description": "Requests still speaking it. A model with leases is not evictable."
+                    },
+                    "lastUsedAt": {
+                        "type": "string",
+                        "description": "ISO 8601, UTC."
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "description": "Absent while it is speaking, or when its keep-alive says never."
+                    },
+                    "keepAliveSeconds": {
+                        "type": "integer",
+                        "description": "The one in force here: request, then engine, then server."
+                    },
+                    "sizeBytes": {
+                        "type": "integer",
+                        "description": "What the worker measured the model taking, where it could."
+                    }
+                },
+                "required": [
+                    "engine",
+                    "variant",
+                    "leases",
+                    "lastUsedAt",
+                    "keepAliveSeconds"
+                ],
+                "description": "One model on the card, and what the core knows about it. protocol.md § 3."
+            },
+            "ResidencyDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ResidencySummary"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "models": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/ResidentModel"
+                                }
+                            }
+                        },
+                        "required": [
+                            "models"
+                        ]
+                    }
                 ]
             },
             "CoreHealth": {

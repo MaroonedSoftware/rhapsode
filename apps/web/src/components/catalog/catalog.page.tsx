@@ -16,6 +16,7 @@ import { notifyFailure, notifySuccess } from '../shared/notify';
 import { PageHeader } from '../shared/page.header';
 import { PageSkeleton } from '../shared/page.skeleton';
 import { EngineCard } from './engine.card';
+import { LoadedModels } from './loaded.models';
 
 /** Every engine that exists, with both licences, which of them this box has, and the means to change that. */
 export function CatalogPage() {
@@ -146,6 +147,8 @@ export function CatalogPage() {
                     ))}
                 </SimpleGrid>
             )}
+
+            <LoadedModels />
 
             {managed && jobs.data !== undefined && jobs.data.length > 0 && shown !== undefined ? (
                 <Stack gap="sm">

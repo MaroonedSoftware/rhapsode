@@ -8,6 +8,7 @@ describe('the core barrel', () => {
     it('exposes what a composition root needs and nothing model-shaped', () => {
         expect(typeof EngineRegistry).toBe('function');
         expect(DEFAULTS.maxResidentModels).toBe(1);
+        expect(DEFAULTS.keepAliveSeconds).toBe(300);
         expect(Object.keys(CATALOG)).toContain('tone');
     });
 });

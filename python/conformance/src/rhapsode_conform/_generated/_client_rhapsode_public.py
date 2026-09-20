@@ -6,7 +6,12 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, DialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, Voice
+
+
+UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
+    "mode": NotRequired[Literal["terminate", "unload"]],
+})
 
 
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
@@ -208,6 +213,30 @@ class UninstallEngine409Response(TypedDict):
     data: ErrorBody
 
 
+class UnloadEngine200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: EngineSummary
+
+
+class UnloadEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UnloadEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UnloadEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class InstallEngine202Response(TypedDict):
     status: Literal[202]
     content_type: Literal["application/json"]
@@ -319,6 +348,13 @@ class RhapsodePublicClient(BaseClient):
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
 
+    async def residency(self) -> ResidencyDetail:
+        """
+        What is on the card, for an operator asking where their memory went. Reads the core's own
+        """
+        result = await self._fetch("/residency", method="GET")
+        return ResidencyDetail.model_validate(result)
+
     async def openapi(self) -> OpenApiDocument:
         """
         Open to every caller, like /health. The public API only: never a worker route.
@@ -405,7 +441,7 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 200, "content_type": "audio/l16", "data": result }
         return { "status": 200, "content_type": "audio/wav", "data": result }
 
-    async def dialogue(self, engine: str, body: DialogueRequest) -> Dialogue200Response | Dialogue400Response | Dialogue404Response | Dialogue422Response | Dialogue429Response | Dialogue503Response:
+    async def dialogue(self, engine: str, body: EngineDialogueRequest) -> Dialogue200Response | Dialogue400Response | Dialogue404Response | Dialogue422Response | Dialogue429Response | Dialogue503Response:
         """
         A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per
         """
@@ -449,6 +485,19 @@ class RhapsodePublicClient(BaseClient):
         if _status == 409:
             return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 204 }
+
+    async def unload_engine(self, engine: str, query: UnloadEngineQuery | None = None) -> UnloadEngine200Response | UnloadEngine403Response | UnloadEngine404Response | UnloadEngine409Response:
+        """
+        Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/unload", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": EngineSummary.model_validate(result) }
 
     async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)

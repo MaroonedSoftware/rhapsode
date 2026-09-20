@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildServer } from '../src/server.js';
@@ -92,6 +93,30 @@ describe('refusals that happen before anything is committed', () => {
     it('requires an engine', async () => {
         const builder = await start();
         expect((await speak(builder, { text: 'x' })).statusCode).toBe(400);
+    });
+
+    it('refuses a keep-alive that is not a whole number of seconds, or is below never', async () => {
+        // -1 is as low as it goes, and -2 would read as "never expire" to anything testing for a
+        // negative. A caller who fumbled the number gets told, rather than a model kept for good.
+        const builder = await start();
+
+        for (const keepAliveSeconds of [-2, 1.5, '5m', null]) {
+            const response = await speak(builder, { engine: 'tone', text: 'x', keepAliveSeconds });
+            expect(response.statusCode).toBe(400);
+            expect(response.json().error.message).toContain('keepAliveSeconds');
+        }
+    });
+
+    it('takes a keep-alive of -1, 0 and a duration', async () => {
+        // Against an engine that does not exist, so this asks whether the value got past validation
+        // and nothing else: a 404 means it did. What the value then does is the residency manager's,
+        // and is tested there without a worker either.
+        const builder = await start();
+
+        for (const keepAliveSeconds of [-1, 0, 30]) {
+            const response = await speak(builder, { engine: 'nope', text: 'x', keepAliveSeconds });
+            expect(response.json().error).toMatchObject({ code: 'unknown_engine' });
+        }
     });
 
     it('refuses a misspelled field and names it, rather than ignoring what the client meant', async () => {
@@ -347,9 +372,14 @@ describeWithSockets('version skew', () => {
 });
 
 describeWithSockets('residency under contention', () => {
-    it('queues a second engine rather than evicting a model that is speaking', async () => {
-        // At maxResidentModels 1 this is simply a queue, and it will look like a hang to an
-        // operator, which is why /health names what is blocking.
+    /**
+     * Two engines and one slot, which is the only way to make the core evict on purpose.
+     *
+     * The second is a genuinely different engine rather than the tone engine under another name: a
+     * worker refuses to start when the core spawned an id it does not answer to, so a second engine
+     * has to be a second engine.
+     */
+    const startTwo = async () => {
         socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
         const builder = await buildServer(
             {
@@ -357,20 +387,26 @@ describeWithSockets('residency under contention', () => {
                 residency: { maxResidentModels: 1, evictionWaitSeconds: 30 },
                 engines: {
                     tone: { venv: join(REPO, 'python/.venv') },
-                    second: {
-                        displayName: 'Second',
-                        license: MIT,
-                        command: PYTHON,
-                        args: ['-m', 'rhapsode_engine_tone'],
-                        cwd: REPO,
-                        env: { RHAPSODE_WORKER_ENGINE_ALIAS: 'second' },
-                    },
+                    noisy: { displayName: 'Noisy', license: MIT, command: PYTHON, args: ['-m', 'engines.noisy'], cwd: WORKER_TESTS },
                 },
             },
             new RhapsodeJsonLogger('error', () => {}),
         );
         running = builder;
         await builder.app.ready();
+        return builder;
+    };
+
+    type Listed = { resident: number; max: number; models: { engine: string; leases: number; keepAliveSeconds: number; expiresAt: string }[] };
+    const residencyOf = (response: { json: () => unknown }) => response.json() as Listed;
+
+    const engineState = async (builder: Awaited<ReturnType<typeof buildServer>>, id: string) =>
+        (await builder.app.inject({ method: 'GET', url: '/engines' })).json().find((engine: { id: string }) => engine.id === id);
+
+    it('queues a second engine rather than evicting a model that is speaking', async () => {
+        // At maxResidentModels 1 this is simply a queue, and it will look like a hang to an
+        // operator, which is why /health names what is blocking.
+        const builder = await startTwo();
 
         await speak(builder, { engine: 'tone', text: 'first', stream: false });
         const health = (await builder.app.inject({ method: 'GET', url: '/health' })).json();
@@ -378,4 +414,50 @@ describeWithSockets('residency under contention', () => {
         // One resident, and the budget is honest about the ceiling.
         expect(health.residency).toMatchObject({ resident: 1, max: 1 });
     }, 60_000);
+
+    it('lists what a speak left on the card', async () => {
+        const builder = await startTwo();
+        expect(residencyOf(await builder.app.inject({ method: 'GET', url: '/residency' })).models).toEqual([]);
+
+        await speak(builder, { engine: 'tone', text: 'first', stream: false, keepAliveSeconds: 900 });
+        const residency = residencyOf(await builder.app.inject({ method: 'GET', url: '/residency' }));
+
+        expect(residency).toMatchObject({ resident: 1, max: 1 });
+        expect(residency.models).toHaveLength(1);
+        expect(residency.models[0]).toMatchObject({ engine: 'tone', leases: 0, keepAliveSeconds: 900 });
+        // The request said 900, so the deadline is fifteen minutes out rather than five.
+        const expiresIn = DateTime.fromISO(residency.models[0].expiresAt).diffNow().as('seconds');
+        expect(expiresIn).toBeGreaterThan(600);
+    }, 60_000);
+
+    it('frees a real model on request, and the engine still speaks afterwards', async () => {
+        const builder = await startTwo();
+        await speak(builder, { engine: 'tone', text: 'first', stream: false, keepAliveSeconds: -1 });
+
+        const unloaded = await builder.app.inject({ method: 'POST', url: '/engines/tone/unload' });
+
+        expect(unloaded.statusCode).toBe(200);
+        expect(unloaded.json()).toMatchObject({ id: 'tone', model: 'unloaded', restarts: 0 });
+        expect(residencyOf(await builder.app.inject({ method: 'GET', url: '/residency' })).models).toEqual([]);
+
+        expect((await speak(builder, { engine: 'tone', text: 'again', stream: false })).statusCode).toBe(200);
+        expect(await engineState(builder, 'tone')).toMatchObject({ model: 'loaded', restarts: 0 });
+    }, 90_000);
+
+    it('evicts the idle one by the verb, and does not count its exit as a crash', async () => {
+        // An exit that follows `/terminate` is not a crash however it is timed (§ 2). Counted as
+        // one, an engine evicted often enough would open its own circuit breaker and stop coming
+        // back, which is exactly what idle freeing would make routine.
+        const builder = await startTwo();
+
+        expect((await speak(builder, { engine: 'tone', text: 'first', stream: false })).statusCode).toBe(200);
+        expect((await speak(builder, { engine: 'noisy', text: 'second', stream: false })).statusCode).toBe(200);
+
+        expect(await engineState(builder, 'tone')).toMatchObject({ process: 'down', model: 'unloaded', restarts: 0 });
+        expect(await engineState(builder, 'noisy')).toMatchObject({ model: 'loaded' });
+
+        // And the evicted engine still works, which is the whole point of reclaiming it cleanly.
+        expect((await speak(builder, { engine: 'tone', text: 'again', stream: false })).statusCode).toBe(200);
+        expect(await engineState(builder, 'tone')).toMatchObject({ model: 'loaded', restarts: 0 });
+    }, 90_000);
 });

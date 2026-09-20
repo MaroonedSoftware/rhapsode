@@ -4,12 +4,13 @@ import type {
     Capabilities,
     CatalogEntry,
     CoreHealth,
-    DialogueRequest,
+    EngineDialogueRequest,
     EngineSpeakRequest,
     EngineSummary,
     ErrorBody,
     InstallJob,
     PullRequest,
+    ResidencyDetail,
     Voice,
 } from '../rhapsode/types/rhapsode.types.js';
 import type { OpenApiDocument } from './types/rhapsode.public.js';
@@ -21,6 +22,12 @@ export class PublicClient {
     async health(): Promise<CoreHealth> {
         const result = await this.fetch(`/health`, { method: 'GET' });
         return await parseJson<CoreHealth>(result);
+    }
+
+    /** @description What is on the card, for an operator asking where their memory went. Reads the core's own */
+    async residency(): Promise<ResidencyDetail> {
+        const result = await this.fetch(`/residency`, { method: 'GET' });
+        return await parseJson<ResidencyDetail>(result);
     }
 
     /** @description Open to every caller, like /health. The public API only: never a worker route. */
@@ -185,7 +192,7 @@ export class PublicClient {
     /** @description A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per */
     async dialogue(
         engine: string,
-        body: DialogueRequest,
+        body: EngineDialogueRequest,
     ): Promise<
         | { status: 200; contentType: 'audio/wav' | 'audio/mpeg' | 'audio/opus' | 'audio/flac' | 'audio/l16'; data: Blob }
         | { status: 400; contentType: 'application/json'; data: ErrorBody }
@@ -248,6 +255,33 @@ export class PublicClient {
                 return { status: 409, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             default:
                 return { status: 204 };
+        }
+    }
+
+    /** @description Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an */
+    async unloadEngine(
+        engine: string,
+        query?: { mode?: 'terminate' | 'unload' },
+    ): Promise<
+        | { status: 200; contentType: 'application/json'; data: EngineSummary }
+        | { status: 403; contentType: 'application/json'; data: ErrorBody }
+        | { status: 404; contentType: 'application/json'; data: ErrorBody }
+        | { status: 409; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const qs = buildQueryString(query);
+        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/unload${qs}`, {
+            method: 'POST',
+            expectStatuses: [403, 404, 409],
+        });
+        switch (result.status) {
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 404:
+                return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 409:
+                return { status: 409, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 200, contentType: 'application/json', data: await parseJson<EngineSummary>(result) };
         }
     }
 

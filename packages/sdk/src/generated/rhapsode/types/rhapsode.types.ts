@@ -152,7 +152,7 @@ export interface SpeakRequest {
 
 /**
  * One speaker's line in a conversation. `speaker` is a label the request makes up, not a voice.
- * generated from [DialogueTurn](../../../../../../contracts/rhapsode.types.ck#L159)
+ * generated from [DialogueTurn](../../../../../../contracts/rhapsode.types.ck#L162)
  */
 export interface DialogueTurn {
     speaker: string;
@@ -160,7 +160,7 @@ export interface DialogueTurn {
 }
 
 /**
- * generated from [LoadRequest](../../../../../../contracts/rhapsode.types.ck#L177)
+ * generated from [LoadRequest](../../../../../../contracts/rhapsode.types.ck#L185)
  */
 export interface LoadRequest {
     variant?: string;
@@ -169,7 +169,7 @@ export interface LoadRequest {
 /**
  * Required, unlike a load's: there is no "whatever is loaded" to fall back on for weights that are
  * not loaded yet. protocol.md § 8.
- * generated from [FetchRequest](../../../../../../contracts/rhapsode.types.ck#L183)
+ * generated from [FetchRequest](../../../../../../contracts/rhapsode.types.ck#L191)
  */
 export interface FetchRequest {
     variant: string;
@@ -180,7 +180,7 @@ export interface FetchRequest {
  * distinction that matters is between "this request was wrong" and "this request was fine and the
  * server was not". A caller that conflates them either retries a permanent failure forever or
  * discards work that would have succeeded on the next pass.
- * generated from [ErrorDetail](../../../../../../contracts/rhapsode.types.ck#L195)
+ * generated from [ErrorDetail](../../../../../../contracts/rhapsode.types.ck#L203)
  */
 export interface ErrorDetail {
     /**
@@ -205,18 +205,21 @@ export interface ErrorDetail {
 }
 
 /**
- * generated from [WorkerHealth](../../../../../../contracts/rhapsode.types.ck#L213)
+ * generated from [WorkerHealth](../../../../../../contracts/rhapsode.types.ck#L221)
  */
 export interface WorkerHealth {
     process: 'up' | 'draining';
     model: 'unloaded' | 'loading' | 'loaded' | 'unloading';
     variant?: string;
     device?: string;
+    /** What the card holds in total. */
     vramBytes?: number;
+    /** What the loaded model took of it, measured. § 3. */
+    modelBytes?: number;
 }
 
 /**
- * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L232)
+ * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L241)
  */
 export interface ResidencySummary {
     resident: number;
@@ -227,7 +230,26 @@ export interface ResidencySummary {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L275)
+ * One model on the card, and what the core knows about it. protocol.md § 3.
+ * generated from [ResidentModel](../../../../../../contracts/rhapsode.types.ck#L249)
+ */
+export interface ResidentModel {
+    engine: string;
+    variant: string;
+    /** Requests still speaking it. A model with leases is not evictable. */
+    leases: number;
+    /** ISO 8601, UTC. */
+    lastUsedAt: string;
+    /** Absent while it is speaking, or when its keep-alive says never. */
+    expiresAt?: string;
+    /** The one in force here: request, then engine, then server. */
+    keepAliveSeconds: number;
+    /** What the worker measured the model taking, where it could. */
+    sizeBytes?: number;
+}
+
+/**
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L299)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -237,7 +259,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L281)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L305)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -274,7 +296,7 @@ export interface Variant {
 }
 
 /**
- * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L221)
+ * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L230)
  */
 export interface EngineSummary {
     id: string;
@@ -290,7 +312,7 @@ export interface EngineSummary {
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L252)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L276)
  */
 export interface CatalogEntry {
     id: string;
@@ -305,16 +327,20 @@ export interface CatalogEntry {
 }
 
 /**
- * generated from [EngineSpeakRequest](../../../../../../contracts/rhapsode.types.ck#L154)
+ * The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
+ * and a worker has no opinion about how long anything stays resident. protocol.md § 3.
+ * generated from [EngineSpeakRequest](../../../../../../contracts/rhapsode.types.ck#L156)
  */
 export interface EngineSpeakRequest extends SpeakRequest {
     engine: string;
+    /** -1 never expires, 0 frees on release. */
+    keepAliveSeconds?: number;
 }
 
 /**
  * A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
  * `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
- * generated from [DialogueRequest](../../../../../../contracts/rhapsode.types.ck#L166)
+ * generated from [DialogueRequest](../../../../../../contracts/rhapsode.types.ck#L169)
  */
 export interface DialogueRequest {
     turns: DialogueTurn[];
@@ -329,14 +355,14 @@ export interface DialogueRequest {
 }
 
 /**
- * generated from [ErrorBody](../../../../../../contracts/rhapsode.types.ck#L205)
+ * generated from [ErrorBody](../../../../../../contracts/rhapsode.types.ck#L213)
  */
 export interface ErrorBody {
     error: ErrorDetail;
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L262)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L286)
  */
 export interface InstallJob {
     id: string;
@@ -355,7 +381,14 @@ export interface InstallJob {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L288)
+ * generated from [ResidencyDetail](../../../../../../contracts/rhapsode.types.ck#L259)
+ */
+export interface ResidencyDetail extends ResidencySummary {
+    models: ResidentModel[];
+}
+
+/**
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L312)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -387,13 +420,21 @@ export interface CurrentVariant extends Omit<Variant, 'cloning' | 'blending'> {
 }
 
 /**
- * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L239)
+ * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L263)
  */
 export interface CoreHealth {
     contract: number;
     status: 'ok' | 'degraded';
     engines: EngineSummary[];
     residency: ResidencySummary;
+}
+
+/**
+ * As `EngineSpeakRequest` is to `SpeakRequest`, and for the same reason.
+ * generated from [EngineDialogueRequest](../../../../../../contracts/rhapsode.types.ck#L181)
+ */
+export interface EngineDialogueRequest extends DialogueRequest {
+    keepAliveSeconds?: number;
 }
 
 /**

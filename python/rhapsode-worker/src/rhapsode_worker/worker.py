@@ -27,6 +27,7 @@ from .engine import (
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
+from .memory import held_bytes
 
 
 class Worker:
@@ -43,6 +44,8 @@ class Worker:
         self.log = log
 
         self.model = "unloaded"
+        #: What the loaded model is holding, when anything could measure it. protocol.md § 3.
+        self.model_bytes: int | None = None
         self.draining = False
         self._transition = asyncio.Lock()
         self._slots = asyncio.Semaphore(max(1, engine.concurrency))
@@ -68,6 +71,10 @@ class Worker:
         document["device"] = device.type if device.vram_bytes is None else f"{device.type}:0"
         if device.vram_bytes is not None:
             document["vramBytes"] = device.vram_bytes
+        # `vramBytes` is what the card holds and `modelBytes` is what this model took of it. A core
+        # choosing what to evict needs the second, and has only ever been given the first.
+        if self.model_bytes is not None:
+            document["modelBytes"] = self.model_bytes
         return document
 
     def capabilities(self) -> dict[str, Any]:
@@ -186,6 +193,7 @@ class Worker:
         await self.until_synthesising_fewer_than(1)
         self.model = "loading"
         self.log.info("loading", variant=variant)
+        before = held_bytes(self.engine.device)
         try:
             await asyncio.to_thread(self.engine.load, variant)
         except BaseException as error:
@@ -194,7 +202,23 @@ class Worker:
             raise classify(error) from error
         self.engine.variant = variant
         self.model = "loaded"
-        self.log.info("loaded", variant=variant)
+        self.model_bytes = self._measure(before)
+        self.log.info("loaded", variant=variant, modelBytes=self.model_bytes)
+
+    def _measure(self, before: int | None) -> int | None:
+        """What the load cost, as the adapter's own answer or a delta across it.
+
+        A delta of zero or less is discarded rather than reported: the load happened, so zero is
+        the measurement failing rather than the model being free, and an invented number is worse
+        than no number at all to a core deciding what to evict.
+        """
+        declared = self.engine.memory_bytes()
+        if declared is not None:
+            return declared
+        after = held_bytes(self.engine.device)
+        if before is None or after is None:
+            return None
+        return after - before if after > before else None
 
     async def _unload_locked(self, *, quiet: bool = False) -> None:
         await self.until_synthesising_fewer_than(1)
@@ -208,6 +232,7 @@ class Worker:
         finally:
             self.engine.variant = None
             self.model = "unloaded"
+            self.model_bytes = None
         if not quiet:
             self.log.info("unloaded")
 

@@ -145,13 +145,16 @@ class ErrorDetail(BaseModel):
     retryable: bool
 
 class WorkerHealth(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
     process: Literal["up", "draining"]
     model: Literal["unloaded", "loading", "loaded", "unloading"]
     variant: str | None = None
     device: str | None = None
+    # What the card holds in total.
     vram_bytes: int | None = Field(alias="vramBytes", default=None)
+    # What the loaded model took of it, measured. § 3.
+    model_bytes: int | None = Field(alias="modelBytes", default=None)
 
 class ResidencySummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -161,6 +164,23 @@ class ResidencySummary(BaseModel):
     waiting: int
     # Named, because a wait at maxResidentModels 1 looks exactly like a hang.
     blocked_by: str | None = Field(alias="blockedBy", default=None)
+
+# One model on the card, and what the core knows about it. protocol.md § 3.
+class ResidentModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    engine: str
+    variant: str
+    # Requests still speaking it. A model with leases is not evictable.
+    leases: int
+    # ISO 8601, UTC.
+    last_used_at: str = Field(alias="lastUsedAt")
+    # Absent while it is speaking, or when its keep-alive says never.
+    expires_at: str | None = Field(alias="expiresAt", default=None)
+    # The one in force here: request, then engine, then server.
+    keep_alive_seconds: int = Field(alias="keepAliveSeconds")
+    # What the worker measured the model taking, where it could.
+    size_bytes: int | None = Field(alias="sizeBytes", default=None)
 
 class PullRequest(BaseModel):
     # Absent means the engine's default variant.
@@ -226,8 +246,14 @@ class CatalogEntry(BaseModel):
     # Installed through the API, so removable by it.
     managed: bool
 
+# The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
+# and a worker has no opinion about how long anything stays resident. protocol.md § 3.
 class EngineSpeakRequest(SpeakRequest):
+    model_config = ConfigDict(populate_by_name=True)
+
     engine: str
+    # -1 never expires, 0 frees on release.
+    keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
 
 # A conversation in one take. protocol.md § 6. `/speak`'s fields except `text`, `voice` and
 # `delivery`: a delivery reads a whole line one way, and a dialogue has more than one reader.
@@ -262,6 +288,9 @@ class InstallJob(BaseModel):
     # Present exactly when `state` is `failed`.
     error: ErrorDetail | None = None
 
+class ResidencyDetail(ResidencySummary):
+    models: list[ResidentModel]
+
 class FeedEvent(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -295,6 +324,12 @@ class CoreHealth(BaseModel):
     status: Literal["ok", "degraded"]
     engines: list[EngineSummary]
     residency: ResidencySummary
+
+# As `EngineSpeakRequest` is to `SpeakRequest`, and for the same reason.
+class EngineDialogueRequest(DialogueRequest):
+    model_config = ConfigDict(populate_by_name=True)
+
+    keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
 
 class Capabilities(BaseModel):
     # The contract major this worker settled on. § 9.

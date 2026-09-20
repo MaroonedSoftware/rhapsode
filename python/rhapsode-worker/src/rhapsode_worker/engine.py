@@ -297,6 +297,17 @@ class Engine:
     def delete_voice(self, voice_id: str) -> None:
         raise Unsupported("this engine does not clone voices")
 
+    def memory_bytes(self) -> int | None:
+        """What the loaded model is holding, when this adapter can say better than a measurement.
+
+        Optional, and almost always left alone. The SDK measures a delta across `load()`, which is
+        card-wide and so counts allocations nobody attributes to a model, but which is also blind to
+        a model whose weights live somewhere the process cannot see, and noisy when something else
+        on the card allocates at the same moment. An adapter that knows the real figure returns it
+        and the measurement is not used. protocol.md § 3.
+        """
+        return None
+
     def fetch(self, variant: str) -> None:
         """Download a variant's weights to wherever this engine keeps them, without loading them.
 

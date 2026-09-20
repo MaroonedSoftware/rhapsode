@@ -1,4 +1,4 @@
-import { CatalogEntry, FeedEvent, InstallJob, type License } from '@rhapsode/contract';
+import { CatalogEntry, EngineSummary, FeedEvent, InstallJob, ResidencyDetail, type License } from '@rhapsode/contract';
 
 /**
  * A client for the management routes in protocol.md § 10, and nothing else.
@@ -102,6 +102,17 @@ export class ManagementClient {
 
     async job(id: string): Promise<InstallJob> {
         return InstallJob.parse(await this.json('GET', `/installs/${encodeURIComponent(id)}`));
+    }
+
+    /** What is on the card. A read of the core's own state: it starts nothing. protocol.md § 3. */
+    async residency(): Promise<ResidencyDetail> {
+        return ResidencyDetail.parse(await this.json('GET', '/residency'));
+    }
+
+    /** Free a model now. `terminate` is the only mode that gets the whole card back. § 3. */
+    async unload(engine: string, mode: 'terminate' | 'unload' = 'terminate'): Promise<EngineSummary> {
+        const query = mode === 'terminate' ? '' : `?mode=${mode}`;
+        return EngineSummary.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/unload${query}`));
     }
 
     /** Stream a job's events to `onEvent` until its last one, then hang up and return the job. */
