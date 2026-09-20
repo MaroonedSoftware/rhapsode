@@ -17,8 +17,18 @@ export interface RhapsodeConfig {
         /** One is the right answer for one GPU, which is why it is the default. § 3. */
         maxResidentModels?: number;
         evictionWaitSeconds?: number;
-        /** Both off by default: they trade a cold start for memory nobody is asking for. */
+        /**
+         * How long a model with nothing to do stays on the card, five minutes by default. `-1`
+         * keeps it until something else needs the room, `0` frees it as soon as the last request
+         * lets go. § 3.
+         */
+        keepAliveSeconds?: number;
+        /**
+         * @deprecated Both are read as `keepAliveSeconds` when it is not set, and an expiry now
+         * terminates whichever of them named it. Say `-1` for what absent used to mean.
+         */
         idleUnloadSeconds?: number;
+        /** @deprecated See `idleUnloadSeconds`. */
         idleTerminateSeconds?: number;
     };
     workers?: {
@@ -63,6 +73,7 @@ export const DEFAULTS = {
     shutdownGraceMs: 20_000,
     maxResidentModels: 1,
     evictionWaitSeconds: 30,
+    keepAliveSeconds: 300,
     startupTimeoutSeconds: 60,
     drainGraceMs: 10_000,
     maxRestarts: 5,

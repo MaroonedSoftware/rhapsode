@@ -25,9 +25,12 @@ rather than about the contract.
         // How long a request for a second engine waits for the first to stop speaking before it is
         // told to try again. At maxResidentModels 1 this is simply a queue.
         "evictionWaitSeconds": 30,
-        // Both off by default: they trade a cold start for memory nobody is asking for.
-        "idleUnloadSeconds": null,
-        "idleTerminateSeconds": null
+        // How long a model with nothing to do stays on the card. An expiry terminates the worker,
+        // because an unload leaves roughly 30% stranded (§ 3). -1 keeps the model until something
+        // else needs the room, which is what this server did before this setting existed; 0 frees
+        // it the moment the last request lets go. Replaces idleUnloadSeconds and
+        // idleTerminateSeconds, which are still read when this is not set.
+        "keepAliveSeconds": 300
     },
 
     "workers": {

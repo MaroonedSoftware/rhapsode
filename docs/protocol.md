@@ -169,8 +169,19 @@ The worker obeys; the core decides. Default policy, all configurable:
 
 - `maxResidentModels` (default 1, which is the right answer for one GPU)
 - LRU eviction when a `/speak` needs a model and the budget is full
-- `idleUnloadSeconds` (default off, because it trades a cold start for memory nobody is asking for)
-- `idleTerminateSeconds` (default off)
+- `keepAliveSeconds` (default 300): how long a model with nothing left to do stays on the card.
+  `-1` keeps it until something else needs the room, `0` frees it as the last request lets go.
+
+An expiry terminates rather than unloads, by rule 3 above: an unload leaves roughly 30% behind, and
+a deadline that runs every few minutes would give a card away 30% at a time. This replaces the
+`idleUnloadSeconds` and `idleTerminateSeconds` pair, which was two deadlines for two verbs and is
+one deadline now that there is one verb.
+
+The default is on, which is a reversal. Off was defensible while an expiry was something an operator
+opted into: it trades a cold start for memory nobody asked for. It stops being defensible as the
+default on a box with one card, because the memory *is* being asked for, by whatever wants to run
+next and finds the card held by a model idle since this morning. A cold start is a cost the request
+that pays it can see; a card held by nothing is a cost that lands on somebody else.
 
 Putting this in the core rather than in each worker is what stops every adapter author reinventing
 an idle timer, and it is the only component that can see the whole card.

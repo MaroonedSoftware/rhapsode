@@ -5,7 +5,7 @@ import { DateTime } from 'luxon';
  *
  * Every residency rule worth having is a rule about elapsed time, and against the real clock the
  * only way to assert one is to sleep for it: a suite that covers a five-minute idle expiry honestly
- * takes five minutes, so nobody writes it, which is why `armIdleTimers` shipped untested.
+ * takes five minutes, so nobody writes it, which is why the idle timers shipped untested.
  *
  * `run` returns a promise so that a manual clock can await the transition it just fired. Without
  * that the manager would need a test-only "have the timers finished" hook, and the thing under test

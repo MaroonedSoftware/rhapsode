@@ -41,6 +41,17 @@ class ManualClock implements ResidencyClock {
         }
     }
 
+    /**
+     * The callbacks a jump of this many seconds would fire, taken without firing them.
+     *
+     * Holding one and running it later is how a test reproduces a timer already on its way when
+     * something cancelled it, which is the one case cancelling cannot cover.
+     */
+    due(seconds: number): (() => Promise<void>)[] {
+        const at = this.instant.plus({ seconds });
+        return [...this.pending].filter(entry => entry.due <= at).map(entry => entry.run);
+    }
+
     get armed(): number {
         return this.pending.size;
     }
@@ -94,8 +105,9 @@ describe('the residency manager', () => {
     let workers: FakeWorkers;
     let engines: EngineRegistry;
 
+    /** Keep-alive off unless a test is about the keep-alive, so nothing else expires mid-assertion. */
     const build = (policy: Partial<ResidencyPolicy> = {}) =>
-        new ResidencyManager(workers, engines, silent(), { maxResidentModels: 1, evictionWaitSeconds: 30, ...policy }, clock);
+        new ResidencyManager(workers, engines, silent(), { maxResidentModels: 1, evictionWaitSeconds: 30, keepAliveSeconds: -1, ...policy }, clock);
 
     beforeEach(() => {
         clock = new ManualClock();
@@ -208,41 +220,51 @@ describe('the residency manager', () => {
         (await queued).release();
     });
 
-    describe('idle timers', () => {
-        it('unloads an idle model when only the unload deadline is set', async () => {
-            const residency = build({ idleUnloadSeconds: 60 });
+    describe('the keep-alive', () => {
+        it('terminates a model that has been idle for its keep-alive', async () => {
+            const residency = build({ keepAliveSeconds: 300 });
 
             (await residency.acquire('tone', 'fast')).release();
-            await clock.advance(59);
+            await clock.advance(299);
             expect(residency.summary().resident).toBe(1);
 
             await clock.advance(1);
-            expect(workers.calls).toContain('tone:unload');
-            expect(residency.summary().resident).toBe(0);
-        });
-
-        it('prefers the terminate deadline when it comes first', async () => {
-            const residency = build({ idleUnloadSeconds: 120, idleTerminateSeconds: 60 });
-
-            (await residency.acquire('tone', 'fast')).release();
-            await clock.advance(60);
-
+            // Terminate, not unload: an unload leaves roughly 30% stranded, and an expiry that ran
+            // every five minutes would give a card away 30% at a time. § 3.
             expect(workers.calls).toContain('tone:stop:evict');
             expect(workers.calls).not.toContain('tone:unload');
+            expect(residency.summary().resident).toBe(0);
+            expect(engines.state('tone')).toMatchObject({ model: 'unloaded' });
         });
 
-        it('arms nothing when neither deadline is set', async () => {
-            const residency = build();
+        it('keeps a model for good when the keep-alive says never', async () => {
+            const residency = build({ keepAliveSeconds: -1 });
 
             (await residency.acquire('tone', 'fast')).release();
 
             expect(clock.armed).toBe(0);
-            await clock.advance(3600);
+            await clock.advance(86_400);
             expect(residency.summary().resident).toBe(1);
         });
 
+        it('frees a model as soon as the last request lets go, at zero', async () => {
+            const residency = build({ keepAliveSeconds: 0 });
+
+            const first = await residency.acquire('tone', 'fast');
+            const second = await residency.acquire('tone', 'fast');
+
+            first.release();
+            await clock.advance(0);
+            expect(residency.summary().resident).toBe(1);
+
+            second.release();
+            await clock.advance(0);
+            expect(workers.calls).toContain('tone:stop:evict');
+            expect(residency.summary().resident).toBe(0);
+        });
+
         it('disarms while the model is speaking again', async () => {
-            const residency = build({ idleUnloadSeconds: 60 });
+            const residency = build({ keepAliveSeconds: 60 });
 
             (await residency.acquire('tone', 'fast')).release();
             const speaking = await residency.acquire('tone', 'fast');
@@ -251,6 +273,39 @@ describe('the residency manager', () => {
             expect(workers.calls).toEqual(['tone:load:fast']);
             expect(residency.summary().resident).toBe(1);
             speaking.release();
+        });
+
+        it('spares a model that was used again while its expiry was already on its way', async () => {
+            // Cancelling covers the model picked up again in time; it cannot recall a callback
+            // already dispatched. Without the deadline check that callback terminates a model used
+            // a millisecond ago, and at five minutes by default this is a race that would run all
+            // day on a busy box.
+            const residency = build({ keepAliveSeconds: 60 });
+
+            (await residency.acquire('tone', 'fast')).release();
+            await clock.advance(59);
+
+            // The expiry is a second away and about to fire when the model is asked for again.
+            const dispatched = clock.due(1);
+            expect(dispatched).toHaveLength(1);
+            (await residency.acquire('tone', 'fast')).release();
+
+            await clock.advance(1);
+            await Promise.all(dispatched.map(run => run()));
+
+            expect(residency.summary().resident).toBe(1);
+            expect(workers.calls).toEqual(['tone:load:fast']);
+        });
+
+        it('drops every expiry when the core is going down', async () => {
+            const residency = build({ keepAliveSeconds: 60 });
+
+            (await residency.acquire('tone', 'fast')).release();
+            residency.stopExpiry();
+
+            expect(clock.armed).toBe(0);
+            await clock.advance(600);
+            expect(workers.calls).toEqual(['tone:load:fast']);
         });
     });
 

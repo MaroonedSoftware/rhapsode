@@ -13,9 +13,15 @@ export interface ResidencyPolicy {
     /** One is the right answer for one GPU, which is why it is the default. */
     maxResidentModels: number;
     evictionWaitSeconds: number;
-    /** `undefined` rather than 0, because 0 legitimately means "immediately". */
-    idleUnloadSeconds?: number;
-    idleTerminateSeconds?: number;
+    /**
+     * How long a model with nothing left to do stays on the card.
+     *
+     * `-1` keeps it until something else needs the room, `0` frees it the moment the last request
+     * lets go. A number rather than the absent-means-off pair this replaced, because "off" turned
+     * out to be the wrong default: a card held by a model nobody has asked for in an hour is a card
+     * the next process cannot have. § 3.
+     */
+    keepAliveSeconds: number;
 }
 
 /**
@@ -35,6 +41,8 @@ interface Resident {
     variant: string;
     leases: number;
     lastUsedAt: DateTime;
+    /** Absent while the model is speaking, or when its keep-alive says never. */
+    expiresAt?: DateTime;
     cancelIdle?: () => void;
 }
 
@@ -162,6 +170,7 @@ export class ResidencyManager {
         resident.lastUsedAt = this.clock.now();
         resident.cancelIdle?.();
         resident.cancelIdle = undefined;
+        resident.expiresAt = undefined;
     }
 
     /**
@@ -181,7 +190,7 @@ export class ResidencyManager {
                 released = true;
                 resident.leases = Math.max(0, resident.leases - 1);
                 resident.lastUsedAt = this.clock.now();
-                if (resident.leases === 0) this.armIdleTimers(resident);
+                if (resident.leases === 0) this.armExpiry(resident);
                 this.wake();
             },
         };
@@ -213,28 +222,43 @@ export class ResidencyManager {
     }
 
     /**
-     * Both off by default, because they trade a cold start for memory nobody is asking for.
+     * Put a deadline on a model nobody is holding.
      *
-     * A timer's view is always stale, so it re-checks under the lock before acting.
+     * Terminate rather than unload, for the reason § 3 measured: an unload leaves roughly 30%
+     * stranded, and a card given away 30% at a time is gone by morning. An expiry is not a promise
+     * the model survives that long either, since a budget eviction can still take it first.
      */
-    private armIdleTimers(resident: Resident): void {
-        const unloadAfter = this.policy.idleUnloadSeconds;
-        const terminateAfter = this.policy.idleTerminateSeconds;
-        const chosen =
-            terminateAfter !== undefined && (unloadAfter === undefined || terminateAfter <= unloadAfter)
-                ? ({ seconds: terminateAfter, verb: 'terminate' } as const)
-                : unloadAfter !== undefined
-                  ? ({ seconds: unloadAfter, verb: 'unload' } as const)
-                  : undefined;
-        if (chosen === undefined) return;
+    private armExpiry(resident: Resident): void {
+        const seconds = this.policy.keepAliveSeconds;
+        if (seconds < 0) return;
 
-        resident.cancelIdle = this.clock.after(chosen.seconds, async () => {
+        resident.expiresAt = this.clock.now().plus({ seconds });
+        resident.cancelIdle = this.clock.after(seconds, async () => {
             await this.transition.run(async () => {
+                // A timer's view is always stale. Cancelling covers the model that was picked up
+                // again, but not a callback already on its way when that happened, so the deadline
+                // is checked rather than assumed: without this, a model used a millisecond ago is
+                // terminated by a timer armed for the request before it.
                 const current = this.residents.get(resident.engineId);
-                if (current === undefined || current.leases > 0) return;
-                await this.release(current, chosen.verb);
+                if (current !== resident || current.leases > 0) return;
+                if (current.expiresAt === undefined || current.expiresAt > this.clock.now()) return;
+                await this.release(current, 'terminate');
             });
         });
+    }
+
+    /**
+     * Drop every expiry, for a core that is going down anyway.
+     *
+     * A timer that fires after the workers have stopped would lazily build a fresh handle for an
+     * engine nothing is going to speak, and shutdown would then wait on it.
+     */
+    stopExpiry(): void {
+        for (const resident of this.residents.values()) {
+            resident.cancelIdle?.();
+            resident.cancelIdle = undefined;
+            resident.expiresAt = undefined;
+        }
     }
 
     private async waitForRelease(deadline: DateTime): Promise<void> {
