@@ -7,7 +7,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
     "openapi": "3.1.0",
     "info": {
         "title": "Rhapsode",
-        "version": "0.1.5"
+        "version": "0.1.6"
     },
     "paths": {
         "/health": {
