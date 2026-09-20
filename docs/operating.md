@@ -71,6 +71,9 @@ rather than about the contract.
         "chatterbox": {
             "venv": "/opt/rhapsode/venvs/chatterbox",
             "autostart": true,
+            // This engine's own keep-alive, overriding residency.keepAliveSeconds. Worth raising
+            // for a model that is slow to load and lowering for one that is quick.
+            "keepAliveSeconds": 900,
             "env": { "CUDA_VISIBLE_DEVICES": "0" }
         },
         "dia": { "url": "http://gpu-02.lan:9310" }

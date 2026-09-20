@@ -229,7 +229,7 @@ export class ResidencyManager {
      * the model survives that long either, since a budget eviction can still take it first.
      */
     private armExpiry(resident: Resident): void {
-        const seconds = this.policy.keepAliveSeconds;
+        const seconds = this.keepAliveFor(resident);
         if (seconds < 0) return;
 
         resident.expiresAt = this.clock.now().plus({ seconds });
@@ -245,6 +245,11 @@ export class ResidencyManager {
                 await this.release(current, 'terminate');
             });
         });
+    }
+
+    /** The engine's own deadline if it has one, and the server's otherwise. § 3. */
+    private keepAliveFor(resident: Resident): number {
+        return this.engines.entry(resident.engineId)?.keepAliveSeconds ?? this.policy.keepAliveSeconds;
     }
 
     /**

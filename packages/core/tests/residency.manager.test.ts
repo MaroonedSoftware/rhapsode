@@ -92,6 +92,8 @@ class FakeWorkers implements ResidentWorkers {
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
+const MIT = { code: 'MIT', weights: 'MIT', weightsCommercialUse: true };
+
 /**
  * Let a queued acquire reach its wait, which is several microtasks past the call.
  *
@@ -239,6 +241,29 @@ describe('the residency manager', () => {
 
         it('keeps a model for good when the keep-alive says never', async () => {
             const residency = build({ keepAliveSeconds: -1 });
+
+            (await residency.acquire('tone', 'fast')).release();
+
+            expect(clock.armed).toBe(0);
+            await clock.advance(86_400);
+            expect(residency.summary().resident).toBe(1);
+        });
+
+        it('lets an engine that is expensive to load keep its model longer than the rest', async () => {
+            const residency = build({ keepAliveSeconds: 60 });
+            engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: 600 });
+
+            (await residency.acquire('tone', 'fast')).release();
+            await clock.advance(60);
+            expect(residency.summary().resident).toBe(1);
+
+            await clock.advance(540);
+            expect(workers.calls).toContain('tone:stop:evict');
+        });
+
+        it('lets an engine pin its model against a server-wide deadline', async () => {
+            const residency = build({ keepAliveSeconds: 60 });
+            engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: -1 });
 
             (await residency.acquire('tone', 'fast')).release();
 

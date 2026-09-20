@@ -19,6 +19,14 @@ export interface EngineEntry {
     url?: string;
     autostart?: boolean;
     defaultVariant?: string;
+    /**
+     * This engine's own keep-alive, overriding `residency.keepAliveSeconds`. § 3.
+     *
+     * Per engine because the cost of a cold start is per engine: a model that takes forty seconds
+     * to load earns a longer deadline than one that takes two, and a request can only say what it
+     * wants for itself.
+     */
+    keepAliveSeconds?: number;
 }
 
 /**

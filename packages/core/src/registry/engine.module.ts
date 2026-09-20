@@ -76,5 +76,6 @@ export function entryFrom(id: string, configured: ConfiguredEngine): EngineEntry
         env: configured.env,
         url: configured.url,
         autostart: configured.autostart ?? false,
+        ...(configured.keepAliveSeconds === undefined ? {} : { keepAliveSeconds: configured.keepAliveSeconds }),
     };
 }

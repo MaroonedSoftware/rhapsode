@@ -171,6 +171,9 @@ The worker obeys; the core decides. Default policy, all configurable:
 - LRU eviction when a `/speak` needs a model and the budget is full
 - `keepAliveSeconds` (default 300): how long a model with nothing left to do stays on the card.
   `-1` keeps it until something else needs the room, `0` frees it as the last request lets go.
+  Settable per engine as well as server-wide, because the cold start it trades against is per
+  engine: a model that takes forty seconds to load has earned a longer deadline than one that takes
+  two.
 
 An expiry terminates rather than unloads, by rule 3 above: an unload leaves roughly 30% behind, and
 a deadline that runs every few minutes would give a card away 30% at a time. This replaces the
