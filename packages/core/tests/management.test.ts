@@ -255,6 +255,48 @@ describe('GET /catalog', () => {
     });
 });
 
+describe('POST /engines/{engine}/unload', () => {
+    const unload = (app: Awaited<ReturnType<typeof start>>['app'], url: string, remoteAddress = '127.0.0.1') =>
+        app.inject({ method: 'POST', url, remoteAddress });
+
+    it('is behind the guard, because emptying a card costs everybody else a cold start', async () => {
+        const { app } = await start({ engines: { tone: { venv: '/nowhere' } } });
+        const response = await unload(app, '/engines/tone/unload', '10.0.0.5');
+
+        expect(response.statusCode).toBe(403);
+        expect(response.json().error).toMatchObject({ code: 'forbidden', retryable: false });
+    });
+
+    it('refuses an engine it was never told about', async () => {
+        const { app } = await start({ engines: { tone: { venv: '/nowhere' } } });
+        const response = await unload(app, '/engines/chatterbox/unload');
+
+        expect(response.statusCode).toBe(404);
+        expect(response.json().error).toMatchObject({ code: 'unknown_engine' });
+        expect(response.json().error.message).toContain('tone');
+    });
+
+    it('refuses a mode that is neither verb, rather than picking one', async () => {
+        const { app } = await start({ engines: { tone: { venv: '/nowhere' } } });
+        const response = await unload(app, '/engines/tone/unload?mode=obliterate');
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error.message).toMatch(/terminate or unload/);
+    });
+
+    it('answers 200 for an engine holding nothing, and starts nothing to say so', async () => {
+        // Idempotent, like the worker verb it reaches for: an engine holding nothing is already in
+        // the state this asks for. A venv that does not exist would fail loudly if it spawned.
+        const { app } = await start({ engines: { tone: { venv: '/nowhere' } } });
+
+        for (const url of ['/engines/tone/unload', '/engines/tone/unload?mode=unload', '/engines/tone/unload']) {
+            const response = await unload(app, url);
+            expect(response.statusCode).toBe(200);
+            expect(response.json()).toMatchObject({ id: 'tone', process: 'down', model: 'unloaded', restarts: 0 });
+        }
+    });
+});
+
 describe('ServerKit’s own refusals', () => {
     it('go out as the request’s fault, not the server’s', async () => {
         // They used to fall through to `internal` 500, telling a client with a wrong content type

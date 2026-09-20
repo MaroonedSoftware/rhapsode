@@ -394,6 +394,49 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ErrorBody"
+    /engines/{engine}/unload:
+        post:
+            operationId: unloadEngine
+            description: "Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an"
+            parameters:
+                - name: engine
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: mode
+                  in: query
+                  required: false
+                  schema:
+                      type: string
+                      enum:
+                          - terminate
+                          - unload
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/EngineSummary"
+                "403":
+                    description: Forbidden
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "404":
+                    description: Not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
+                "409":
+                    description: Conflict
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
     /engines/{engine}/install:
         post:
             operationId: installEngine

@@ -236,6 +236,30 @@ operation /engines/{engine}: {
     }
 }
 
+operation /engines/{engine}/unload: {
+    params: {
+        engine: string
+    }
+    post: {
+        # Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an
+        # engine holding nothing is already in the state this asks for, and answers 200.
+        #
+        # A query rather than a body, as the install route explains. protocol.md § 3 and § 10.
+        sdk: unloadEngine
+        query: {
+            # `terminate` (the default) ends the worker process, which is the only way to get back
+            # the roughly 30% an unload strands. `unload` keeps the process for a faster next load.
+            mode?: enum(terminate, unload)
+        }
+        response: {
+            200: { application/json: EngineSummary }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
 operation /engines/{engine}/install: {
     params: {
         engine: string

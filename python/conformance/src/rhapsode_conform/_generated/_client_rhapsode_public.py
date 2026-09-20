@@ -9,6 +9,11 @@ from ._models_rhapsode_public import OpenApiDocument
 from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, Voice
 
 
+UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
+    "mode": NotRequired[Literal["terminate", "unload"]],
+})
+
+
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
     "pull": NotRequired[str],
 })
@@ -203,6 +208,30 @@ class UninstallEngine404Response(TypedDict):
 
 
 class UninstallEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UnloadEngine200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: EngineSummary
+
+
+class UnloadEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UnloadEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UnloadEngine409Response(TypedDict):
     status: Literal[409]
     content_type: Literal["application/json"]
     data: ErrorBody
@@ -456,6 +485,19 @@ class RhapsodePublicClient(BaseClient):
         if _status == 409:
             return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 204 }
+
+    async def unload_engine(self, engine: str, query: UnloadEngineQuery | None = None) -> UnloadEngine200Response | UnloadEngine403Response | UnloadEngine404Response | UnloadEngine409Response:
+        """
+        Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/unload", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": EngineSummary.model_validate(result) }
 
     async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)

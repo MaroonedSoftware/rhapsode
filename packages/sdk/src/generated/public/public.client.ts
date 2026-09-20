@@ -258,6 +258,33 @@ export class PublicClient {
         }
     }
 
+    /** @description Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an */
+    async unloadEngine(
+        engine: string,
+        query?: { mode?: 'terminate' | 'unload' },
+    ): Promise<
+        | { status: 200; contentType: 'application/json'; data: EngineSummary }
+        | { status: 403; contentType: 'application/json'; data: ErrorBody }
+        | { status: 404; contentType: 'application/json'; data: ErrorBody }
+        | { status: 409; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const qs = buildQueryString(query);
+        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/unload${qs}`, {
+            method: 'POST',
+            expectStatuses: [403, 404, 409],
+        });
+        switch (result.status) {
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 404:
+                return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 409:
+                return { status: 409, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 200, contentType: 'application/json', data: await parseJson<EngineSummary>(result) };
+        }
+    }
+
     async installEngine(
         engine: string,
         query?: { pull?: string },

@@ -1,6 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 
+import { RhapsodeError } from '../errors/rhapsode.error.js';
+import { managementGuard } from '../management/management.module.js';
+import { EngineRegistry } from '../registry/engine.registry.js';
 import { ResidencyManager } from './residency.manager.js';
+
+const MODES = ['terminate', 'unload'] as const;
 
 /**
  * `GET /residency`. What is on the card, and when each of it goes. § 3.
@@ -21,4 +26,30 @@ export const residencyRoutes: FastifyPluginAsync = async app => {
         const residency = request.container.get(ResidencyManager);
         return { ...residency.summary(), models: residency.models() };
     });
+
+    /**
+     * `POST /engines/{engine}/unload`. Give the memory back now. § 3 and § 10.
+     *
+     * Behind the management guard, because it takes a model away from whatever was about to use it
+     * next: a stranger who can empty a card can make every synthesis on this box pay a cold start.
+     */
+    app.post<{ Params: { engine: string }; Querystring: { mode?: unknown } }>(
+        '/engines/:engine/unload',
+        { onRequest: managementGuard },
+        async request => {
+            const engines = request.container.get(EngineRegistry);
+            const engine = request.params.engine;
+            if (!engines.has(engine)) throw RhapsodeError.unknownEngine(engine, engines.ids());
+
+            const { mode } = request.query;
+            if (mode !== undefined && !MODES.includes(mode as (typeof MODES)[number])) {
+                throw new RhapsodeError('bad_request', `\`mode\` is ${MODES.join(' or ')}, and defaults to terminate`);
+            }
+
+            // Terminate by default: an unload leaves roughly 30% of the card behind, and somebody
+            // asking for memory back means all of it.
+            await request.container.get(ResidencyManager).free(engine, (mode as (typeof MODES)[number]) ?? 'terminate');
+            return engines.summaries().find(summary => summary.id === engine);
+        },
+    );
 };

@@ -184,6 +184,36 @@ export class ResidencyManager {
         });
     }
 
+    /**
+     * Give this engine's memory back now, rather than waiting out its keep-alive. § 3.
+     *
+     * Refused while the engine is speaking, for `forget`'s reason: cutting off a stream in progress
+     * hands that caller a truncated file for something they could not have predicted. A busy box
+     * can therefore refuse this indefinitely, which is the honest answer. Draining instead was
+     * considered and left out: the next request may set a new keep-alive, so a promise to unload
+     * once the current one ends is one the core cannot keep.
+     *
+     * Idempotent, like the worker verb it reaches for: an engine holding nothing is already in the
+     * state this asks for. `terminate` still ends a process holding no model, because that is how
+     * an operator reclaims what a variant switch left stranded.
+     */
+    async free(engineId: string, mode: 'terminate' | 'unload'): Promise<void> {
+        await this.transition.run(async () => {
+            const resident = this.residents.get(engineId);
+            if (resident !== undefined && resident.leases > 0) {
+                throw new RhapsodeError('conflict', `"${engineId}" is speaking; free it once it has finished`);
+            }
+            if (resident !== undefined) {
+                await this.release(resident, mode);
+                return;
+            }
+
+            // Nothing resident. A terminate still has a process to end; an unload has nothing to do
+            // and must not spawn a worker to discover that.
+            if (mode === 'terminate') await this.workers.handle(engineId).stop('evict');
+        });
+    }
+
     private hold(resident: Resident, wanted: ResidencyRequest): void {
         resident.leases += 1;
         resident.lastUsedAt = this.clock.now();

@@ -452,6 +452,71 @@ describe('the residency manager', () => {
         });
     });
 
+    describe('freeing a model on request', () => {
+        it('terminates by default, because somebody asking for memory back means all of it', async () => {
+            const residency = build();
+            (await residency.acquire('tone', 'fast')).release();
+
+            await residency.free('tone', 'terminate');
+
+            expect(workers.calls).toEqual(['tone:load:fast', 'tone:stop:evict']);
+            expect(residency.models()).toEqual([]);
+            expect(engines.state('tone')).toMatchObject({ model: 'unloaded' });
+        });
+
+        it('keeps the process when asked for the soft verb', async () => {
+            const residency = build();
+            (await residency.acquire('tone', 'fast')).release();
+
+            await residency.free('tone', 'unload');
+
+            expect(workers.calls).toEqual(['tone:load:fast', 'tone:unload']);
+            expect(residency.summary().resident).toBe(0);
+        });
+
+        it('refuses while the engine is speaking, rather than truncating the stream', async () => {
+            const residency = build();
+            const speaking = await residency.acquire('tone', 'fast');
+
+            await expect(residency.free('tone', 'terminate')).rejects.toThrow(/is speaking/);
+            expect(residency.summary().resident).toBe(1);
+
+            speaking.release();
+            await residency.free('tone', 'terminate');
+            expect(residency.summary().resident).toBe(0);
+        });
+
+        it('is idempotent, and a soft unload of nothing spawns nothing', async () => {
+            const residency = build();
+
+            await residency.free('tone', 'unload');
+            await residency.free('tone', 'unload');
+
+            expect(workers.calls).toEqual([]);
+        });
+
+        it('still ends a process that is holding no model', async () => {
+            // How an operator reclaims what a variant switch left stranded: the unload freed the
+            // weights and the runtime kept roughly 30% until the process goes.
+            const residency = build();
+
+            await residency.free('tone', 'terminate');
+
+            expect(workers.calls).toEqual(['tone:stop:evict']);
+        });
+
+        it('drops the expiry with the model, so no timer fires for something already gone', async () => {
+            const residency = build({ keepAliveSeconds: 60 });
+            (await residency.acquire('tone', 'fast')).release();
+
+            await residency.free('tone', 'terminate');
+
+            expect(clock.armed).toBe(0);
+            await clock.advance(120);
+            expect(workers.calls).toEqual(['tone:load:fast', 'tone:stop:evict']);
+        });
+    });
+
     describe('forget', () => {
         it('runs the removal while nothing can load the engine', async () => {
             const residency = build();

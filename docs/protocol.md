@@ -230,6 +230,23 @@ monitor polls `/health` and gets every engine's licence with it. **And it is not
 before speaking.** `/speak` loads on demand, and a client that reads this first to decide whether it
 needs to has rebuilt the round trip per utterance that rule 1 exists to remove.
 
+### `POST /engines/{engine}/unload`, for giving the memory back now
+
+`?mode=terminate` by default, or `?mode=unload` to keep the process for a faster next load. It is a
+management route (§ 10), behind the same guard as install: somebody who can empty a card can make
+every synthesis on the box pay a cold start.
+
+It is idempotent, like the worker verb it reaches for, and answers `200` with the engine's summary.
+`terminate` ends the process even when no model is loaded, which is how an operator reclaims what a
+variant switch left stranded (rule 3: an unload keeps roughly 30% until the process exits).
+
+**It is refused with `409` while the engine is speaking**, for the reason § 7 gives about uninstall:
+cutting off a stream in progress hands that caller a truncated file for something they could not
+have predicted. On a busy box this can refuse for as long as the box is busy, which is the honest
+answer. Draining instead, unloading once the current request finishes, was considered and left out:
+the next request may set a new keep-alive, so a promise to unload afterwards is one the core cannot
+keep, and a `202` that silently becomes nothing is worse than a `409` that says what is true now.
+
 ### A request may say how long it wants its model kept
 
 `POST /speak` and `POST /engines/{engine}/dialogue` take `keepAliveSeconds`, meaning the same thing
@@ -939,6 +956,7 @@ what one is built on.
 | `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too |
 | `DELETE /engines/{id}` | Stops and removes an engine this API installed |
 | `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
+| `POST /engines/{id}/unload` | Frees the model now (§ 3); `?mode=unload` keeps the process |
 | `GET /installs` | Every job this process knows about, newest first |
 | `GET /installs/{job}` | One job |
 | `GET /installs/{job}/events` | The job's progress as server-sent events |

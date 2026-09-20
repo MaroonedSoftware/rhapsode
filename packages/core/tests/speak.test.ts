@@ -430,6 +430,20 @@ describeWithSockets('residency under contention', () => {
         expect(expiresIn).toBeGreaterThan(600);
     }, 60_000);
 
+    it('frees a real model on request, and the engine still speaks afterwards', async () => {
+        const builder = await startTwo();
+        await speak(builder, { engine: 'tone', text: 'first', stream: false, keepAliveSeconds: -1 });
+
+        const unloaded = await builder.app.inject({ method: 'POST', url: '/engines/tone/unload' });
+
+        expect(unloaded.statusCode).toBe(200);
+        expect(unloaded.json()).toMatchObject({ id: 'tone', model: 'unloaded', restarts: 0 });
+        expect(residencyOf(await builder.app.inject({ method: 'GET', url: '/residency' })).models).toEqual([]);
+
+        expect((await speak(builder, { engine: 'tone', text: 'again', stream: false })).statusCode).toBe(200);
+        expect(await engineState(builder, 'tone')).toMatchObject({ model: 'loaded', restarts: 0 });
+    }, 90_000);
+
     it('evicts the idle one by the verb, and does not count its exit as a crash', async () => {
         // An exit that follows `/terminate` is not a crash however it is timed (§ 2). Counted as
         // one, an engine evicted often enough would open its own circuit breaker and stop coming
