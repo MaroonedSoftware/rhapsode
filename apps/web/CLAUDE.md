@@ -7,7 +7,8 @@ rules, so that somebody who knows one knows the other.
 ## What it is for
 
 Three pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
-uninstall with each job followed as it happens. **Try it** (`/try`) is § 6 and § 7: say a line with
+uninstall with each job followed as it happens, and § 3's "On the card": what is loaded, how big it
+is, when it expires, and the means to unload it now. **Try it** (`/try`) is § 6 and § 7: say a line with
 an installed engine, offering only what the chosen variant's capability document claims, and list,
 preview, clone, blend and delete its voices. **API** (`/reference`) is § 9: every route, drawn from the
 `GET /openapi.json` the core serves, never from a copy of its own, so it describes the core it is
@@ -58,6 +59,15 @@ that is no longer `running`. The core leaves the stream open on purpose.
 
 **Every query key is in `src/api/query.keys.ts`.** A job starting or ending invalidates the catalog
 and the job list rather than patching them: the core is their only writer.
+
+**`useResidency` is the one polled query, and the only one that should be.** Every other document
+changes when something on the page asks it to, and a keep-alive runs out on its own, so without the
+poll a row sits on screen minutes after its model has gone. Anything else that wants a `refetchInterval`
+probably wants an invalidation instead.
+
+**`unwrap` is for an operation that declares refusals.** `GET /residency` declares none, so the SDK
+hands back the document itself and the query uses it directly, as `useEngines` does. Passing a bare
+value through `unwrap` yields `undefined`, silently.
 
 ## Tests
 
