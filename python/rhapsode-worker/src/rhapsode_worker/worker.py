@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator, Callable, Iterator
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from . import encoding, streaming
+from . import text as textwork
 from .blends import parse_blend
 from .engine import (
     BlendRequest,
@@ -20,6 +22,7 @@ from .engine import (
     Variant,
     Voice,
     check_voice_id,
+    segmentation_document,
 )
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
@@ -78,6 +81,7 @@ class Worker:
             **({} if formats is None else {"formats": list(formats)}),
         }
         blending = {"supported": engine.supports_blending}
+        segmentation = segmentation_document(engine.segment_characters)
 
         document: dict[str, Any] = {
             "contract": self.contract,
@@ -92,7 +96,12 @@ class Worker:
             # On every variant as well as `current`, because cloning and blending need no model and a
             # client must be able to tell an engine that cannot from one that is idle. protocol.md § 4.
             "variants": {
-                name: {**self._variant_document(variant), "cloning": cloning, "blending": blending}
+                name: {
+                    **self._variant_document(variant),
+                    "cloning": cloning,
+                    "blending": blending,
+                    "segmentation": segmentation,
+                }
                 for name, variant in variants.items()
             },
             "formats": encoding.available_formats(),
@@ -108,6 +117,7 @@ class Worker:
                 "maxCharacters": resident.max_characters or engine.max_characters,
                 "cloning": cloning,
                 "blending": blending,
+                "segmentation": segmentation,
                 "streaming": {"supported": True, "granularity": "chunk"},
                 "nativeFormat": {
                     "encoding": engine.native_format.encoding,
@@ -432,7 +442,31 @@ class Worker:
         """The adapter's own output, still in its native format."""
         if isinstance(request, DialogueRequest):
             return self.engine.dialogue(request)
-        return self.engine.speak(request)
+        limit = self.engine.segment_characters
+        if limit is None or self.engine.splits_own_text:
+            return self.engine.speak(request)
+        return self._segmented(request, limit)
+
+    def _segmented(self, request: SpeakRequest, limit: int) -> Iterator[bytes]:
+        """One `speak()` per piece, joined into one take. protocol.md § 8.
+
+        The adapter still writes a `speak()` that says one thing, which is the whole point: an
+        engine becomes able to read a chapter by declaring a number, not by growing a loop.
+        """
+        pieces = textwork.segments(request.text, limit)
+        pause = self._segment_pause()
+        for index, piece in enumerate(pieces):
+            if index > 0 and pause:
+                yield pause
+            yield from self.engine.speak(
+                replace(request, text=piece, seed=_segment_seed(request.seed, index))
+            )
+
+    def _segment_pause(self) -> bytes:
+        """Silence between two pieces, in the engine's own native format."""
+        native = self.engine.native_format
+        samples = native.sample_rate * self.engine.segment_pause_ms // 1000
+        return bytes(samples * 2 * native.channels)
 
     def slots(self) -> asyncio.Semaphore:
         """Requests are serialised by default. One model, one utterance at a time is right for a GPU."""
@@ -445,6 +479,16 @@ class Worker:
     def request_stop(self) -> None:
         """Finish what is in flight, then exit. The caller has already been answered."""
         self.stop()
+
+
+def _segment_seed(seed: int | None, index: int) -> int | None:
+    """A seed per piece of a seeded request, and none for an unseeded one.
+
+    The request's plus the piece's index, so the whole request reproduces and no two pieces are
+    sampled alike. Orpheus arrived at this rule first and the SDK now owns it, because every engine
+    whose text is split has it: one seed for every piece makes each piece the same draw.
+    """
+    return None if seed is None else seed + index
 
 
 def _license_document(declared: dict[str, Any]) -> dict[str, Any]:

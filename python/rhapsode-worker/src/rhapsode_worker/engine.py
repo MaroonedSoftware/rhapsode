@@ -78,6 +78,18 @@ class Variant:
         }
 
 
+def segmentation_document(segment_characters: int | None) -> dict[str, Any]:
+    """Whether long text is split, and into what. protocol.md § 8.
+
+    Engine-level rather than per-variant, and spread onto every variant the way cloning and blending
+    are, because a client must be able to tell an engine that does not split from one that is merely
+    idle.
+    """
+    if segment_characters is None:
+        return {"supported": False}
+    return {"supported": True, "segmentCharacters": segment_characters}
+
+
 @dataclass(frozen=True)
 class Voice:
     id: str
@@ -227,6 +239,19 @@ class Engine:
     #: genuinely batch raises this and takes responsibility for what happens.
     concurrency: int = 1
     max_characters: int = DEFAULT_MAX_CHARACTERS
+    #: The most text one generation gets, where that is less than `max_characters`. Set it and the
+    #: SDK splits long text at sentence, clause and word boundaries, calls `speak()` once per piece
+    #: and joins the audio. None means this engine speaks whatever it is given in one take.
+    #: protocol.md § 8.
+    segment_characters: int | None = None
+    #: Set by an adapter that splits its own text because it carries something across the joint, as
+    #: Dia carries an audio prompt from one piece into the next. The SDK then declares the split and
+    #: leaves the loop alone. Such an adapter calls `rhapsode_worker.text.segments` itself, so there
+    #: is still one splitter.
+    splits_own_text: bool = False
+    #: Silence the SDK puts between two pieces, where the engine does not join them itself. Kokoro's
+    #: 250 ms is its own; an engine whose next piece continues from the last one's audio wants none.
+    segment_pause_ms: int = 0
     #: How many speakers one conversation may have, where this engine overrides `dialogue`.
     max_speakers: int = 2
     adapter_version: str = "0.0.0"

@@ -29,6 +29,7 @@ from .errors import (
 )
 from .log import Log
 from .serve import serve
+from .text import segments
 
 #: The contract major this SDK speaks. protocol.md § 9.
 CONTRACT = 1
@@ -55,5 +56,6 @@ __all__ = [
     "Voice",
     "WorkerError",
     "parse_blend",
+    "segments",
     "serve",
 ]
