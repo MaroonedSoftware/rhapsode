@@ -119,6 +119,28 @@ describe('ManagementClient against a real core', () => {
         expect(refused).toMatchObject({ code: 'unknown_engine', status: 404 });
     });
 
+    it('reads what is resident, on a server holding nothing', async () => {
+        const client = new ManagementClient(await start());
+
+        expect(await client.residency()).toEqual({ resident: 0, max: 1, waiting: 0, models: [] });
+    });
+
+    it('unloads an engine that is holding nothing, because the state asked for is already true', async () => {
+        const client = new ManagementClient(await start());
+        await client.follow((await client.install('tone')).id, () => {});
+
+        expect(await client.unload('tone')).toMatchObject({ id: 'tone', model: 'unloaded' });
+        expect(await client.unload('tone', 'unload')).toMatchObject({ id: 'tone', model: 'unloaded' });
+    });
+
+    it('turns an unload of an engine nobody installed into the protocol’s code', async () => {
+        const client = new ManagementClient(await start());
+        const refused = await client.unload('chatterbox').catch((error: unknown) => error);
+
+        expect(refused).toBeInstanceOf(ManagementError);
+        expect(refused).toMatchObject({ code: 'unknown_engine', status: 404 });
+    });
+
     it('says nothing is answering, rather than failing with a socket error', async () => {
         const base = await start();
         await running!.app.close();
