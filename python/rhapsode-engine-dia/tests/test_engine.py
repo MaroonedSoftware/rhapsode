@@ -21,7 +21,7 @@ from rhapsode_engine_dia.builds import (
     REVISION,
 )
 from rhapsode_engine_dia.engine import CHUNK_SAMPLES, DiaEngine, chunked_pcm
-from rhapsode_engine_dia.prompt import ANCHOR_CHARACTERS, room, tokens_for
+from rhapsode_engine_dia.prompt import ANCHOR_CHARACTERS, SEGMENT_CHARACTERS, room, tokens_for
 
 
 class RecordingLog(Log):
@@ -110,6 +110,14 @@ class TestFetching:
 
 
 class TestText:
+    def test_the_split_is_declared_and_kept(self, tmp_path: Path) -> None:
+        """This adapter splits its own text, because every piece continues from the audio of the one
+        before. A client still has to be told, which is what `segmentation` is for. protocol.md § 8.
+        """
+        built = engine(tmp_path)
+        assert built.segment_characters == SEGMENT_CHARACTERS
+        assert built.splits_own_text is True
+
     def test_one_voice_is_the_first_speaker(self, dia: Recorder, tmp_path: Path) -> None:
         spoken(loaded(tmp_path), "Hello there.")
         assert [generation.text for generation in dia.generations] == ["[S1] Hello there."]

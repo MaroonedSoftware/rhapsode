@@ -37,6 +37,14 @@ CHUNK_SAMPLES = SAMPLE_RATE // 10
 #: sounded the same whatever it was given would prove none of it.
 CLONED_HZ = (150.0, 450.0)
 
+#: What one generation gets, where the SDK splits for this engine. Small, because every character
+#: costs SECONDS_PER_CHARACTER of audio a test then has to carry.
+SEGMENT_CHARACTERS = 200
+
+#: Silence between two pieces. Non-zero so that the join is a thing a test can hear, and so that the
+#: default of nothing is not the only path CI ever runs.
+SEGMENT_PAUSE_MS = 100
+
 #: The pitch of each speaker a dialogue gives no voice, in the order they first speak. A fifth above
 #: the last, so two unvoiced speakers are two sounds, which is all a conversation of tones can prove.
 UNVOICED_HZ = (220.0, 330.0)
@@ -62,6 +70,11 @@ class ToneEngine(Engine):
     native_format = NativeFormat(encoding="pcm_s16le", sample_rate=SAMPLE_RATE, channels=1)
     adapter_version = "0.0.0"
     default_variant = "plain"
+    # The reference engine is the one that proves the SDK splits, so it declares a split it does not
+    # need: arithmetic has no context window. The numbers are small on purpose, so a check can pass
+    # text past the segment without paying for a minute of audio to find out. protocol.md § 8.
+    segment_characters = SEGMENT_CHARACTERS
+    segment_pause_ms = SEGMENT_PAUSE_MS
 
     def variants(self) -> dict[str, Variant]:
         # Two builds that differ in what they can do, because an engine where every variant is

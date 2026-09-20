@@ -199,6 +199,7 @@ GET /capabilities
     "dials": {},
     "languages": ["en"],
     "maxCharacters": 4096,
+    "segmentation": { "supported": false },
     "cloning": { "supported": true, "referenceSeconds": [5, 10], "formats": ["wav", "mp3", "flac", "ogg"] },
     "blending": { "supported": false },
     "streaming": { "supported": true, "granularity": "chunk" },
@@ -690,6 +691,8 @@ serve(ChatterboxEngine())
   rather than closing it cleanly when `speak()` raises mid-stream.
 - Enforces `maxCharacters` and validates `params` against the declared dials before `speak()` is
   called, so an adapter never receives a request it did not declare support for.
+- **Splits long text where a reader would pause**, so `maxCharacters` stops being the client's
+  problem. The subsection below is why this is the SDK's job and not each adapter's.
 - Serialises requests by default. One model, one utterance at a time is the correct default for a
   GPU; an engine that can genuinely batch sets `concurrency > 1` and takes responsibility.
 - **Waits for an abandoned synthesis to end** before it loads, unloads or starts another. A model's
@@ -697,6 +700,58 @@ serve(ChatterboxEngine())
   returns, and until then the model is still on the device. Measured with Dia on Metal: a load that
   started under an abandoned generation killed the process with "failed assertion _status <
   MTLCommandBufferStatusCommitted".
+
+### Long text, and who splits it
+
+**`maxCharacters` is the most text a request may carry. It is not the most text one generation
+gets.** Those were the same number until three adapters had each written the code that makes them
+different, and the fourth had not.
+
+- **Kokoro** splits on sentences and packs them back up. A 4096-character request is about four and
+  a half minutes of audio, and at the 2.5x realtime measured on int8 that is 110 seconds before the
+  first byte, against the core's 120-second wait for headers. Speaking a group at a time makes the
+  wait the length of the first group instead.
+- **Dia** and **Orpheus** split on sentences, then clauses, then words, and pack the pieces back
+  greedily so that a run of short sentences is one generation rather than several. Dia also carries
+  an audio prompt from one piece into the next, because its voice drifts across generations that
+  have nothing in common.
+- **Chatterbox** does none of this, which is exactly why Chatterbox is the engine that still refuses
+  anything over 4096 characters.
+
+`_fit` and `_pack` in `rhapsode_engine_dia.prompt` and `rhapsode_engine_orpheus.prompt` are the same
+twenty lines, character for character, and their sentence and clause patterns are the same two
+regular expressions. Kokoro has a third copy, weaker in two ways nobody chose: no clause fallback,
+so a sentence longer than the limit reaches the model whole, and a sentence pattern that misses the
+ellipsis the other two match. Three copies of one idea, diverging quietly, is the shape of something
+that belongs one level down.
+
+**So the SDK splits, and `speak()` receives one segment at a time.** Breaking text where a reader
+would pause is text handling, not engine knowledge: it is the same argument that put encoding in the
+SDK, and it is the single largest thing left that every adapter still pays for itself.
+
+- **The algorithm is fixed and shared.** Sentences, then clauses, then words, packed back greedily.
+  A single word longer than the limit stays whole, because splitting it has the model read two
+  halves of a word.
+- **The size is the adapter's.** 180 characters for Orpheus, 250 for Dia, 200 for Kokoro. The number
+  is a fact about the model's attention and its generation budget; the splitting is not. An adapter
+  that declares no size receives the whole text, as every adapter does today.
+- **The joint is the adapter's too.** Kokoro puts 250 ms of silence between groups. Dia puts none,
+  because its next piece continues from the audio of the last. An adapter that needs to carry state
+  across a boundary keeps its own loop and calls the shared splitter for the text alone.
+
+**The capability document declares the split**, because a client cannot see it and is affected by
+it. `segmentation.segmentCharacters` is what one generation gets, beside `maxCharacters` for what
+the request may carry. `supported: false` means text over `maxCharacters` is refused rather than
+split: where every engine stood before this rule, where an engine whose take is indivisible stays,
+and what § 4's example still shows, because that example is Chatterbox's and Chatterbox's own
+segment size is the one number here nobody has measured yet. 180, 250 and 200 were each arrived at
+on the engine that declares them. Guessing a fourth would be the kind of unpaid-for rule this
+document does not keep.
+
+A client needs this for two reasons and § 4 is the place that owes it to them. A `seed` reproduces
+a generation, so a request split four ways is four seeded generations rather than one. And prosody
+does not carry across a joint unless the engine carries it, which is a thing engines differ on and
+therefore a thing this document says out loud.
 
 ### `fetch`, the one optional verb
 

@@ -7,7 +7,6 @@ workers like any other, so this is an ordinary adapter and the core learns nothi
 from __future__ import annotations
 
 import hashlib
-import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, ClassVar
@@ -35,9 +34,9 @@ SAMPLE_RATE = 24_000
 #: much audio is in flight" means to the SDK's bounded queue.
 CHUNK_SAMPLES = SAMPLE_RATE // 10
 
-#: What kokoro-onnx puts between sentences inside one call. Spoken sentence by sentence (see `speak`),
-#: the gap has to be put back by hand or the sentences run together.
-SENTENCE_PAUSE_SAMPLES = SAMPLE_RATE // 4
+#: What kokoro-onnx puts between sentences inside one call. Split across calls, the gap has to be put
+#: back or the sentences run together; the SDK writes it, this says how long it is.
+SEGMENT_PAUSE_MS = 250
 
 #: A group of sentences synthesised in one call. Small enough that the first audio leaves quickly,
 #: large enough that a run of short sentences is not a call each.
@@ -65,8 +64,6 @@ ENGLISH_VOICES: tuple[str, ...] = (
 
 ACCENTS = {"a": ("en-us", "American"), "b": ("en-gb", "British")}
 SEXES = {"f": "female", "m": "male"}
-
-SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
 def _installed_kokoro_onnx() -> str | None:
@@ -98,6 +95,9 @@ class KokoroEngine(Engine):
     default_variant = "fp16"
     concurrency = 1
     max_characters = 4096
+    # The SDK splits, because this engine carries nothing from one piece to the next. protocol.md § 8.
+    segment_characters = GROUP_CHARACTERS
+    segment_pause_ms = SEGMENT_PAUSE_MS
     upstream_version = _installed_kokoro_onnx()
 
     _model: Any = None
@@ -228,12 +228,13 @@ class KokoroEngine(Engine):
     # ------------------------------------------------------------------ speaking
 
     def speak(self, request: SpeakRequest) -> Iterator[bytes]:
-        """Sentence groups, one call each, so the first audio leaves before the last is made.
+        """One piece, said. The SDK splits long text and joins the pieces. protocol.md § 8.
 
-        kokoro-onnx's `create` returns a whole waveform. A 4096-character request is about four and a
-        half minutes of audio, which at the 2.5x realtime int8 managed here is 110 s before the first
-        byte, against the core's 120 s wait for headers. Speaking a group at a time makes the wait the
-        length of the first group instead.
+        kokoro-onnx's `create` returns a whole waveform, so this chunks a finished one rather than
+        pretending to be incremental. The split is what keeps the wait short: a 4096-character
+        request is about four and a half minutes of audio, which at the 2.5x realtime int8 manages
+        here is 110 s before the first byte, against the core's 120 s wait for headers. One piece at
+        a time makes the wait the length of the first piece instead.
         """
         name = request.voice or DEFAULT_VOICE
         voice: Any
@@ -249,12 +250,8 @@ class KokoroEngine(Engine):
             raise Unsupported("no model is loaded")
 
         speed = self.dials_for(request)["speed"]
-
-        for index, group in enumerate(sentence_groups(request.text)):
-            if index > 0:
-                yield bytes(SENTENCE_PAUSE_SAMPLES * 2)
-            audio, _ = self._model.create(group, voice=voice, speed=speed, lang=language)
-            yield from chunked_pcm(audio)
+        audio, _ = self._model.create(request.text, voice=voice, speed=speed, lang=language)
+        yield from chunked_pcm(audio)
 
 
 def espeak_data_path() -> str:
@@ -269,19 +266,6 @@ def espeak_data_path() -> str:
             "(install.venvDir)."
         )
     return path
-
-
-def sentence_groups(text: str, limit: int = GROUP_CHARACTERS) -> Iterator[str]:
-    """Whole sentences, gathered until the next would pass `limit`. A longer sentence goes alone."""
-    group = ""
-    for sentence in SENTENCE_END.split(text.strip()):
-        if group and len(group) + 1 + len(sentence) > limit:
-            yield group
-            group = sentence
-        else:
-            group = f"{group} {sentence}" if group else sentence
-    if group:
-        yield group
 
 
 def _accent_of(stem: str) -> str:

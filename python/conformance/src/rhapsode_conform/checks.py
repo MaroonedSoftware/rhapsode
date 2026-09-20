@@ -436,6 +436,56 @@ def text_past_the_ceiling_is_refused(worker: Worker, report: Report) -> None:
     report.record("text past maxCharacters is refused", "§ 6", status == 400, f"status {status}")
 
 
+@check
+def declared_segmentation_speaks_past_one_generation(worker: Worker, report: Report) -> None:
+    """§ 8. A worker that declares a split and then refuses the text has declared nothing.
+
+    The text is whole sentences, because the claim is that it is broken where a reader would pause:
+    one unbroken 900-character word is a case the rule deliberately does not split, so it would pass
+    this check while proving the opposite.
+    """
+    name = "text past segmentCharacters is spoken"
+    current = _current(worker)
+    segmentation = current.get("segmentation") or {}
+    if not segmentation.get("supported"):
+        report.skip(name, "§ 8", "this variant declares no segmentation")
+        return
+
+    piece = segmentation.get("segmentCharacters")
+    ceiling = current.get("maxCharacters")
+    if not isinstance(piece, int) or not isinstance(ceiling, int):
+        report.record(name, "§ 8", False, f"segmentCharacters {piece!r}, maxCharacters {ceiling!r}")
+        return
+    if ceiling <= piece:
+        report.record(
+            name, "§ 8", False, f"maxCharacters {ceiling} leaves no room past segmentCharacters {piece}"
+        )
+        return
+
+    sentence = "The quick brown fox jumps over the lazy dog. "
+    wanted = min(ceiling, piece * 3)
+    text = (sentence * (wanted // len(sentence) + 1))[:wanted]
+
+    status, body = worker.speak({"text": text, "format": "wav", "stream": False})
+    if status != 200:
+        report.record(name, "§ 8", False, f"status {status} for {len(text)} characters")
+        return
+
+    one = worker.speak({"text": text[:piece], "format": "wav", "stream": False})[1]
+    long_seconds, short_seconds = _audio_seconds(body), _audio_seconds(one)
+    if long_seconds is None or short_seconds is None:
+        report.record(name, "§ 8", True, "spoken, and not a WAV this check can measure")
+        return
+
+    # Longer than one segment's worth, which is what says the rest was spoken rather than dropped.
+    report.record(
+        name,
+        "§ 8",
+        long_seconds > short_seconds,
+        f"{len(text)} characters gave {long_seconds:.2f}s against {short_seconds:.2f}s for {piece}",
+    )
+
+
 # --------------------------------------------------------------------------- voices and residency
 
 

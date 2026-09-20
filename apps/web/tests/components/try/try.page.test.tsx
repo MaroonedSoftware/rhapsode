@@ -177,6 +177,95 @@ describe('TryPanel', () => {
         const alert = await screen.findByRole('alert');
         expect(within(alert).getByText('no voice "narrator"')).toBeInTheDocument();
     });
+
+    it('counts the line, and says nothing about a split where the build declares none', async () => {
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await screen.findByRole('button', { name: 'laugh' });
+        expect(screen.getByText(/74 characters/)).toBeInTheDocument();
+        expect(screen.queryByText(/at a time/)).not.toBeInTheDocument();
+    });
+
+    it('says a long line is spoken a piece at a time, where the build declares a split', async () => {
+        api.engineCapabilities.mockResolvedValue({
+            status: 200,
+            data: {
+                ...capabilities,
+                variants: {
+                    ...capabilities.variants,
+                    turbo: { ...capabilities.variants.turbo!, maxCharacters: 4096, segmentation: { supported: true, segmentCharacters: 50 } },
+                },
+            },
+        });
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await screen.findByRole('button', { name: 'laugh' });
+        // The sample line is 74 characters, past a 50-character piece.
+        expect(screen.getByText(/74 characters of 4,096\. Spoken 50 at a time/)).toBeInTheDocument();
+    });
+
+    it('says nothing about a split for a line that fits in one generation', async () => {
+        api.engineCapabilities.mockResolvedValue({
+            status: 200,
+            data: {
+                ...capabilities,
+                variants: {
+                    ...capabilities.variants,
+                    turbo: { ...capabilities.variants.turbo!, segmentation: { supported: true, segmentCharacters: 500 } },
+                },
+            },
+        });
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await screen.findByRole('button', { name: 'laugh' });
+        expect(screen.queryByText(/at a time/)).not.toBeInTheDocument();
+    });
+
+    it('warns before the request that a line past the ceiling is refused', async () => {
+        const user = setupUser();
+        api.engineCapabilities.mockResolvedValue({
+            status: 200,
+            data: {
+                ...capabilities,
+                variants: { ...capabilities.variants, turbo: { ...capabilities.variants.turbo!, maxCharacters: 80 } },
+            },
+        });
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        const line = await screen.findByRole('textbox', { name: 'Line' });
+        await user.clear(line);
+        // Pasted rather than typed: `type` sends 81 keystrokes, which is slow enough to time out on
+        // a loaded machine, and this test is about the length rather than about typing.
+        await user.click(line);
+        await user.paste('x'.repeat(81));
+
+        const alert = await screen.findByRole('alert');
+        expect(within(alert).getByText(/81 characters, and this build accepts 80/)).toBeInTheDocument();
+        expect(api.speak).not.toHaveBeenCalled();
+    });
+
+    it('reads the ceiling off the resident build only when that is the chosen one', async () => {
+        // `current` describes what is loaded. Its ceiling says nothing about another build, and § 4
+        // is the reason the page does not guess one.
+        api.engineCapabilities.mockResolvedValue({
+            status: 200,
+            data: {
+                ...capabilities,
+                current: {
+                    ...capabilities.variants.original!,
+                    variant: 'original',
+                    maxCharacters: 300,
+                    cloning: { supported: false },
+                    streaming: { supported: true },
+                    nativeFormat: { encoding: 'pcm_s16le', sampleRate: 24000, channels: 1 },
+                },
+            },
+        });
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        // `original` is resident, so the panel opens on it and shows its ceiling.
+        expect(await screen.findByText(/74 characters of 300/)).toBeInTheDocument();
+    });
 });
 
 /** Dia's document, trimmed: one build, which performs a conversation of two. */
