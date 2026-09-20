@@ -133,13 +133,16 @@ class ErrorDetail(BaseModel):
     retryable: bool
 
 class WorkerHealth(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
     process: Literal["up", "draining"]
     model: Literal["unloaded", "loading", "loaded", "unloading"]
     variant: str | None = None
     device: str | None = None
+    # What the card holds in total.
     vram_bytes: int | None = Field(alias="vramBytes", default=None)
+    # What the loaded model took of it, measured. § 3.
+    model_bytes: int | None = Field(alias="modelBytes", default=None)
 
 class ResidencySummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

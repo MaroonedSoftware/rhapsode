@@ -751,6 +751,10 @@ components:
                     type: string
                 vramBytes:
                     type: integer
+                    description: What the card holds in total.
+                modelBytes:
+                    type: integer
+                    description: What the loaded model took of it, measured. § 3.
             required:
                 - process
                 - model

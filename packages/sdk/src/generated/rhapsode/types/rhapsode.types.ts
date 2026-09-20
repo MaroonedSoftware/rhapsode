@@ -198,11 +198,14 @@ export interface WorkerHealth {
     model: 'unloaded' | 'loading' | 'loaded' | 'unloading';
     variant?: string;
     device?: string;
+    /** What the card holds in total. */
     vramBytes?: number;
+    /** What the loaded model took of it, measured. § 3. */
+    modelBytes?: number;
 }
 
 /**
- * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L229)
+ * generated from [ResidencySummary](../../../../../../contracts/rhapsode.types.ck#L230)
  */
 export interface ResidencySummary {
     resident: number;
@@ -213,7 +216,7 @@ export interface ResidencySummary {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L272)
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L273)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -223,7 +226,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L278)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L279)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -258,7 +261,7 @@ export interface Variant {
 }
 
 /**
- * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L218)
+ * generated from [EngineSummary](../../../../../../contracts/rhapsode.types.ck#L219)
  */
 export interface EngineSummary {
     id: string;
@@ -274,7 +277,7 @@ export interface EngineSummary {
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L249)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L250)
  */
 export interface CatalogEntry {
     id: string;
@@ -324,7 +327,7 @@ export interface ErrorBody {
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L259)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L260)
  */
 export interface InstallJob {
     id: string;
@@ -343,7 +346,7 @@ export interface InstallJob {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L285)
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L286)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -375,7 +378,7 @@ export interface CurrentVariant extends Omit<Variant, 'cloning' | 'blending'> {
 }
 
 /**
- * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L236)
+ * generated from [CoreHealth](../../../../../../contracts/rhapsode.types.ck#L237)
  */
 export interface CoreHealth {
     contract: number;

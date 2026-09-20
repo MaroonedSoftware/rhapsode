@@ -131,8 +131,21 @@ down → starting → up(unloaded) → loading → up(loaded)
 `GET /health` reports both:
 
 ```json
-{"process":"up","model":"loaded","variant":"turbo","device":"cuda:0","vramBytes":4831838208}
+{"process":"up","model":"loaded","variant":"turbo","device":"cuda:0","vramBytes":4831838208,"modelBytes":3355443200}
 ```
+
+`vramBytes` is what the card holds and `modelBytes` is what this model took of it, measured across
+the load by the SDK and reported while it stays loaded. They are different questions and only the
+second one helps a core decide what to evict: a budget counted in models assumes every model is the
+same size, and Kokoro is 82M parameters where Dia is 1.6B.
+
+`modelBytes` is optional, because no measurement covers every device, and it is approximate where it
+is given: it is a card-wide delta, so it counts the runtime's own context and anything else that
+allocated during the load, which is the right answer for "can another model fit" and the wrong one
+for "how big are these weights". An adapter that knows the real figure returns it from
+`Engine.memory_bytes` and is believed. What a worker must never report is `0` or a negative: a core
+adding up a card reads those as a model that is free, so a measurement that failed is left out
+instead.
 
 ### Three rules, each paid for
 
@@ -737,6 +750,9 @@ serve(ChatterboxEngine())
   through ffmpeg. Without this, every adapter reimplements format conversion and they all do it
   differently. This is the single largest reduction in adapter burden in the design.
 - **Applies the unload-then-load-once retry** around `load()`, so the OOM lesson is free.
+- **Measures what a load cost**, as a device-wide delta across `load()`, and reports it as
+  `modelBytes` (§ 3). An adapter that knows better overrides `memory_bytes()`; one that does not
+  gets a figure for free, and one on a device nothing can measure reports nothing rather than zero.
 - Maps exceptions onto the error taxonomy, with `retryable` set correctly, and aborts the connection
   rather than closing it cleanly when `speak()` raises mid-stream.
 - Enforces `maxCharacters` and validates `params` against the declared dials before `speak()` is

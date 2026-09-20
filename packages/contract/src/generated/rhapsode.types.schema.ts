@@ -215,12 +215,19 @@ export const WorkerHealth = z.looseObject({
     model: z.enum(['unloaded', 'loading', 'loaded', 'unloading']),
     variant: z.string().optional(),
     device: z.string().optional(),
-    vramBytes: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).optional(),
+    vramBytes: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .optional()
+        .describe('What the card holds in total.'),
+    modelBytes: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int())
+        .optional()
+        .describe('What the loaded model took of it, measured. § 3.'),
 });
 export type WorkerHealth = z.infer<typeof WorkerHealth>;
 
 /**
- * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L229)
+ * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L230)
  */
 export const ResidencySummary = z.looseObject({
     resident: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -231,7 +238,7 @@ export const ResidencySummary = z.looseObject({
 export type ResidencySummary = z.infer<typeof ResidencySummary>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L272)
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L273)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -241,7 +248,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L278)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L279)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -273,7 +280,7 @@ export const Variant = z.looseObject({
 export type Variant = z.infer<typeof Variant>;
 
 /**
- * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L218)
+ * generated from [EngineSummary](../../../../contracts/rhapsode.types.ck#L219)
  */
 export const EngineSummary = z.looseObject({
     id: z.string(),
@@ -290,7 +297,7 @@ export type EngineSummary = z.infer<typeof EngineSummary>;
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L249)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L250)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -350,7 +357,7 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L259)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L260)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
@@ -367,7 +374,7 @@ export const InstallJob = z.looseObject({
 export type InstallJob = z.infer<typeof InstallJob>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L285)
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L286)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -398,7 +405,7 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L236)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L237)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),

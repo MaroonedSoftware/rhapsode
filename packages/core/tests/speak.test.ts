@@ -107,13 +107,14 @@ describe('refusals that happen before anything is committed', () => {
     });
 
     it('takes a keep-alive of -1, 0 and a duration', async () => {
+        // Against an engine that does not exist, so this asks whether the value got past validation
+        // and nothing else: a 404 means it did. What the value then does is the residency manager's,
+        // and is tested there without a worker either.
         const builder = await start();
 
         for (const keepAliveSeconds of [-1, 0, 30]) {
-            // Past validation is as far as this gets without a worker; what it does with the value
-            // is the residency manager's, and tested there.
-            const response = await speak(builder, { engine: 'tone', text: 'x', keepAliveSeconds });
-            expect(response.statusCode).not.toBe(400);
+            const response = await speak(builder, { engine: 'nope', text: 'x', keepAliveSeconds });
+            expect(response.json().error).toMatchObject({ code: 'unknown_engine' });
         }
     });
 

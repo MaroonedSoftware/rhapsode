@@ -212,7 +212,8 @@ contract mode(loose) WorkerHealth: {
     model: enum(unloaded, loading, loaded, unloading)
     variant?: string
     device?: string
-    vramBytes?: int
+    vramBytes?: int                                     # What the card holds in total.
+    modelBytes?: int                                    # What the loaded model took of it, measured. § 3.
 }
 
 contract mode(loose) EngineSummary: {
