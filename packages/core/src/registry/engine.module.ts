@@ -4,7 +4,6 @@ import { CATALOG } from './engines.catalog.js';
 import { EngineRegistry, type EngineEntry } from './engine.registry.js';
 import { ManagedEngines, type ConfiguredEngine } from './managed.engines.js';
 import type { RhapsodeConfig } from '../config.js';
-import { DEFAULTS } from '../config.js';
 
 /**
  * Declare every engine this box has, by joining the shipped catalog to local configuration.
@@ -39,7 +38,6 @@ export const engineModule = (settings: RhapsodeConfig, managed: ManagedEngines =
 
 export function buildRegistry(settings: RhapsodeConfig): EngineRegistry {
     const engines = new EngineRegistry();
-    engines.maxResidentModels = settings.residency?.maxResidentModels ?? DEFAULTS.maxResidentModels;
 
     for (const [id, configured] of Object.entries(settings.engines ?? {})) {
         if (configured.enabled === false) continue;

@@ -1,6 +1,6 @@
 import { Injectable } from 'injectkit';
 
-import type { EngineSummary, License, ResidencySummary } from '@rhapsode/contract';
+import type { EngineSummary, License } from '@rhapsode/contract';
 
 /** What an engine is, before anything has tried to run it. */
 export interface EngineEntry {
@@ -81,14 +81,6 @@ export class EngineRegistry {
             };
         });
     }
-
-    residency(): ResidencySummary {
-        const resident = [...this.states.values()].filter(state => state.model === 'loaded' || state.model === 'loading');
-        return { resident: resident.length, max: this.maxResidentModels, waiting: 0 };
-    }
-
-    /** Set by the residency module, which owns the policy. The registry only reports it. */
-    maxResidentModels = 1;
 }
 
 export interface EngineState {
