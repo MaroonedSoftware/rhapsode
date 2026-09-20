@@ -236,6 +236,12 @@ to 0.1.6 went on speaking through a worker from 0.1.2 and only stopped reporting
 `GET /residency`, which reads as a card that cannot be measured rather than as an engine that needs
 reinstalling.
 
+Two things will tell you. `GET /engines` carries each engine's `workerVersion` beside its state, and
+it is read from the virtualenv rather than asked of the worker, so an engine that is `down` still
+answers. From a checkout, `pnpm wizard doctor` compares every local engine against the core and
+names the ones that differ. Neither is an error: a stale worker is contract-legal and works, and
+`docs/protocol.md` § 9 leaves you free to run an engine at a version of your choosing.
+
 The remedy is cheap, because both caches are in `/data` and survive: uninstalling and reinstalling
 chatterbox on an upgraded box took 55 seconds and downloaded nothing, against the 93 seconds and
 6.2 GB its first install cost. An install refuses an engine that is already installed, so it is two
@@ -434,10 +440,16 @@ rules and the reasons.
 {
     "contract": 1,
     "status": "ok",
-    "engines": [{ "id": "tone", "process": "up", "model": "loaded", "variant": "plain", "restarts": 0 }],
+    "engines": [
+        { "id": "tone", "process": "up", "model": "loaded", "variant": "plain", "restarts": 0, "workerVersion": "0.1.6" }
+    ],
     "residency": { "resident": 1, "max": 1, "waiting": 0 }
 }
 ```
+
+`workerVersion` is the `rhapsode-worker` installed in that engine's virtualenv, and one that is not
+this server's own version is an engine an upgrade left behind: see "Upgrading leaves the engines
+behind" above. It is absent for a remote engine, which has no virtualenv here.
 
 `residency.waiting` above zero with `blockedBy` set is the case that looks like a hang and is not: at
 `maxResidentModels: 1`, a five-minute synthesis on one engine makes a request for another wait. It
