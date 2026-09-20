@@ -433,6 +433,28 @@ a missing format says which.
 
 Installing ffmpeg needs a worker restart to be noticed.
 
+## Long text
+
+`GET /engines/{id}/capabilities` reports `segmentation` beside `maxCharacters`. Where it says
+`supported`, text longer than `segmentCharacters` is spoken as several generations joined into one
+response rather than refused: the request still has to fit `maxCharacters`, but that ceiling is now
+about how much text the engine will take in one go, not about how much it can say in one pass.
+
+Two consequences are worth knowing before you rely on it.
+
+**A seed reproduces a generation, not a request.** A request split four ways is four seeded
+generations, seeded from yours plus the piece's index. The same request with the same seed gives the
+same audio; the same seed on a request you have since edited moves every piece after the edit.
+
+**Prosody carries across a joint only where the engine carries it.** Dia continues each piece from
+the audio of the one before, so its reader stays the same person. Kokoro starts each piece fresh and
+puts 250 ms of silence between them. Neither is a fault; they are different engines, which is why
+the capability document says which you have rather than leaving you to hear it.
+
+`stream: false` buffers the whole answer in the core (`docs/protocol.md` § 13.2), and that buffer
+is bounded by `maxCharacters`. An engine with a high ceiling and a long request is a proportionally
+larger buffer, so an operator raising a ceiling should know it is also raising that.
+
 ## Two things worth knowing about failure
 
 **A `/speak` that fails mid-stream breaks the connection.** Once a `200` and a `Content-Type` are on
