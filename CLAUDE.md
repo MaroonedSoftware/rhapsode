@@ -45,6 +45,13 @@ node scripts/docker.smoke.mjs       # build the image, install through it, and r
 pnpm release version 0.2.0          # every published package to one version, changesets into CHANGELOG.md
 ```
 
+Build from the root before building one package. `pnpm build` is turbo, which builds a package's
+workspace dependencies first; `pnpm --filter <package> build` runs that one script and nothing else.
+In a checkout where nothing has been built yet, the filtered form fails on missing `.d.ts` files
+rather than on anything wrong with the package: `@rhapsode/web` reports two dozen "Cannot find module
+'@maroonedsoftware/rhapsode-sdk'" errors because the SDK's types do not exist yet. Use
+`pnpm --filter <package>... build` with the trailing dots when you want the dependencies too.
+
 Every released package, npm, Python and the image, carries one version (`docs/protocol.md` § 9).
 `pnpm release` sets it rather than `changeset version`, because a changeset cannot name a Python
 package. Write a changeset as before, and `.github/workflows/release-pr.yml` keeps a "Release x.y.z"
