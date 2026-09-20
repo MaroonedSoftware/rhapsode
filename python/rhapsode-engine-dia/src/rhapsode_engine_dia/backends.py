@@ -47,12 +47,15 @@ class Spoken:
     """One generation's audio, without the prompt it continued from."""
 
     audio: np.ndarray
-    #: Whether the model was still speaking when it ran out of positions, so the audio stops mid-word.
+    #: Whether the model was still speaking when it ran out of room, so the audio stops mid-word:
+    #: it filled the decoder's positions, or it ran through the budget it was given.
     exhausted: bool
 
 
 class Generator(Protocol):
-    def generate(self, text: str, sampling: Sampling, prompt: Prompt | None = None) -> Spoken: ...
+    def generate(
+        self, text: str, sampling: Sampling, prompt: Prompt | None = None, max_new_tokens: int | None = None
+    ) -> Spoken: ...
 
     def close(self) -> None: ...
 
@@ -97,7 +100,9 @@ class TransformersDia:
             .eval()
         )
 
-    def generate(self, text: str, sampling: Sampling, prompt: Prompt | None = None) -> Spoken:
+    def generate(
+        self, text: str, sampling: Sampling, prompt: Prompt | None = None, max_new_tokens: int | None = None
+    ) -> Spoken:
         if sampling.seed is not None:
             _seed(sampling.seed)
 
@@ -120,12 +125,19 @@ class TransformersDia:
                 guidance_scale=sampling.cfg_scale,
                 temperature=sampling.temperature,
                 top_p=sampling.top_p,
+                # Counts what is generated, so a prompt does not eat into it.
+                **({} if max_new_tokens is None else {"max_new_tokens": max_new_tokens}),
             )
             audio = processor.batch_decode(outputs, audio_prompt_len=prompt_length)[0]
 
-        # Past the checkpoint's own `max_length` the model was cut off rather than finished. The
-        # processor pads a finished sequence out, so only an exhausted one fills every position.
-        exhausted = int(outputs.shape[1]) >= MAX_POSITIONS
+        # A generation that stopped by itself is shorter than what it was allowed; one that used all
+        # of it was still speaking. The delay pattern puts a few frames on the end either way, so this
+        # counts a generation within a frame or two of its limit as cut off, which it is.
+        start = prompt_length if prompt_length is not None else 1
+        generated = int(outputs.shape[1]) - start
+        exhausted = generated >= MAX_POSITIONS - start or (
+            max_new_tokens is not None and generated >= max_new_tokens
+        )
         return Spoken(audio=np.asarray(audio.float().cpu().numpy(), dtype=np.float32), exhausted=exhausted)
 
     def close(self) -> None:

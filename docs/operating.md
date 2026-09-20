@@ -142,13 +142,18 @@ is not on PyPI, so pip needs a path, not a name.
 
 ### Dia
 
-Dia runs through transformers and torch, in bfloat16 on an NVIDIA card, where upstream measured
-4.4 GB of VRAM and 1.5 times real time on an RTX 4090. It also runs on a Mac, in float32 on Metal,
-at about a tenth of real time: 10 s of audio took 100 s on an Apple Silicon laptop. That is enough to
-hear it and not enough to use it. On a CPU it will be slower still.
+Dia runs through transformers and torch, in bfloat16 on an NVIDIA card. Measured on an RTX 4070 Ti
+SUPER: it loads in 2.5 s, holds 3.3 GiB, peaks at 4.0 GiB while speaking and 4.9 GiB in a cloned
+voice, and speaks at 1.2 to 1.4 times real time. It also runs on a Mac, in float32 on Metal, at about
+a tenth of real time: 10 s of audio took 100 s on an Apple Silicon laptop. That is enough to hear it
+and not enough to use it. On a CPU it will be slower still.
 
-It generates each piece of text whole, about 17 s of speech at a time, so the first audio of a long
-request arrives when its first piece is finished rather than as it is spoken.
+It generates each piece of text whole, so the first audio of a long request arrives when its first
+piece is finished rather than as it is spoken: 5.2 s into a 26.5 s reading, on the card above.
+
+Each piece is given a budget of decoder tokens from how much text it holds, because Dia does not
+always stop: "one" ran to 27 s of murmur unbounded, where a ten-word line stopped by itself after
+3.8 s.
 
 It answers `/dialogue` (protocol.md § 6) with up to two speakers, which is what it was trained for.
 It has no voices of its own. A request that names none is read in whichever voice the model picks,
