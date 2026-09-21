@@ -241,6 +241,9 @@ contract mode(loose) EngineSummary: {
     # differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
     # includes every remote engine. protocol.md § 9.
     workerVersion?: string
+    # Whether `workerVersion` differs from this core's version, so no client compares the two.
+    # Absent exactly when `workerVersion` is. A warning, never a refusal. protocol.md § 9.
+    outdated?: boolean
 }
 
 contract mode(loose) ResidencySummary: {
@@ -267,6 +270,7 @@ contract mode(loose) ResidencyDetail: ResidencySummary & {
 
 contract mode(loose) CoreHealth: {
     contract: int
+    version: string                             # The running core's package version, for display. Not the contract. § 9.
     status: enum(ok, degraded)
     engines: array(EngineSummary)
     residency: ResidencySummary
@@ -286,6 +290,8 @@ contract mode(loose) CatalogEntry: {
     defaultVariant?: string
     installed: enum(no, installing, yes)
     managed: boolean                            # Installed through the API, so removable by it.
+    workerVersion?: string                      # As on EngineSummary, for an installed engine. § 9.
+    outdated?: boolean                          # As on EngineSummary. § 9.
 }
 
 contract mode(loose) InstallJob: {

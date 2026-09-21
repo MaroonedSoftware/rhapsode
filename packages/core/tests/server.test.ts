@@ -1,7 +1,12 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ResidencyDetail } from '@rhapsode/contract';
 
+import { CORE_VERSION } from '../src/core.version.js';
 import { buildServer } from '../src/server.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import type { RhapsodeConfig } from '../src/config.js';
@@ -31,6 +36,29 @@ describe('GET /health', () => {
 
         expect(response.statusCode).toBe(200);
         expect(response.json()).toMatchObject({ contract: 1, status: 'ok', engines: [] });
+    });
+
+    it('carries the core’s own version, for display', async () => {
+        const builder = await start();
+        expect(response(await builder.app.inject({ method: 'GET', url: '/health' })).version).toBe(CORE_VERSION);
+    });
+
+    it('says which engines an upgrade left behind, and so does the catalog', async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'rh-outdated-'));
+        try {
+            const venv = join(dir, 'tone');
+            mkdirSync(join(venv, 'lib', 'python3.12', 'site-packages', 'rhapsode_worker-0.0.1.dist-info'), { recursive: true });
+            const builder = await start({ engines: { tone: { venv } } });
+
+            const health = response(await builder.app.inject({ method: 'GET', url: '/health' }));
+            expect(health.engines[0]).toMatchObject({ id: 'tone', workerVersion: '0.0.1', outdated: true });
+
+            const catalog = (await builder.app.inject({ method: 'GET', url: '/catalog' })).json();
+            expect(catalog.find((entry: { id: string }) => entry.id === 'tone')).toMatchObject({ workerVersion: '0.0.1', outdated: true });
+            expect(catalog.find((entry: { id: string }) => entry.id === 'kokoro')).not.toHaveProperty('outdated');
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 
     it('reports the residency budget', async () => {

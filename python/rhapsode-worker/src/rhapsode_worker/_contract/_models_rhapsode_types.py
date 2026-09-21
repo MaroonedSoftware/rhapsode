@@ -235,6 +235,9 @@ class EngineSummary(BaseModel):
     # differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
     # includes every remote engine. protocol.md § 9.
     worker_version: str | None = Field(alias="workerVersion", default=None)
+    # Whether `workerVersion` differs from this core's version, so no client compares the two.
+    # Absent exactly when `workerVersion` is. A warning, never a refusal. protocol.md § 9.
+    outdated: bool | None = None
 
 # What exists, installed or not. `/engines` is what this box has; this is what it could have, with
 # both licences, because the weights licence is only worth reading before the install.
@@ -250,6 +253,10 @@ class CatalogEntry(BaseModel):
     installed: Literal["no", "installing", "yes"]
     # Installed through the API, so removable by it.
     managed: bool
+    # As on EngineSummary, for an installed engine. § 9.
+    worker_version: str | None = Field(alias="workerVersion", default=None)
+    # As on EngineSummary. § 9.
+    outdated: bool | None = None
 
 # The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
 # and a worker has no opinion about how long anything stays resident. protocol.md § 3.
@@ -326,6 +333,8 @@ class CurrentVariant(Variant):
 
 class CoreHealth(BaseModel):
     contract: int
+    # The running core's package version, for display. Not the contract. § 9.
+    version: str
     status: Literal["ok", "degraded"]
     engines: list[EngineSummary]
     residency: ResidencySummary

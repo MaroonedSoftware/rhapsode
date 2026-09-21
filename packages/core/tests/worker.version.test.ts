@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { CORE_VERSION } from '../src/core.version.js';
 import { EngineRegistry } from '../src/registry/engine.registry.js';
 import { installedWorkerVersion } from '../src/registry/worker.version.js';
 
@@ -96,5 +97,47 @@ describe('the engine summary', () => {
         registry.remove('tone');
 
         expect(registry.workerVersion('tone')).toBeUndefined();
+    });
+});
+
+describe('outdated', () => {
+    it('is true for an engine an upgrade left behind', () => {
+        const registry = new EngineRegistry();
+        registry.declare({ id: 'tone', displayName: 'Tone', license, venv: venvWith('rhapsode_worker-0.0.1.dist-info') });
+
+        expect(registry.summaries()[0]?.outdated).toBe(true);
+    });
+
+    it('is false for an engine this core installed', () => {
+        const registry = new EngineRegistry();
+        registry.declare({ id: 'tone', displayName: 'Tone', license, venv: venvWith(`rhapsode_worker-${CORE_VERSION}.dist-info`) });
+
+        expect(registry.summaries()[0]?.outdated).toBe(false);
+    });
+
+    it('is true for a worker newer than the core, because a rollback breaks the pin the same way', () => {
+        const registry = new EngineRegistry();
+        registry.declare({ id: 'tone', displayName: 'Tone', license, venv: venvWith('rhapsode_worker-999.0.0.dist-info') });
+
+        expect(registry.outdated('tone')).toBe(true);
+    });
+
+    it('is absent wherever workerVersion is, rather than guessed', () => {
+        const registry = new EngineRegistry();
+        registry.declare({ id: 'dia', displayName: 'Dia', license, url: 'http://gpu-02.lan:9310' });
+
+        expect(registry.summaries()[0]).not.toHaveProperty('outdated');
+    });
+
+    it('follows a declare that points the engine at a new virtualenv', () => {
+        // A reinstall declares the engine again with its new slot, and this is what clears the flag.
+        const registry = new EngineRegistry();
+        registry.declare({ id: 'tone', displayName: 'Tone', license, venv: venvWith('rhapsode_worker-0.0.1.dist-info') });
+        const fresh = join(dir, 'fresh');
+        const site = process.platform === 'win32' ? join(fresh, 'Lib', 'site-packages') : join(fresh, 'lib', 'python3.12', 'site-packages');
+        mkdirSync(join(site, `rhapsode_worker-${CORE_VERSION}.dist-info`), { recursive: true });
+        registry.declare({ id: 'tone', displayName: 'Tone', license, venv: fresh });
+
+        expect(registry.outdated('tone')).toBe(false);
     });
 });
