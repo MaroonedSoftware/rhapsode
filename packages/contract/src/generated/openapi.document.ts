@@ -739,6 +739,14 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "accept",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -748,6 +756,16 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/InstallJob"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
                                 }
                             }
                         }

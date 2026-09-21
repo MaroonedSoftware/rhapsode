@@ -270,9 +270,13 @@ operation /engines/{engine}/install: {
         # one, and an install with nothing else to say has always been a bare POST. protocol.md § 10.
         query: {
             pull?: string                       # A variant to fetch once registered, as step 5.
+            # The weights licence, exactly as the catalog names it. Required where the weights may
+            # not be used commercially, and checked wherever it is sent. protocol.md § 10.
+            accept?: string
         }
         response: {
             202: { application/json: InstallJob }
+            400: { application/json: ErrorBody }
             403: { application/json: ErrorBody }
             404: { application/json: ErrorBody }
             409: { application/json: ErrorBody }

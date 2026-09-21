@@ -16,6 +16,7 @@ UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
 
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
     "pull": NotRequired[str],
+    "accept": NotRequired[str],
 })
 
 
@@ -241,6 +242,12 @@ class InstallEngine202Response(TypedDict):
     status: Literal[202]
     content_type: Literal["application/json"]
     data: InstallJob
+
+
+class InstallEngine400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
 
 
 class InstallEngine403Response(TypedDict):
@@ -499,8 +506,10 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "application/json", "data": EngineSummary.model_validate(result) }
 
-    async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)
+    async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine400Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(400, 403, 404, 409), params=query)
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:

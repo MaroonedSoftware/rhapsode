@@ -94,6 +94,10 @@ spawned with is constructed rather than inherited, so it never sees the core's `
 `pnpm wizard install kokoro` does it from a terminal, and anything else can do it through the
 routes in `docs/protocol.md` § 10. Either way the server does the work, so it has to be running.
 
+An engine whose weights may not be used commercially installs only once its licence is accepted by
+name: the wizard and the web page ask, and a direct call adds `?accept=` with the catalog's
+`weights` string, `?accept=CC-BY-NC-4.0`. Without it the install is refused, saying which licence.
+
 What it installs is recorded in `rhapsode.engines.json` beside the config file (or beside wherever
 `RHAPSODE_CONFIG` points). The server writes that file and never touches yours. Both are read at
 boot and **yours wins** where they name the same engine, so to override something about an

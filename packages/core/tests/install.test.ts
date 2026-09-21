@@ -385,6 +385,54 @@ describe('the install routes', () => {
         expect(job).toMatchObject({ state: 'succeeded', step: 'weights', variant: 'plain' });
     });
 
+    describe('a weights licence that may not be used commercially', () => {
+        // No catalog engine has such weights yet, so one is added for the length of each test.
+        beforeEach(() => {
+            CATALOG.research = { ...CATALOG.tone!, displayName: 'Research', license: { code: 'MIT', weights: 'CC-BY-NC-4.0', weightsCommercialUse: false } };
+        });
+        afterEach(() => {
+            delete CATALOG.research;
+        });
+
+        it('is refused without accept, before a job exists, naming the licence and the query that accepts it', async () => {
+            const { runner, ran } = fakeRunner();
+            const app = await start(runner);
+
+            const refused = await install(app, 'research');
+            expect(refused.statusCode).toBe(400);
+            expect(refused.json().error).toMatchObject({ code: 'bad_request' });
+            expect(refused.json().error.message).toContain('CC-BY-NC-4.0');
+            expect(refused.json().error.message).toContain('?accept=CC-BY-NC-4.0');
+            expect((await app.inject({ method: 'GET', url: '/installs' })).json()).toEqual([]);
+            expect(ran).toEqual([]);
+        });
+
+        it('installs once accept names the licence exactly', async () => {
+            const app = await start(fakeRunner().runner);
+
+            const accepted = await install(app, 'research', '?accept=CC-BY-NC-4.0');
+            expect(accepted.statusCode).toBe(202);
+            expect(await settled(app, accepted.json().id)).toMatchObject({ state: 'succeeded', engine: 'research' });
+        });
+
+        it('refuses an accept that is empty, repeated, or names another licence', async () => {
+            const app = await start(fakeRunner().runner);
+
+            for (const query of ['?accept=', '?accept=MIT', '?accept=cc-by-nc-4.0', '?accept=CC-BY-NC-4.0&accept=CC-BY-NC-4.0']) {
+                const refused = await install(app, 'research', query);
+                expect(refused.statusCode, query).toBe(400);
+                expect(refused.json().error.message, query).toContain('?accept=CC-BY-NC-4.0');
+            }
+        });
+    });
+
+    it('needs no accept for commercial weights, and checks one that is sent anyway', async () => {
+        const app = await start(fakeRunner().runner);
+
+        expect((await install(app, 'tone', '?accept=GPL-3.0')).statusCode).toBe(400);
+        expect((await install(app, 'tone', '?accept=MIT')).statusCode).toBe(202);
+    });
+
     it('cannot install on a server built without a managed file', async () => {
         const builder = await buildServer({ install: { venvDir } }, silent(), { runner: fakeRunner().runner });
         running = builder;

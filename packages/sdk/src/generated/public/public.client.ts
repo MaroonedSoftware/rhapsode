@@ -287,9 +287,10 @@ export class PublicClient {
 
     async installEngine(
         engine: string,
-        query?: { pull?: string },
+        query?: { pull?: string; accept?: string },
     ): Promise<
         | { status: 202; contentType: 'application/json'; data: InstallJob }
+        | { status: 400; contentType: 'application/json'; data: ErrorBody }
         | { status: 403; contentType: 'application/json'; data: ErrorBody }
         | { status: 404; contentType: 'application/json'; data: ErrorBody }
         | { status: 409; contentType: 'application/json'; data: ErrorBody }
@@ -297,9 +298,11 @@ export class PublicClient {
         const qs = buildQueryString(query);
         const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/install${qs}`, {
             method: 'POST',
-            expectStatuses: [403, 404, 409],
+            expectStatuses: [400, 403, 404, 409],
         });
         switch (result.status) {
+            case 400:
+                return { status: 400, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             case 403:
                 return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             case 404:
