@@ -318,6 +318,18 @@ contract mode(loose) InstallJob: {
     error?: ErrorDetail                         # Present exactly when `state` is `failed`.
 }
 
+# An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+# reinstall would have to ask somebody about. § 10.
+contract mode(loose) ReinstallSkipped: {
+    engine: string
+    reason: enum(licence, busy, uncatalogued)   # Needs `accept`; has a job already; the catalog no longer has it.
+}
+
+contract mode(loose) ReinstallOutdated: {
+    jobs: array(InstallJob)                     # One reinstall per outdated engine this API installed, in id order.
+    skipped: array(ReinstallSkipped)
+}
+
 contract PullRequest: {
     variant?: string                            # Absent means the engine's default variant.
 }

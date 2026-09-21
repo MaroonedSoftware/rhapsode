@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises';
 import { join, relative, isAbsolute } from 'node:path';
 
-import type { InstallJob } from '@rhapsode/contract';
+import type { InstallJob, ReinstallOutdated } from '@rhapsode/contract';
 
 import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { entryFrom } from '../registry/engine.module.js';
@@ -78,6 +78,31 @@ export class EngineInstaller {
         const accepted = acceptanceFor(id, record, this.managed.entry(id)?.accepted, accept);
 
         return this.jobs.submit('reinstall', id, undefined, context => this.rebuild(id, record, accepted, context));
+    }
+
+    /**
+     * Queue a reinstall for every `outdated` engine this API installed, in id order. § 10.
+     *
+     * Never refuses as a whole. An engine that a single reinstall would have to ask somebody about is
+     * skipped and named, and nothing behind is an empty answer, so a cron line can end with this.
+     */
+    reinstallOutdated(): ReinstallOutdated {
+        const answer: ReinstallOutdated = { jobs: [], skipped: [] };
+        for (const id of this.engines.ids().sort()) {
+            if (this.engines.outdated(id) !== true || !this.managed.isManaged(id)) continue;
+            const record = CATALOG[id];
+            if (record === undefined) {
+                answer.skipped.push({ engine: id, reason: 'uncatalogued' });
+            } else if (this.jobs.pending(id) !== undefined) {
+                answer.skipped.push({ engine: id, reason: 'busy' });
+            } else if (!coveredWithoutAsking(id, record, this.managed.entry(id)?.accepted)) {
+                answer.skipped.push({ engine: id, reason: 'licence' });
+            } else {
+                const accepted = this.managed.entry(id)?.accepted;
+                answer.jobs.push(this.jobs.submit('reinstall', id, undefined, context => this.rebuild(id, record, accepted, context)));
+            }
+        }
+        return answer;
     }
 
     /**
@@ -273,6 +298,16 @@ export function acceptanceFor(id: string, record: CatalogRecord, recorded: strin
     if (accept === undefined && recorded === record.license.weights) return recorded;
     refuseUnaccepted(id, record, accept);
     return typeof accept === 'string' ? accept : undefined;
+}
+
+/** Whether a reinstall of this engine needs no `accept`. */
+function coveredWithoutAsking(id: string, record: CatalogRecord, recorded: string | undefined): boolean {
+    try {
+        acceptanceFor(id, record, recorded, undefined);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /** Whether a path is strictly inside a directory, so an uninstall never deletes the directory itself or anything outside it. */

@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, UpdateStatus, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice
 
 
 UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
@@ -339,6 +339,18 @@ class InstallJobs403Response(TypedDict):
     data: ErrorBody
 
 
+class ReinstallOutdated202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: ReinstallOutdated
+
+
+class ReinstallOutdated403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class InstallJob200Response(TypedDict):
     status: Literal[200]
     content_type: Literal["application/json"]
@@ -587,6 +599,12 @@ class RhapsodePublicClient(BaseClient):
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "application/json", "data": _INSTALL_JOBS_RESPONSE_200.validate_python(result) }
+
+    async def reinstall_outdated(self) -> ReinstallOutdated202Response | ReinstallOutdated403Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full("/installs/outdated", method="POST", response_kind="auto", expect_statuses=(403,))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": ReinstallOutdated.model_validate(result) }
 
     async def install_job(self, job: str) -> InstallJob200Response | InstallJob403Response | InstallJob404Response:
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(str(job), safe='')}", method="GET", response_kind="auto", expect_statuses=(403, 404))

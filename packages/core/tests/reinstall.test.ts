@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { CatalogEntry, InstallJob } from '@rhapsode/contract';
+import { CatalogEntry, InstallJob, ReinstallOutdated } from '@rhapsode/contract';
 
 import { CORE_VERSION } from '../src/core.version.js';
 import type { CommandRunner } from '../src/install/command.runner.js';
@@ -197,6 +197,68 @@ describe('reinstalling an engine', () => {
         expect(refused.statusCode).toBe(403);
     });
 
+    describe('POST /installs/outdated', () => {
+        const outdated = async (app: App) => {
+            const response = await post(app, '/installs/outdated');
+            expect(response.statusCode).toBe(202);
+            return ReinstallOutdated.parse(response.json());
+        };
+
+        it('answers with nothing to do when nothing is behind, which is a success', async () => {
+            const app = await start(fakeRunner({ version: CORE_VERSION }).runner);
+            await settled(app, (await post(app, '/engines/tone/install')).json().id);
+
+            expect(await outdated(app)).toEqual({ jobs: [], skipped: [] });
+        });
+
+        it('reinstalls every outdated engine it installed, one at a time, in id order', async () => {
+            const options = { version: '0.0.1' };
+            const app = await start(fakeRunner(options).runner);
+            await settled(app, (await post(app, '/engines/tone/install')).json().id);
+            await settled(app, (await post(app, '/engines/chatterbox/install')).json().id);
+            options.version = CORE_VERSION;
+
+            const answer = await outdated(app);
+            expect(answer.jobs.map(job => [job.engine, job.kind])).toEqual([
+                ['chatterbox', 'reinstall'],
+                ['tone', 'reinstall'],
+            ]);
+            expect(answer.skipped).toEqual([]);
+            for (const job of answer.jobs) expect((await settled(app, job.id)).state).toBe('succeeded');
+
+            expect(await outdated(app)).toEqual({ jobs: [], skipped: [] });
+        });
+
+        it('leaves out an engine that is current and one the operator configured', async () => {
+            const stale = join(dir, 'elsewhere', 'kokoro');
+            writeWorkerVersion(stale, '0.0.1');
+            const app = await start(fakeRunner({ version: CORE_VERSION }).runner, { engines: { kokoro: { venv: stale } } });
+            await settled(app, (await post(app, '/engines/tone/install')).json().id);
+
+            expect(await catalogEntry(app, 'kokoro')).toMatchObject({ outdated: true, managed: false });
+            expect(await outdated(app)).toEqual({ jobs: [], skipped: [] });
+        });
+
+        it('skips an engine that already has a job, and says so', async () => {
+            const options: { version: string; hold?: Promise<void> } = { version: '0.0.1' };
+            const app = await start(fakeRunner(options).runner);
+            await installStale(app, options);
+
+            let release!: () => void;
+            options.hold = new Promise<void>(fulfil => (release = fulfil));
+            const running = (await post(app, '/engines/tone/reinstall')).json();
+
+            expect(await outdated(app)).toEqual({ jobs: [], skipped: [{ engine: 'tone', reason: 'busy' }] });
+            release();
+            await settled(app, running.id);
+        });
+
+        it('refuses a remote caller', async () => {
+            const app = await start(fakeRunner({ version: CORE_VERSION }).runner);
+            expect((await app.inject({ method: 'POST', url: '/installs/outdated', remoteAddress: '10.0.0.5' })).statusCode).toBe(403);
+        });
+    });
+
     describe('a weights licence that may not be used commercially', () => {
         beforeEach(() => {
             CATALOG.research = {
@@ -243,6 +305,27 @@ describe('reinstalling an engine', () => {
 
             expect((await post(app, '/engines/research/reinstall')).statusCode).toBe(400);
             expect((await post(app, '/engines/research/reinstall?accept=CC-BY-NC-4.0')).statusCode).toBe(202);
+        });
+
+        it('is skipped by a reinstall of everything, which has nobody to ask', async () => {
+            const venv = join(venvDir, 'research');
+            writeWorkerVersion(venv, '0.0.1');
+            writeFileSync(join(dir, MANAGED_FILE), JSON.stringify({ engines: { research: { venv } } }));
+            const app = await start(fakeRunner({ version: CORE_VERSION }).runner);
+
+            const answer = ReinstallOutdated.parse((await post(app, '/installs/outdated')).json());
+            expect(answer).toEqual({ jobs: [], skipped: [{ engine: 'research', reason: 'licence' }] });
+        });
+
+        it('is reinstalled by a reinstall of everything while what was accepted still covers it', async () => {
+            const options = { version: '0.0.1' };
+            const app = await start(fakeRunner(options).runner);
+            await installStale(app, options, 'research', '?accept=CC-BY-NC-4.0');
+
+            const answer = ReinstallOutdated.parse((await post(app, '/installs/outdated')).json());
+            expect(answer.jobs.map(job => job.engine)).toEqual(['research']);
+            expect((await settled(app, answer.jobs[0]!.id)).state).toBe('succeeded');
+            expect(managedEntry('research').accepted).toBe('CC-BY-NC-4.0');
         });
     });
 });

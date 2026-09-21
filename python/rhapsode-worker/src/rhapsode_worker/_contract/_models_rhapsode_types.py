@@ -201,6 +201,13 @@ class UpdateStatus(BaseModel):
     # Which upgrade instructions apply.
     distribution: Literal["docker", "source"]
 
+# An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+# reinstall would have to ask somebody about. § 10.
+class ReinstallSkipped(BaseModel):
+    engine: str
+    # Needs `accept`; has a job already; the catalog no longer has it.
+    reason: Literal["licence", "busy", "uncatalogued"]
+
 class PullRequest(BaseModel):
     # Absent means the engine's default variant.
     variant: str | None = None
@@ -363,6 +370,11 @@ class EngineDialogueRequest(DialogueRequest):
     model_config = ConfigDict(populate_by_name=True)
 
     keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
+
+class ReinstallOutdated(BaseModel):
+    # One reinstall per outdated engine this API installed, in id order.
+    jobs: list[InstallJob]
+    skipped: list[ReinstallSkipped]
 
 class Capabilities(BaseModel):
     # The contract major this worker settled on. § 9.

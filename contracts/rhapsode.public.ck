@@ -347,6 +347,19 @@ operation /installs: {
     }
 }
 
+operation /installs/outdated: {
+    post: {
+        sdk: reinstallOutdated
+        # A reinstall for every `outdated` engine this API installed. Never refused as a whole: what
+        # it cannot reinstall without asking is `skipped`, and nothing behind is `jobs: []`, so it can
+        # end an unattended upgrade every night. § 10.
+        response: {
+            202: { application/json: ReinstallOutdated }
+            403: { application/json: ErrorBody }
+        }
+    }
+}
+
 operation /installs/{job}: {
     params: {
         job: string

@@ -270,7 +270,18 @@ export interface UpdateStatus {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L321)
+ * An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+ * reinstall would have to ask somebody about. § 10.
+ * generated from [ReinstallSkipped](../../../../../../contracts/rhapsode.types.ck#L323)
+ */
+export interface ReinstallSkipped {
+    engine: string;
+    /** Needs `accept`; has a job already; the catalog no longer has it. */
+    reason: 'licence' | 'busy' | 'uncatalogued';
+}
+
+/**
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L333)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -280,7 +291,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L327)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L339)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -425,7 +436,7 @@ export interface ResidencyDetail extends ResidencySummary {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L334)
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L346)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */
@@ -474,6 +485,15 @@ export interface CoreHealth {
  */
 export interface EngineDialogueRequest extends DialogueRequest {
     keepAliveSeconds?: number;
+}
+
+/**
+ * generated from [ReinstallOutdated](../../../../../../contracts/rhapsode.types.ck#L328)
+ */
+export interface ReinstallOutdated {
+    /** One reinstall per outdated engine this API installed, in id order. */
+    jobs: InstallJob[];
+    skipped: ReinstallSkipped[];
 }
 
 /**

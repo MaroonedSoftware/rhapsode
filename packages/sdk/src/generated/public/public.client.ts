@@ -10,6 +10,7 @@ import type {
     ErrorBody,
     InstallJob,
     PullRequest,
+    ReinstallOutdated,
     ResidencyDetail,
     UpdateStatus,
     Voice,
@@ -389,6 +390,21 @@ export class PublicClient {
                 return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             default:
                 return { status: 200, contentType: 'application/json', data: await parseJson<InstallJob[]>(result) };
+        }
+    }
+
+    async reinstallOutdated(): Promise<
+        { status: 202; contentType: 'application/json'; data: ReinstallOutdated } | { status: 403; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const result = await this.fetch(`/installs/outdated`, {
+            method: 'POST',
+            expectStatuses: [403],
+        });
+        switch (result.status) {
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 202, contentType: 'application/json', data: await parseJson<ReinstallOutdated>(result) };
         }
     }
 

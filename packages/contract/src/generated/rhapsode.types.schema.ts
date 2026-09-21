@@ -295,7 +295,18 @@ export const UpdateStatus = z.looseObject({
 export type UpdateStatus = z.infer<typeof UpdateStatus>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L321)
+ * An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+ * reinstall would have to ask somebody about. § 10.
+ * generated from [ReinstallSkipped](../../../../contracts/rhapsode.types.ck#L323)
+ */
+export const ReinstallSkipped = z.looseObject({
+    engine: z.string(),
+    reason: z.enum(['licence', 'busy', 'uncatalogued']).describe('Needs `accept`; has a job already; the catalog no longer has it.'),
+});
+export type ReinstallSkipped = z.infer<typeof ReinstallSkipped>;
+
+/**
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L333)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -305,7 +316,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L327)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L339)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -457,7 +468,7 @@ export const ResidencyDetail = ResidencySummary.extend({
 export type ResidencyDetail = z.infer<typeof ResidencyDetail>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L334)
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L346)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -507,6 +518,15 @@ export const EngineDialogueRequest = DialogueRequest.extend({
     keepAliveSeconds: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(-1)).optional(),
 });
 export type EngineDialogueRequest = z.infer<typeof EngineDialogueRequest>;
+
+/**
+ * generated from [ReinstallOutdated](../../../../contracts/rhapsode.types.ck#L328)
+ */
+export const ReinstallOutdated = z.looseObject({
+    jobs: z.array(InstallJob).describe('One reinstall per outdated engine this API installed, in id order.'),
+    skipped: z.array(ReinstallSkipped),
+});
+export type ReinstallOutdated = z.infer<typeof ReinstallOutdated>;
 
 /**
  * generated from [Capabilities](../../../../contracts/rhapsode.types.ck#L107)

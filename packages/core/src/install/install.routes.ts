@@ -50,6 +50,10 @@ export const installRoutes: FastifyPluginAsync = async app => {
         return reply.status(204).send();
     });
 
+    app.post('/installs/outdated', { onRequest: managementGuard }, async (request, reply) =>
+        reply.status(202).send(request.container.get(EngineInstaller).reinstallOutdated()),
+    );
+
     app.get('/installs', { onRequest: managementGuard }, async request => request.container.get(InstallJobs).list());
 
     app.get<{ Params: { job: string } }>('/installs/:job', { onRequest: managementGuard }, async (request, reply) => {

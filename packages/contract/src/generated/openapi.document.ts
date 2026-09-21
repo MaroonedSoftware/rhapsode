@@ -993,6 +993,33 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/installs/outdated": {
+            "post": {
+                "operationId": "reinstallOutdated",
+                "responses": {
+                    "202": {
+                        "description": "Response 202",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReinstallOutdated"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/installs/{job}": {
             "get": {
                 "operationId": "installJob",
@@ -2133,6 +2160,50 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "kind",
                     "state",
                     "createdAt"
+                ]
+            },
+            "ReinstallSkipped": {
+                "type": "object",
+                "properties": {
+                    "engine": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "licence",
+                            "busy",
+                            "uncatalogued"
+                        ],
+                        "description": "Needs `accept`; has a job already; the catalog no longer has it."
+                    }
+                },
+                "required": [
+                    "engine",
+                    "reason"
+                ],
+                "description": "An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single\nreinstall would have to ask somebody about. § 10."
+            },
+            "ReinstallOutdated": {
+                "type": "object",
+                "properties": {
+                    "jobs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InstallJob"
+                        },
+                        "description": "One reinstall per outdated engine this API installed, in id order."
+                    },
+                    "skipped": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReinstallSkipped"
+                        }
+                    }
+                },
+                "required": [
+                    "jobs",
+                    "skipped"
                 ]
             },
             "PullRequest": {
