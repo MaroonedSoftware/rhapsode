@@ -9,9 +9,15 @@ from typing import Any
 import pytest
 from rhapsode_worker import BadRequest, CreateVoiceRequest, Log, SpeakRequest, Unsupported
 from rhapsode_worker.engine import Device
+from rhapsode_worker.worker import Worker
 
 from rhapsode_engine_chatterbox.builds import CFG_WEIGHT_RANGE, EXAGGERATION_RANGE
-from rhapsode_engine_chatterbox.engine import SAMPLE_RATE, ChatterboxEngine, chunked_pcm
+from rhapsode_engine_chatterbox.engine import (
+    SAMPLE_RATE,
+    SEGMENT_CHARACTERS,
+    ChatterboxEngine,
+    chunked_pcm,
+)
 
 
 def engine(tmp_path: Path) -> ChatterboxEngine:
@@ -159,6 +165,45 @@ class TestWhatReachesGenerate:
         with pytest.raises(Exception, match="narrator_99"):
             spoken(built, variant="turbo", voice="narrator_99")
         assert chatterbox["turbo"].calls == []
+
+
+class TestLongText:
+    #: A 1,060-character news bulletin, the length that reached turbo whole and came back as 26.7
+    #: seconds of skipped and crammed speech.
+    BULLETIN = " ".join(f"Item {n} of the bulletin says something worth hearing today." for n in range(18))
+
+    def test_a_bulletin_is_several_generations_none_over_the_limit(self, chatterbox, tmp_path: Path) -> None:
+        # Every build stops at 40 seconds a call. Handed the whole bulletin, turbo skipped most of it.
+        built = engine(tmp_path)
+        built.load("turbo")
+        built.variant = "turbo"
+        worker = Worker(built, contract=1, log=built.log)
+
+        list(worker.pcm(SpeakRequest(text=self.BULLETIN, variant="turbo")))
+
+        texts = [call.text for call in chatterbox["turbo"].calls]
+        assert len(self.BULLETIN) > 1_000
+        assert len(texts) > 1
+        assert all(len(text) <= SEGMENT_CHARACTERS for text in texts)
+        assert " ".join(texts) == self.BULLETIN
+
+    def test_each_piece_speaks_in_the_requested_voice(self, chatterbox, tmp_path: Path) -> None:
+        # A piece that fell back to the stock voice would change speaker mid-bulletin.
+        (tmp_path / "conspiracy.wav").write_bytes(b"RIFF" + b"\0" * 64)
+        built = engine(tmp_path)
+        built.load("turbo")
+        built.variant = "turbo"
+        worker = Worker(built, contract=1, log=built.log)
+
+        list(worker.pcm(SpeakRequest(text=self.BULLETIN, variant="turbo", voice="conspiracy")))
+
+        assert {call.conds for call in chatterbox["turbo"].calls} == {"cloned:conspiracy.wav"}
+
+    def test_the_split_is_declared_for_the_sdk_to_make(self, tmp_path: Path) -> None:
+        """The number is this engine's; the splitting is not. protocol.md § 8."""
+        built = engine(tmp_path)
+        assert built.segment_characters == SEGMENT_CHARACTERS
+        assert built.splits_own_text is False
 
 
 class TestConditionalsCache:

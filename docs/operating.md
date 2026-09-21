@@ -528,8 +528,10 @@ same audio; the same seed on a request you have since edited moves every piece a
 
 **Prosody carries across a joint only where the engine carries it.** Dia continues each piece from
 the audio of the one before, so its reader stays the same person. Kokoro starts each piece fresh and
-puts 250 ms of silence between them. Neither is a fault; they are different engines, which is why
-the capability document says which you have rather than leaving you to hear it.
+puts 250 ms of silence between them. Chatterbox starts each piece fresh as well, in the same voice,
+and its turbo and nano builds end every piece on 120 ms of silence of their own. None is a fault;
+they are different engines, which is why the capability document says which you have rather than
+leaving you to hear it.
 
 `stream: false` buffers the whole answer in the core (`docs/protocol.md` § 13.2), and that buffer
 is bounded by `maxCharacters`. An engine with a high ceiling and a long request is a proportionally

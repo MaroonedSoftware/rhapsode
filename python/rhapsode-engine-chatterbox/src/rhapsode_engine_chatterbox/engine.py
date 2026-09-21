@@ -38,6 +38,14 @@ VOICE_SUFFIXES = (".wav", ".mp3", ".flac", ".ogg")
 #: 1.3 MB on nano and 0.8 MB on original, measured, so all 32 are about 42 MB beside gigabytes of weights.
 CONDITIONALS_KEPT = 32
 
+#: What one `generate` is handed, where the SDK splits for this engine. Every build stops at 1000
+#: speech tokens at 25 a second (chatterbox-tts 0.1.7, `inference_turbo`'s `max_gen_len` and the
+#: other builds' `max_new_tokens`), so a call cannot say more than 40 seconds whatever it is given.
+#: A 1,060-character bulletin sent to turbo whole came back as 26.7 seconds of skipped and crammed
+#: speech, about 40 characters a second, where a 488-character one read cleanly at 16 a second in
+#: 30.8. 300 is about 19 seconds at that pace: under half the ceiling, so a slower voice still fits.
+SEGMENT_CHARACTERS = 300
+
 
 def _installed_chatterbox() -> str | None:
     """The upstream version, when it is installed. It is not, in this repository's dev environment."""
@@ -71,6 +79,11 @@ class ChatterboxEngine(Engine):
     concurrency = 1
 
     max_characters = 4096
+    # The SDK splits, because this adapter carries nothing from one piece to the next: each call is
+    # conditioned on the same voice afresh. No `segment_pause_ms`: turbo and nano end every generation
+    # on three silence tokens, 120 ms, so their pieces already have a gap, and a pause is one number
+    # for the engine where only two of its four builds would want it.
+    segment_characters = SEGMENT_CHARACTERS
 
     #: Which chatterbox is installed, which is a different question from which adapter this is. A
     #: plain attribute rather than a property, because the base class declares it as one and an

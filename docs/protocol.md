@@ -307,7 +307,7 @@ GET /capabilities
     "dials": {},
     "languages": ["en"],
     "maxCharacters": 4096,
-    "segmentation": { "supported": false },
+    "segmentation": { "supported": true, "segmentCharacters": 300 },
     "cloning": { "supported": true, "referenceSeconds": [5, 10], "formats": ["wav", "mp3", "flac", "ogg"] },
     "blending": { "supported": false },
     "streaming": { "supported": true, "granularity": "chunk" },
@@ -828,8 +828,10 @@ different, and the fourth had not.
   greedily so that a run of short sentences is one generation rather than several. Dia also carries
   an audio prompt from one piece into the next, because its voice drifts across generations that
   have nothing in common.
-- **Chatterbox** does none of this, which is exactly why Chatterbox is the engine that still refuses
-  anything over 4096 characters.
+- **Chatterbox** did none of this, and paid for it. Every build stops at 1000 speech tokens at 25 a
+  second, so one `generate` cannot say more than 40 seconds whatever it is handed. A 1,060-character
+  news bulletin sent to turbo whole came back as 26.7 seconds of skipped and crammed speech, where a
+  488-character one read cleanly in 30.8.
 
 `_fit` and `_pack` in `rhapsode_engine_dia.prompt` and `rhapsode_engine_orpheus.prompt` are the same
 twenty lines, character for character, and their sentence and clause patterns are the same two
@@ -845,9 +847,9 @@ SDK, and it is the single largest thing left that every adapter still pays for i
 - **The algorithm is fixed and shared.** Sentences, then clauses, then words, packed back greedily.
   A single word longer than the limit stays whole, because splitting it has the model read two
   halves of a word.
-- **The size is the adapter's.** 180 characters for Orpheus, 250 for Dia, 200 for Kokoro. The number
-  is a fact about the model's attention and its generation budget; the splitting is not. An adapter
-  that declares no size receives the whole text, as every adapter does today.
+- **The size is the adapter's.** 180 characters for Orpheus, 250 for Dia, 200 for Kokoro, 300 for
+  Chatterbox. The number is a fact about the model's attention and its generation budget; the
+  splitting is not. An adapter that declares no size receives the whole text.
 - **The joint is the adapter's too.** Kokoro puts 250 ms of silence between groups. Dia puts none,
   because its next piece continues from the audio of the last. An adapter that needs to carry state
   across a boundary keeps its own loop and calls the shared splitter for the text alone.
@@ -855,11 +857,11 @@ SDK, and it is the single largest thing left that every adapter still pays for i
 **The capability document declares the split**, because a client cannot see it and is affected by
 it. `segmentation.segmentCharacters` is what one generation gets, beside `maxCharacters` for what
 the request may carry. `supported: false` means text over `maxCharacters` is refused rather than
-split: where every engine stood before this rule, where an engine whose take is indivisible stays,
-and what § 4's example still shows, because that example is Chatterbox's and Chatterbox's own
-segment size is the one number here nobody has measured yet. 180, 250 and 200 were each arrived at
-on the engine that declares them. Guessing a fourth would be the kind of unpaid-for rule this
-document does not keep.
+split: where every engine stood before this rule, and where an engine whose take is indivisible
+stays. Each size was arrived at on the engine that declares it. Chatterbox's was the last, held back
+until the 40-second ceiling above had cost a bulletin, because guessing it would have been the kind
+of unpaid-for rule this document does not keep. 300 is about 19 seconds at the 16 characters a second
+that bulletin's voice read at: under half the ceiling, so a slower voice still fits.
 
 A client needs this for two reasons and § 4 is the place that owes it to them. A `seed` reproduces
 a generation, so a request split four ways is four seeded generations rather than one. And prosody
