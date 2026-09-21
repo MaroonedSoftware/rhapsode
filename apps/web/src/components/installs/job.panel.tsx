@@ -29,10 +29,12 @@ function stepsOf(job: InstallJob): Step[] {
 /** A job's name, in the tense its state calls for. */
 export function jobTitle(job: InstallJob): string {
     const doing = job.state === 'queued' || job.state === 'running';
-    const what = job.kind === 'install' ? job.engine : `${job.engine} ${job.variant ?? ''}`.trim();
-    if (job.kind === 'install') return `${doing ? 'Installing' : 'Install'} ${what}`;
-    return `${doing ? 'Downloading' : 'Download'} ${what}`;
+    if (job.kind === 'install') return `${doing ? 'Installing' : 'Install'} ${job.engine}`;
+    if (job.kind === 'reinstall') return `${doing ? 'Reinstalling' : 'Reinstall'} ${job.engine}`;
+    return `${doing ? 'Downloading' : 'Download'} ${`${job.engine} ${job.variant ?? ''}`.trim()}`;
 }
+
+const SUCCEEDED: Record<InstallJob['kind'], string> = { install: 'Installed', reinstall: 'Reinstalled', pull: 'Downloaded' };
 
 /** One job, followed as it happens: which step, what it printed, and how it ended. */
 export function JobPanel({ jobId }: { jobId: string }) {
@@ -81,12 +83,14 @@ export function JobPanel({ jobId }: { jobId: string }) {
                 ) : undefined}
 
                 {data.state === 'succeeded' ? (
-                    <Alert color={severityColor.success} title={data.kind === 'install' ? 'Installed' : 'Downloaded'}>
+                    <Alert color={severityColor.success} title={SUCCEEDED[data.kind]}>
                         {data.kind === 'pull'
                             ? `The ${data.variant ?? 'default'} weights are on this machine, so the first request only has to load them.`
-                            : data.variant === undefined
-                              ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
-                              : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
+                            : data.kind === 'reinstall'
+                              ? `${data.engine} now runs from a virtualenv this server built. Its next request loads the model again.`
+                              : data.variant === undefined
+                                ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
+                                : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
                     </Alert>
                 ) : noFetch ? (
                     <Alert color={severityColor.info} title="Nothing to download ahead of time">
@@ -95,6 +99,8 @@ export function JobPanel({ jobId }: { jobId: string }) {
                 ) : data.state === 'failed' ? (
                     <ErrorAlert title={`Failed at ${current ?? 'the start'}`} fallback="The job failed and said nothing.">
                         {data.error?.message}
+                        {/* A reinstall swaps only once its new virtualenv works, so a failure left the old one running. § 10. */}
+                        {data.kind === 'reinstall' ? ` ${data.engine} is still running from its previous virtualenv.` : undefined}
                         {/* The engine was registered before its weights were asked for, so it is installed. § 10. */}
                         {data.kind === 'install' && current === 'weights'
                             ? ` ${data.engine} is installed; download the weights again from its card.`

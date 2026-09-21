@@ -14,6 +14,8 @@ const api = vi.hoisted(() => ({
     installEngine: vi.fn(),
     pullEngine: vi.fn(),
     uninstallEngine: vi.fn(),
+    reinstallEngine: vi.fn(),
+    reinstallOutdated: vi.fn(),
 }));
 
 vi.mock('../../../src/api/client', () => ({ BASE_URL: '/api', sdk: { public: api } }));
@@ -221,5 +223,87 @@ describe('installing from the page', () => {
 
         expect(await screen.findByText('Nothing to download ahead of time')).toBeInTheDocument();
         expect(screen.queryByText('Failed at weights')).not.toBeInTheDocument();
+    });
+
+    describe('reinstalling what an upgrade left behind', () => {
+        const stale: CatalogEntry = { ...chatterbox, installed: 'yes', managed: true, workerVersion: '0.1.2', outdated: true };
+
+        it('marks the engine, and reinstalls it once the dialog has said what it costs', async () => {
+            const user = setupUser();
+            api.catalog.mockResolvedValue([stale]);
+            api.reinstallEngine.mockImplementation(async () => {
+                jobs = [job({ kind: 'reinstall' })];
+                return { status: 202, data: jobs[0] };
+            });
+            render(<CatalogPage />);
+
+            expect(await screen.findByText('Behind this server')).toBeInTheDocument();
+            expect(screen.getByText(/Its worker is from rhapsode 0.1.2/)).toBeInTheDocument();
+            const card = screen.getByText('rhapsode-engine-chatterbox').closest('.mantine-Card-root') as HTMLElement;
+            await user.click(within(card).getByRole('button', { name: 'Reinstall' }));
+
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).getByText(/Its next request loads the model again/)).toBeInTheDocument();
+            await user.click(within(dialog).getByRole('button', { name: 'Reinstall' }));
+
+            expect(api.reinstallEngine).toHaveBeenCalledWith('chatterbox', { accept: 'MIT' });
+            expect(await screen.findByText('Reinstalling chatterbox')).toBeInTheDocument();
+        });
+
+        it('shows weights that may not be used commercially before a reinstall accepts them', async () => {
+            const user = setupUser();
+            const license = { code: 'MIT', weights: 'CC-BY-NC-4.0', weightsCommercialUse: false };
+            api.catalog.mockResolvedValue([{ ...stale, license }]);
+            api.reinstallEngine.mockResolvedValue({ status: 202, data: job({ kind: 'reinstall' }) });
+            render(<CatalogPage />);
+
+            const card = (await screen.findByText('rhapsode-engine-chatterbox')).closest('.mantine-Card-root') as HTMLElement;
+            await user.click(within(card).getByRole('button', { name: 'Reinstall' }));
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).getByText('Reinstalling accepts the weights licence as it stands now.')).toBeInTheDocument();
+            await user.click(within(dialog).getByRole('button', { name: 'Reinstall' }));
+
+            expect(api.reinstallEngine).toHaveBeenCalledWith('chatterbox', { accept: 'CC-BY-NC-4.0' });
+        });
+
+        it('reinstalls everything behind with one request, and follows the first job', async () => {
+            const user = setupUser();
+            api.catalog.mockResolvedValue([stale]);
+            api.reinstallOutdated.mockImplementation(async () => {
+                jobs = [job({ kind: 'reinstall', state: 'queued' })];
+                return { status: 202, data: { jobs, skipped: [] } };
+            });
+            render(<CatalogPage />);
+
+            expect(await screen.findByText('One engine was installed by an earlier release')).toBeInTheDocument();
+            await user.click(screen.getByRole('button', { name: 'Reinstall all' }));
+
+            expect(api.reinstallOutdated).toHaveBeenCalledTimes(1);
+            expect(await screen.findByText('Reinstalling chatterbox')).toBeInTheDocument();
+        });
+
+        it('offers nothing for an engine the operator configured, and says whose it is', async () => {
+            api.catalog.mockResolvedValue([{ ...stale, managed: false }]);
+            render(<CatalogPage />);
+
+            expect(await screen.findByText(/rebuilding it is the operator’s to do/)).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Reinstall' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Reinstall all' })).not.toBeInTheDocument();
+        });
+
+        it('says a failed reinstall left the engine running as it was', async () => {
+            api.catalog.mockResolvedValue([stale]);
+            jobs = [
+                job({
+                    kind: 'reinstall',
+                    state: 'failed',
+                    step: 'packages',
+                    error: { code: 'internal', message: 'pip exited 1', retryable: false },
+                }),
+            ];
+            render(<CatalogPage />);
+
+            expect(await screen.findByText(/is still running from its previous virtualenv/)).toBeInTheDocument();
+        });
     });
 });
