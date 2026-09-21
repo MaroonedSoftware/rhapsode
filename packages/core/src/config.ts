@@ -65,6 +65,14 @@ export interface RhapsodeConfig {
         /** The interpreter that creates each virtualenv. Default `python3`. */
         python?: string;
     };
+    /** protocol.md § 9. */
+    update?: {
+        /**
+         * Whether `GET /update` asks GitHub for the latest release, at most once a day and only when
+         * asked. On by default. `RHAPSODE_UPDATE_CHECK=0` turns it off from the environment.
+         */
+        check?: boolean;
+    };
     engines?: Record<string, Partial<EngineEntry> & { enabled?: boolean }>;
 }
 
