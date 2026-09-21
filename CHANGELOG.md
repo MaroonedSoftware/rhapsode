@@ -2,6 +2,21 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.8
+
+- `POST /engines/{id}/install` now refuses to install weights that may not be used commercially unless
+  the request names their licence: `?accept=CC-BY-NC-4.0`, the catalog's `weights` string exactly.
+  Without it the refusal is `bad_request` before any job starts, and it names the licence and the query
+  that accepts it. An `accept` sent for commercial weights must still name their licence, so a client can
+  send it on every install. The web page and the wizard already showed both licences before an install,
+  but a script calling the route directly never saw either. `protocol.md` § 10 says why the licence is
+  named rather than being a flag. The route now declares its `400` answer, so the SDK returns the
+  refusal as a value.
+- The web page and `pnpm wizard install` now send the weights licence they showed as `?accept=`, so
+  they go on installing engines whose weights may not be used commercially now that the core requires
+  it. The wizard's "Install under these licences?" prompt now defaults to no for those engines, since
+  pressing return through a prompt is not reading it. `--yes` still accepts from a script.
+
 ## 0.1.7
 
 - `GET /engines` and `GET /health` now carry `workerVersion` for each engine: the version of
