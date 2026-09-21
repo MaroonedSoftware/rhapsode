@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
 
 import { RhapsodeMark } from '../components/shell/rhapsode.mark';
+import { CoreVersion, UpdateBanner } from '../components/update/update.banner';
 
 /** Everything the router needs from outside. Supplied once in `main.tsx`. */
 export interface RouterContext {
@@ -47,10 +48,12 @@ export function RootLayout() {
                             API
                         </Button>
                     </Group>
+                    <CoreVersion />
                 </Group>
             </AppShell.Header>
             <AppShell.Main id="main" tabIndex={-1}>
                 <Box maw={1100}>
+                    <UpdateBanner />
                     <Outlet />
                 </Box>
             </AppShell.Main>
