@@ -2,6 +2,33 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.7
+
+- `GET /engines` and `GET /health` now carry `workerVersion` for each engine: the version of
+  `rhapsode-worker` installed in that engine's virtualenv. `protocol.md` § 9 pins an engine to the
+  core's version when it is installed, and an upgrade is the one thing that breaks that pin, because
+  the virtualenvs live on the volume an upgrade deliberately keeps. Nothing said so. Negotiation
+  refuses a worker whose contract is too new and is silent about one that is too old, and every field
+  added inside a contract major since that worker was built is simply one it never sends: a box
+  upgraded from 0.1.3 to 0.1.6 went on speaking through a 0.1.2 worker and only stopped reporting
+  `sizeBytes`, which reads as a card that cannot be measured rather than as an engine to reinstall.
+  
+  It is read from the virtualenv rather than asked of the worker, so an engine that is `down` still
+  answers, which is an engine's ordinary state now that a model leaves the card when nothing is using
+  it. It is a diagnostic and never an input to negotiation: nothing branches on it, and a client still
+  reads `contract` to decide what it may send. It is absent, rather than guessed, for a remote engine
+  and for any virtualenv whose metadata cannot be read.
+- `pnpm wizard doctor` gains an "engine freshness" check: every local engine's `rhapsode-worker`
+  against the core's own version, naming any that an upgrade left behind and what to do about it.
+  Informational rather than red, for the reason `protocol.md` § 9 gives — a stale worker speaks a
+  contract this core still supports, so it works, and an operator is free to run an engine at a
+  version of their choosing. It answers the question that was previously only findable by listing
+  a virtualenv's `site-packages` by hand.
+  
+  It reads the virtualenvs the config names rather than asking a running server, because the doctor
+  is for a checkout and the server may not be up. Against a container, `workerVersion` on
+  `GET /engines` is the same answer from the same helper.
+
 ## 0.1.6
 
 - An eviction now asks the worker to end its own process with `POST /terminate` and signals only when
