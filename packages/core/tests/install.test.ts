@@ -388,7 +388,11 @@ describe('the install routes', () => {
     describe('a weights licence that may not be used commercially', () => {
         // No catalog engine has such weights yet, so one is added for the length of each test.
         beforeEach(() => {
-            CATALOG.research = { ...CATALOG.tone!, displayName: 'Research', license: { code: 'MIT', weights: 'CC-BY-NC-4.0', weightsCommercialUse: false } };
+            CATALOG.research = {
+                ...CATALOG.tone!,
+                displayName: 'Research',
+                license: { code: 'MIT', weights: 'CC-BY-NC-4.0', weightsCommercialUse: false },
+            };
         });
         afterEach(() => {
             delete CATALOG.research;
