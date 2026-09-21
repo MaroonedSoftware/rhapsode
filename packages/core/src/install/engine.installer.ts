@@ -31,10 +31,12 @@ export class EngineInstaller {
     /**
      * Queue an install. Everything that can be refused is refused here, before a job exists.
      *
-     * With `pull`, a variant, the job fetches it once the engine is registered. § 10.
+     * With `pull`, a variant, the job fetches it once the engine is registered. `accept` is the
+     * weights licence the caller accepts, as the query carried it. § 10.
      */
-    install(id: string, pull?: string): InstallJob {
+    install(id: string, pull?: string, accept?: unknown): InstallJob {
         const record = catalogued(id);
+        refuseUnaccepted(id, record, accept);
         this.refuseIfBusy(id);
         if (this.managed.isOperatorOwned(id)) {
             throw new RhapsodeError('conflict', `"${id}" is configured in the operator's config file, which is theirs to change`);
@@ -155,6 +157,25 @@ function catalogued(id: string): CatalogRecord {
     const record = CATALOG[id];
     if (record === undefined) throw RhapsodeError.unknownEngine(id, Object.keys(CATALOG));
     return record;
+}
+
+/**
+ * Refuse an install whose weights may not be used commercially unless it names their licence, and
+ * any `accept` that names something else. Named rather than a flag, so what is accepted is the
+ * licence the client displayed, and a catalog relicensed since the client read it refuses. § 10.
+ */
+export function refuseUnaccepted(id: string, record: CatalogRecord, accept: unknown): void {
+    const { weights, weightsCommercialUse } = record.license;
+    if (accept === undefined && weightsCommercialUse) return;
+    if (accept === weights) return;
+    const query = `?accept=${encodeURIComponent(weights)}`;
+    if (accept === undefined) {
+        throw new RhapsodeError(
+            'bad_request',
+            `"${id}" has weights under ${weights}, which may not be used commercially. Install it with ${query} to accept that licence`,
+        );
+    }
+    throw new RhapsodeError('bad_request', `\`accept\` names the weights licence, which for "${id}" is ${weights}: ${query}`);
 }
 
 /** Whether a path is strictly inside a directory, so an uninstall never deletes the directory itself or anything outside it. */

@@ -451,6 +451,11 @@ paths:
                   required: false
                   schema:
                       type: string
+                - name: accept
+                  in: query
+                  required: false
+                  schema:
+                      type: string
             responses:
                 "202":
                     description: Response 202
@@ -458,6 +463,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/InstallJob"
+                "400":
+                    description: Bad request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
                 "403":
                     description: Forbidden
                     content:

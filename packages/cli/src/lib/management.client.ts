@@ -91,8 +91,9 @@ export class ManagementClient {
     }
 
     /** With `pull`, a variant, the same job downloads it once the engine is registered. protocol.md § 10. */
-    async install(engine: string, pull?: string): Promise<InstallJob> {
-        const query = pull === undefined ? '' : `?pull=${encodeURIComponent(pull)}`;
+    /** `accept` is the weights licence, as the catalog names it, that a person said yes to. § 10. */
+    async install(engine: string, accept: string, pull?: string): Promise<InstallJob> {
+        const query = `?accept=${encodeURIComponent(accept)}${pull === undefined ? '' : `&pull=${encodeURIComponent(pull)}`}`;
         return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/install${query}`));
     }
 

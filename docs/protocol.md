@@ -395,7 +395,8 @@ responsible, because that is the one a commercial user will ask about.
 So the adapter declares both, by hand, and `GET /engines` surfaces them. Nobody else in this space
 does this, and for anyone using the server commercially it is the most useful field in the document.
 The catalog entry for an engine carries the same two fields, so the licence is visible **before**
-install, not after.
+install, not after, and an install of weights that may not be used commercially has to name the
+licence it accepts (§ 10).
 
 ---
 
@@ -1046,7 +1047,7 @@ what one is built on.
 | Route | Does |
 | --- | --- |
 | `GET /catalog` | Every engine that exists, installed or not, with both licences |
-| `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too |
+| `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too, and `?accept=` names the weights licence where it must be accepted |
 | `DELETE /engines/{id}` | Stops and removes an engine this API installed |
 | `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
 | `POST /engines/{id}/unload` | Frees the model now (§ 3); `?mode=unload` keeps the process |
@@ -1155,6 +1156,34 @@ installing one the operator's config names, even disabled: that entry would win 
 install recorded. An id that is not in the catalog is `unknown_engine`. A server started without a
 managed file (a core embedded as a library can be) answers `unsupported`, because it has nowhere to
 record the result.
+
+### Accepting a weights licence
+
+**An install of weights that may not be used commercially names the licence it accepts.** Where the
+catalog says `weightsCommercialUse: false`, the install carries `?accept=` with the catalog's
+`weights` string exactly, `?accept=CC-BY-NC-4.0`, and without it is refused as `bad_request` before
+a job exists, in a message naming the licence and the query that accepts it. An `accept` that is
+empty, repeated, or names anything else is refused the same way. An engine whose weights are
+commercial needs none, and an `accept` sent to one must still name its licence, so a client can send
+it on every install without first working out which kind of engine it is.
+
+It is enforced here rather than left to the clients because § 4 put the licence in the catalog to be
+read before install, and a promise kept only by the clients that happen to show it is not kept for
+curl, the SDK, or the next client somebody writes. The web page and the wizard showed both licences
+and asked; a script calling this route installed whatever it named and never saw either.
+
+It names the licence rather than being a flag, for the reason `pull` names a variant: the contract's
+booleans are coerced, and `?accept=false` would have read as true. Naming it also makes the
+acceptance of the licence the client displayed. A catalog that changed between the read and the
+install, because the server was upgraded and the weights relicensed, refuses the install rather
+than accepting terms nobody was shown.
+
+It is asked only where the weights are not for commercial use. A condition on every install is one
+a client learns to satisfy without reading, and the refusal is worth something only while it is
+rare. A pull asks nothing: the engine it fetches for was installed, and its licence accepted, or it
+was configured by the operator, whose own file is their decision. A client still does not accept for
+a person. The web page and the wizard send `accept` only once somebody has seen both licences and
+said yes, and the wizard with nobody at the terminal accepts only when given `--yes`.
 
 ### The managed file
 

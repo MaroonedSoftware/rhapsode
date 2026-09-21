@@ -41,7 +41,9 @@ export function CatalogPage() {
     const confirmInstall = (pull: string | undefined) => {
         if (installing === undefined) return;
         install.mutate(
-            { engine: installing.id, ...(pull === undefined ? {} : { pull }) },
+            // Sent for every engine, not only those whose weights need it: the core checks it either
+            // way, and it is the licence the modal put in front of the person who pressed install.
+            { engine: installing.id, ...(pull === undefined ? {} : { pull }), accept: installing.license.weights },
             {
                 onSuccess: job => {
                     setInstalling(undefined);

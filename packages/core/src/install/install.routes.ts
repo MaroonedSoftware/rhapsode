@@ -8,17 +8,19 @@ import { InstallJobs } from './install.jobs.js';
 
 /** Install, uninstall, and the job reads. All behind the management guard. protocol.md § 10. */
 export const installRoutes: FastifyPluginAsync = async app => {
-    app.post<{ Params: { engine: string }; Querystring: { pull?: unknown } }>(
+    app.post<{ Params: { engine: string }; Querystring: { pull?: unknown; accept?: unknown } }>(
         '/engines/:engine/install',
         { onRequest: managementGuard },
         async (request, reply) => {
             // `?pull=turbo` names the variant step 5 fetches. Repeated, or empty, it names nothing,
             // and is refused rather than read as one of its values or as no pull at all.
-            const { pull } = request.query;
+            const { pull, accept } = request.query;
             if (pull !== undefined && (typeof pull !== 'string' || pull === '')) {
                 throw new RhapsodeError('bad_request', '`pull` names one variant to fetch, such as ?pull=turbo');
             }
-            const job = request.container.get(EngineInstaller).install(request.params.engine, pull);
+            // Left for the installer to refuse when it is not one string, because only it knows the
+            // licence the refusal has to name.
+            const job = request.container.get(EngineInstaller).install(request.params.engine, pull, accept);
             return reply.status(202).send(job);
         },
     );
