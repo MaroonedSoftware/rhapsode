@@ -52,15 +52,6 @@ export function EngineCard({ entry, actions }: EngineCardProps) {
                     </Group>
                 </Group>
                 <LicenseLine license={entry.license} />
-                {entry.outdated === true ? (
-                    <Text size="sm" c="dimmed">
-                        Its worker is from rhapsode {entry.workerVersion}, not this server&rsquo;s version, so it works but never sends anything added
-                        since.{' '}
-                        {entry.managed
-                            ? 'Reinstalling it brings it up to date.'
-                            : 'It is configured by hand, so rebuilding it is the operator’s to do.'}
-                    </Text>
-                ) : undefined}
                 {notes === undefined ? undefined : notes.startsWith('https://') ? (
                     <Anchor href={notes} target="_blank" rel="noreferrer" size="sm">
                         {notes}
@@ -70,6 +61,15 @@ export function EngineCard({ entry, actions }: EngineCardProps) {
                         {notes}
                     </Text>
                 )}
+                {entry.outdated === true ? (
+                    <Text size="sm" c="dimmed">
+                        Its worker is from rhapsode {entry.workerVersion}, not this server&rsquo;s version, so it works but never sends anything added
+                        since.{' '}
+                        {entry.managed
+                            ? 'Reinstalling it brings it up to date.'
+                            : 'It is configured by hand, so rebuilding it is the operator’s to do.'}
+                    </Text>
+                ) : undefined}
                 {actions ? <Group gap="xs">{actions}</Group> : undefined}
             </Stack>
         </Card>
