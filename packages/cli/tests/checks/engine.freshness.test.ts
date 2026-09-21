@@ -23,7 +23,7 @@ describe('engine freshness', () => {
 
         expect(result.message).toContain('chatterbox 0.1.2');
         expect(result.message).toContain("this core's 0.1.6");
-        expect(result.message).toContain('Reinstall');
+        expect(result.message).toContain('pnpm wizard reinstall --all');
     });
 
     it('stays green while saying so, because a stale worker is contract-legal', () => {

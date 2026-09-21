@@ -1,8 +1,8 @@
 import { wizard, type CliContext, type CommandModule } from '@maroonedsoftware/johnny5';
-import type { FeedEvent, InstallJob } from '@rhapsode/contract';
 
 import { loadCore } from '../lib/core.js';
-import { configPath, SERVER_ENTRY } from '../lib/paths.js';
+import { follow, interactiveUi, plainUi, reportFailure, type Ui } from '../lib/job.ui.js';
+import { configPath } from '../lib/paths.js';
 import { readConfig } from '../lib/rhapsode.config.js';
 
 type Client = typeof import('../lib/management.client.js');
@@ -12,17 +12,6 @@ interface InstallOptions {
     token?: string;
     pull?: boolean;
     yes?: boolean;
-}
-
-/** What the command needs from a terminal, whether a person is at it or not. */
-interface Ui {
-    info(message: string): void;
-    warn(message: string): void;
-    error(message: string): void;
-    success(message: string): void;
-    confirm(message: string, initial: boolean): Promise<boolean>;
-    /** A job in progress: a spinner at a terminal, a line per step in a log. */
-    progress(title: string): { step(step: string): void; line(line: string): void; stop(message: string): void };
 }
 
 /**
@@ -60,49 +49,15 @@ const command: CommandModule<InstallOptions> = {
 
         if (ctx.isInteractive()) {
             return wizard(ctx, { title: `rhapsode install ${engine}` }, async w =>
-                install(engine, opts, ctx, client, {
-                    info: message => w.log.info(message),
-                    warn: message => w.log.warn(message),
-                    error: message => w.log.error(message),
-                    success: message => w.log.success(message),
-                    confirm: async (message, initial) => opts.yes === true || w.confirm({ message, initialValue: initial }),
-                    progress: title => {
-                        const spinner = w.spinner();
-                        spinner.start(title);
-                        let current = title;
-                        return {
-                            step: step => {
-                                current = `${title}: ${step}`;
-                                spinner.message(current);
-                            },
-                            // The newest line under the step, so a long pip resolve visibly moves.
-                            line: line => spinner.message(`${current}  ${truncate(line.trim(), 60)}`),
-                            stop: message => spinner.stop(message),
-                        };
-                    },
-                }).then(code => {
+                install(engine, opts, ctx, client, interactiveUi(w, opts.yes === true)).then(code => {
                     if (code === 0) w.outro(`Done. POST /speak with "engine": "${engine}" to hear it.`);
                     return code;
                 }),
             );
         }
 
-        return install(engine, opts, ctx, client, {
-            info: message => ctx.logger.info(message),
-            warn: message => ctx.logger.warn(message),
-            error: message => ctx.logger.error(message),
-            success: message => ctx.logger.success(message),
-            // Nobody to ask. A licence is accepted by saying so, never by default.
-            confirm: async () => opts.yes === true,
-            progress: title => {
-                ctx.logger.info(title);
-                return {
-                    step: step => ctx.logger.info(`  ${step}`),
-                    line: line => ctx.logger.debug(`    ${line}`),
-                    stop: message => ctx.logger.info(message),
-                };
-            },
-        });
+        // Nobody to ask. A licence is accepted by saying so, never by default.
+        return install(engine, opts, ctx, client, plainUi(ctx, opts.yes === true));
     },
 };
 
@@ -146,6 +101,7 @@ async function install(engine: string, opts: InstallOptions, ctx: CliContext, cl
         }
 
         ui.info(`${entry.displayName} is already installed.`);
+        if (entry.outdated === true) ui.info(`An earlier release installed it. \`pnpm wizard reinstall ${engine}\` brings it up to date.`);
         if (!(await wantsWeights()) || variant === undefined) return 0;
 
         const pulled = await follow(api, await api.pull(engine, variant), `Downloading ${entry.displayName} ${variant}`, ui);
@@ -156,33 +112,9 @@ async function install(engine: string, opts: InstallOptions, ctx: CliContext, cl
         }
         return pulled.state === 'succeeded' ? 0 : 1;
     } catch (error) {
-        if (error instanceof client.ServerUnreachable) {
-            ui.error(`${error.message}. Start the server with \`node ${SERVER_ENTRY}\` and run this again.`);
-        } else if (error instanceof client.ManagementError && error.code === 'forbidden') {
-            ui.error(`${error.message}. From another machine, pass --token with the server's management.token.`);
-        } else {
-            ui.error((error as Error).message);
-        }
+        reportFailure(error, client, ui);
         return 1;
     }
 }
-
-async function follow(api: InstanceType<Client['ManagementClient']>, job: InstallJob, title: string, ui: Ui): Promise<InstallJob> {
-    const progress = ui.progress(title);
-    const finished = await api.follow(job.id, (event: FeedEvent) => {
-        if (event.kind === 'progress' && event.progress?.status === 'running') progress.step(event.progress.phase);
-        else if (event.kind === 'log' && event.message !== undefined) progress.line(event.message);
-    });
-
-    if (finished.state === 'succeeded') {
-        progress.stop(`${title}: done`);
-    } else {
-        progress.stop(`${title}: failed at ${finished.step ?? 'the start'}`);
-        if (finished.error?.code !== 'unsupported') ui.error(finished.error?.message ?? 'the job failed and said nothing');
-    }
-    return finished;
-}
-
-const truncate = (text: string, length: number): string => (text.length <= length ? text : `${text.slice(0, length - 1)}…`);
 
 export default command;

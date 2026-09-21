@@ -30,7 +30,7 @@ export function freshness(engines: readonly EngineWorker[], coreVersion: string)
     const named = behind.map(e => `${e.id} ${e.workerVersion}`).join(', ');
     return {
         ok: true,
-        message: `${named} against this core's ${coreVersion}. Reinstall each one (uninstall first) or it stays on the older protocol${aside}`,
+        message: `${named} against this core's ${coreVersion}. \`pnpm wizard reinstall --all\` brings them up to date${aside}`,
     };
 }
 

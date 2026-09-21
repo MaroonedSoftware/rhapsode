@@ -1,4 +1,13 @@
-import { CatalogEntry, EngineSummary, FeedEvent, InstallJob, ResidencyDetail, type License } from '@rhapsode/contract';
+import {
+    CatalogEntry,
+    EngineSummary,
+    FeedEvent,
+    InstallJob,
+    ReinstallOutdated,
+    ResidencyDetail,
+    UpdateStatus,
+    type License,
+} from '@rhapsode/contract';
 
 /**
  * A client for the management routes in protocol.md § 10, and nothing else.
@@ -95,6 +104,30 @@ export class ManagementClient {
     async install(engine: string, accept: string, pull?: string): Promise<InstallJob> {
         const query = `?accept=${encodeURIComponent(accept)}${pull === undefined ? '' : `&pull=${encodeURIComponent(pull)}`}`;
         return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/install${query}`));
+    }
+
+    /**
+     * Rebuild an installed engine beside itself. `accept` only where the server asked for it: it
+     * knows what the last install accepted, and the client does not. § 10.
+     */
+    async reinstall(engine: string, accept?: string): Promise<InstallJob> {
+        const query = accept === undefined ? '' : `?accept=${encodeURIComponent(accept)}`;
+        return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/reinstall${query}`));
+    }
+
+    /** A reinstall for every outdated engine this server installed, and what it skipped. § 10. */
+    async reinstallOutdated(): Promise<ReinstallOutdated> {
+        return ReinstallOutdated.parse(await this.json('POST', '/installs/outdated'));
+    }
+
+    /** What this box has, each with `outdated` where the core can say. § 9. */
+    async engines(): Promise<EngineSummary[]> {
+        return EngineSummary.array().parse(await this.json('GET', '/engines'));
+    }
+
+    /** Whether a newer release exists, as the core last heard. Never waits on GitHub. § 9. */
+    async updateStatus(): Promise<UpdateStatus> {
+        return UpdateStatus.parse(await this.json('GET', '/update'));
     }
 
     async pull(engine: string, variant?: string): Promise<InstallJob> {

@@ -13,16 +13,21 @@ import { pythonVenv } from './checks/python.venv.js';
 import { pythonVersion } from './checks/python.version.js';
 import installCommand from './commands/install.command.js';
 import psCommand from './commands/ps.command.js';
+import reinstallCommand from './commands/reinstall.command.js';
 import setupCommand from './commands/setup.command.js';
 import unloadCommand from './commands/unload.command.js';
+import updateCommand from './commands/update.command.js';
 
 const app = await createCliApp({
     name: 'wizard',
-    description: 'rhapsode developer CLI: first-run setup, a doctor for this checkout, engine installs, and what is on the card',
+    description:
+        'rhapsode developer CLI: first-run setup, a doctor for this checkout, engine installs and reinstalls, updates, and what is on the card',
     version: '0.0.0',
     commands: [
         { path: ['setup'], module: setupCommand },
         { path: ['install'], module: installCommand as CommandModule },
+        { path: ['reinstall'], module: reinstallCommand as CommandModule },
+        { path: ['update'], module: updateCommand as CommandModule },
         { path: ['ps'], module: psCommand as CommandModule },
         { path: ['unload'], module: unloadCommand as CommandModule },
     ],
