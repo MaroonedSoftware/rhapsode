@@ -311,6 +311,20 @@ describe('the install routes', () => {
         expect((await app.inject({ method: 'GET', url: '/engines' })).json()).toEqual([]);
     });
 
+    it('clears a second slot that a reinstall left behind, when installing and when uninstalling', async () => {
+        // `<id>.alt` is where a reinstall builds (§ 10). One that died mid-build leaves it there, and
+        // neither a fresh install nor an uninstall may leave it for the next one to trip over.
+        mkdirSync(join(venvDir, 'tone.alt', 'bin'), { recursive: true });
+        const app = await start(fakeRunner().runner);
+        await settled(app, (await app.inject({ method: 'POST', url: '/engines/tone/install' })).json().id);
+        expect(existsSync(join(venvDir, 'tone.alt'))).toBe(false);
+
+        mkdirSync(join(venvDir, 'tone.alt', 'bin'), { recursive: true });
+        await app.inject({ method: 'DELETE', url: '/engines/tone' });
+        expect(existsSync(join(venvDir, 'tone.alt'))).toBe(false);
+        expect(existsSync(venvDir)).toBe(true);
+    });
+
     it('will not uninstall an engine the operator configured', async () => {
         const app = await start(fakeRunner().runner, { engines: { tone: { venv: '/somewhere/else' } } });
         const response = await app.inject({ method: 'DELETE', url: '/engines/tone' });
@@ -417,6 +431,16 @@ describe('the install routes', () => {
             const accepted = await install(app, 'research', '?accept=CC-BY-NC-4.0');
             expect(accepted.statusCode).toBe(202);
             expect(await settled(app, accepted.json().id)).toMatchObject({ state: 'succeeded', engine: 'research' });
+        });
+
+        it('records what it accepted, for a reinstall to read', async () => {
+            const app = await start(fakeRunner().runner);
+            await settled(app, (await install(app, 'research', '?accept=CC-BY-NC-4.0')).json().id);
+
+            const recorded = JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8'));
+            expect(recorded.engines.research).toEqual({ venv: join(venvDir, 'research'), accepted: 'CC-BY-NC-4.0' });
+            // And boot ignores it: the engine comes back from the file as any other does.
+            expect((await app.inject({ method: 'GET', url: '/engines' })).json()[0]).toMatchObject({ id: 'research' });
         });
 
         it('refuses an accept that is empty, repeated, or names another licence', async () => {

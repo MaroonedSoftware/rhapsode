@@ -46,8 +46,9 @@ export class EngineInstaller {
             throw new RhapsodeError('unsupported', 'this server was started without a managed engines file, so it has nowhere to record an install');
         }
 
+        const accepted = typeof accept === 'string' ? accept : undefined;
         return this.jobs.submit('install', id, pull, async context => {
-            await this.run(id, record, context);
+            await this.run(id, record, accepted, context);
             if (pull !== undefined) await this.installWeights(id, pull, context);
         });
     }
@@ -87,7 +88,10 @@ export class EngineInstaller {
             this.engines.remove(id);
         });
         await this.managed.forget(id);
-        if (venv !== undefined && inside(venv, this.settings.venvDir)) await rm(venv, { recursive: true, force: true });
+        // Both slots, so the remains of a reinstall that did not finish go with the engine. § 10.
+        for (const slot of new Set([venv, ...this.slots(id)])) {
+            if (slot !== undefined && inside(slot, this.settings.venvDir)) await rm(slot, { recursive: true, force: true });
+        }
     }
 
     private async fetch(id: string, variant: string, context: JobContext): Promise<void> {
@@ -116,13 +120,37 @@ export class EngineInstaller {
         if (pending !== undefined) throw new RhapsodeError('conflict', `"${id}" already has a ${pending.kind} ${pending.state}, job ${pending.id}`);
     }
 
-    private async run(id: string, record: CatalogRecord, context: JobContext): Promise<void> {
-        const venv = join(this.settings.venvDir, id);
+    /**
+     * The two virtualenvs an engine can run from: `<id>`, and `<id>.alt` for a reinstall to build in
+     * while the engine keeps running from the first. Two fixed paths rather than one per version,
+     * because a reinstall at the version already installed would otherwise build over the live one.
+     */
+    private slots(id: string): [string, string] {
+        return [join(this.settings.venvDir, id), join(this.settings.venvDir, `${id}.alt`)];
+    }
+
+    private async run(id: string, record: CatalogRecord, accepted: string | undefined, context: JobContext): Promise<void> {
+        const [venv, other] = this.slots(id);
 
         context.step('venv');
-        // Nothing registered points here, or install() would have refused. So a directory already
-        // here is what an install that did not finish left behind, and building over it would mix
-        // two attempts' packages.
+        // Nothing registered points at either slot, or install() would have refused. So a directory
+        // already in one is what an install or a reinstall that did not finish left behind.
+        await rm(other, { recursive: true, force: true });
+        await this.build(id, record, venv, context);
+
+        context.step('register');
+        const configured = { venv, ...(accepted === undefined ? {} : { accepted }) };
+        const entry = entryFrom(id, configured);
+        await this.managed.record(id, configured);
+        await this.workers.forget(id);
+        this.engines.declare(entry);
+    }
+
+    /** Steps 1 to 3 into `venv`: create it, install the SDK and the adapter, and import the engine. */
+    private async build(id: string, record: CatalogRecord, venv: string, context: JobContext): Promise<void> {
+        if (context.job.step !== 'venv') context.step('venv');
+        // Whatever is here is not registered, so it is the remains of an attempt that did not finish,
+        // and building over it would mix two attempts' packages.
         await rm(venv, { recursive: true, force: true });
 
         const plan = planInstall({
@@ -143,13 +171,6 @@ export class EngineInstaller {
             context.line(`$ ${command.command} ${command.args.join(' ')}`);
             await this.runner(command, line => context.line(line), context.signal);
         }
-
-        context.step('register');
-        const configured = { venv };
-        const entry = entryFrom(id, configured);
-        await this.managed.record(id, configured);
-        await this.workers.forget(id);
-        this.engines.declare(entry);
     }
 }
 

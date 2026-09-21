@@ -73,7 +73,17 @@ export interface RhapsodeConfig {
          */
         check?: boolean;
     };
-    engines?: Record<string, Partial<EngineEntry> & { enabled?: boolean }>;
+    engines?: Record<
+        string,
+        Partial<EngineEntry> & {
+            enabled?: boolean;
+            /**
+             * The weights licence the last install or reinstall accepted. The core writes it in the
+             * managed file for a reinstall to read, and boot ignores it. protocol.md § 10.
+             */
+            accepted?: string;
+        }
+    >;
 }
 
 export const DEFAULTS = {
