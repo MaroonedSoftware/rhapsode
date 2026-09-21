@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, UpdateStatus, Voice
 
 
 UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
@@ -354,6 +354,13 @@ class RhapsodePublicClient(BaseClient):
         """
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
+
+    async def update_status(self) -> UpdateStatus:
+        """
+        Open to every caller, like /health. It never waits on the network: a first call after boot
+        """
+        result = await self._fetch("/update", method="GET")
+        return UpdateStatus.model_validate(result)
 
     async def residency(self) -> ResidencyDetail:
         """

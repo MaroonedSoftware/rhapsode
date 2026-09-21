@@ -249,7 +249,28 @@ export interface ResidentModel {
 }
 
 /**
- * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L310)
+ * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+ * generated from [UpdateStatus](../../../../../../contracts/rhapsode.types.ck#L280)
+ */
+export interface UpdateStatus {
+    /** This core. */
+    version: string;
+    /** off: turned off. pending: no answer yet. failed: the last attempt got none. */
+    check: 'off' | 'pending' | 'ok' | 'failed';
+    /** The latest release, without its `v`. Present with `ok`. */
+    latest?: string;
+    /** Whether `latest` is newer than this core. Present with `ok`. */
+    updateAvailable?: boolean;
+    /** The release's page, for its notes. */
+    releaseUrl?: string;
+    /** ISO 8601, UTC. When `latest` was read. */
+    checkedAt?: string;
+    /** Which upgrade instructions apply. */
+    distribution: 'docker' | 'source';
+}
+
+/**
+ * generated from [PullRequest](../../../../../../contracts/rhapsode.types.ck#L321)
  */
 export interface PullRequest {
     /** Absent means the engine's default variant. */
@@ -259,7 +280,7 @@ export interface PullRequest {
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L316)
+ * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck#L327)
  */
 export interface FeedProgress {
     /** The job's step. */
@@ -324,7 +345,7 @@ export interface EngineSummary {
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L285)
+ * generated from [CatalogEntry](../../../../../../contracts/rhapsode.types.ck#L296)
  */
 export interface CatalogEntry {
     id: string;
@@ -378,7 +399,7 @@ export interface ErrorBody {
 }
 
 /**
- * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L297)
+ * generated from [InstallJob](../../../../../../contracts/rhapsode.types.ck#L308)
  */
 export interface InstallJob {
     id: string;
@@ -404,7 +425,7 @@ export interface ResidencyDetail extends ResidencySummary {
 }
 
 /**
- * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L323)
+ * generated from [FeedEvent](../../../../../../contracts/rhapsode.types.ck#L334)
  */
 export interface FeedEvent {
     /** The Last-Event-ID resume key. */

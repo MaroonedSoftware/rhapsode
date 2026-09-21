@@ -23,6 +23,17 @@ operation /health: {
     }
 }
 
+operation /update: {
+    get: {
+        # Open to every caller, like /health. It never waits on the network: a first call after boot
+        # answers `pending` and starts the check, which runs at most once a day. § 9.
+        sdk: updateStatus
+        response: {
+            200: { application/json: UpdateStatus }
+        }
+    }
+}
+
 operation /residency: {
     get: {
         # What is on the card, for an operator asking where their memory went. Reads the core's own

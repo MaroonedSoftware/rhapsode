@@ -182,6 +182,25 @@ class ResidentModel(BaseModel):
     # What the worker measured the model taking, where it could.
     size_bytes: int | None = Field(alias="sizeBytes", default=None)
 
+# Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+class UpdateStatus(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    # This core.
+    version: str
+    # off: turned off. pending: no answer yet. failed: the last attempt got none.
+    check: Literal["off", "pending", "ok", "failed"]
+    # The latest release, without its `v`. Present with `ok`.
+    latest: str | None = None
+    # Whether `latest` is newer than this core. Present with `ok`.
+    update_available: bool | None = Field(alias="updateAvailable", default=None)
+    # The release's page, for its notes.
+    release_url: str | None = Field(alias="releaseUrl", default=None)
+    # ISO 8601, UTC. When `latest` was read.
+    checked_at: str | None = Field(alias="checkedAt", default=None)
+    # Which upgrade instructions apply.
+    distribution: Literal["docker", "source"]
+
 class PullRequest(BaseModel):
     # Absent means the engine's default variant.
     variant: str | None = None

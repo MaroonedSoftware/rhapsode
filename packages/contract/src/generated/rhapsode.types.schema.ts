@@ -277,7 +277,25 @@ export const ResidentModel = z.looseObject({
 export type ResidentModel = z.infer<typeof ResidentModel>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L310)
+ * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+ * generated from [UpdateStatus](../../../../contracts/rhapsode.types.ck#L280)
+ */
+export const UpdateStatus = z.looseObject({
+    version: z.string().describe('This core.'),
+    check: z.enum(['off', 'pending', 'ok', 'failed']).describe('off: turned off. pending: no answer yet. failed: the last attempt got none.'),
+    latest: z.string().optional().describe('The latest release, without its `v`. Present with `ok`.'),
+    updateAvailable: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .optional()
+        .describe('Whether `latest` is newer than this core. Present with `ok`.'),
+    releaseUrl: z.string().optional().describe("The release's page, for its notes."),
+    checkedAt: z.string().optional().describe('ISO 8601, UTC. When `latest` was read.'),
+    distribution: z.enum(['docker', 'source']).describe('Which upgrade instructions apply.'),
+});
+export type UpdateStatus = z.infer<typeof UpdateStatus>;
+
+/**
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L321)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -287,7 +305,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L316)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L327)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -349,7 +367,7 @@ export type EngineSummary = z.infer<typeof EngineSummary>;
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L285)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L296)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -414,7 +432,7 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L297)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L308)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
@@ -439,7 +457,7 @@ export const ResidencyDetail = ResidencySummary.extend({
 export type ResidencyDetail = z.infer<typeof ResidencyDetail>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L323)
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L334)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),

@@ -14,6 +14,17 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/CoreHealth"
+    /update:
+        get:
+            operationId: updateStatus
+            description: "Open to every caller, like /health. It never waits on the network: a first call after boot"
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/UpdateStatus"
     /residency:
         get:
             operationId: residency
@@ -1235,6 +1246,43 @@ components:
                 - status
                 - engines
                 - residency
+        UpdateStatus:
+            type: object
+            properties:
+                version:
+                    type: string
+                    description: This core.
+                check:
+                    type: string
+                    enum:
+                        - off
+                        - pending
+                        - ok
+                        - failed
+                    description: "off: turned off. pending: no answer yet. failed: the last attempt got none."
+                latest:
+                    type: string
+                    description: The latest release, without its `v`. Present with `ok`.
+                updateAvailable:
+                    type: boolean
+                    description: Whether `latest` is newer than this core. Present with `ok`.
+                releaseUrl:
+                    type: string
+                    description: The release's page, for its notes.
+                checkedAt:
+                    type: string
+                    description: ISO 8601, UTC. When `latest` was read.
+                distribution:
+                    type: string
+                    enum:
+                        - docker
+                        - source
+                    description: Which upgrade instructions apply.
+            required:
+                - version
+                - check
+                - distribution
+            description: Whether a newer release exists, asked by the core so that no client orders versions. § 9.
         CatalogEntry:
             type: object
             properties:

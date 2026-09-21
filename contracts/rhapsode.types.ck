@@ -276,6 +276,17 @@ contract mode(loose) CoreHealth: {
     residency: ResidencySummary
 }
 
+# Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+contract mode(loose) UpdateStatus: {
+    version: string                             # This core.
+    check: enum(off, pending, ok, failed)       # off: turned off. pending: no answer yet. failed: the last attempt got none.
+    latest?: string                             # The latest release, without its `v`. Present with `ok`.
+    updateAvailable?: boolean                   # Whether `latest` is newer than this core. Present with `ok`.
+    releaseUrl?: string                         # The release's page, for its notes.
+    checkedAt?: string                          # ISO 8601, UTC. When `latest` was read.
+    distribution: enum(docker, source)          # Which upgrade instructions apply.
+}
+
 ############################################################################################
 # Managing engines. protocol.md § 10.
 ############################################################################################

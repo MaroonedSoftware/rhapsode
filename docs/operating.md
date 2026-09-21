@@ -66,6 +66,13 @@ rather than about the contract.
         "python": "python3"
     },
 
+    "update": {
+        // Whether GET /update asks GitHub for the latest release: at most once a day, only when
+        // something asks, with a User-Agent and nothing else. RHAPSODE_UPDATE_CHECK=0 in the
+        // server's environment turns it off too. On by default. Protocol § 9.
+        "check": true
+    },
+
     "engines": {
         "tone": { "venv": "/opt/rhapsode/venvs/tone" },
         "chatterbox": {

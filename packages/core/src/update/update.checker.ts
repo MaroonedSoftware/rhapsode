@@ -1,3 +1,4 @@
+import type { UpdateStatus } from '@rhapsode/contract';
 import type { Logger } from '@maroonedsoftware/logger';
 import { DateTime, Duration } from 'luxon';
 
@@ -16,16 +17,6 @@ const FRESH_FOR = Duration.fromObject({ hours: 24 });
 /** Shorter than `FRESH_FOR`, so a box that was offline at its first check does not wait a day. */
 const RETRY_AFTER = Duration.fromObject({ hours: 6 });
 const TIMEOUT_MS = 10_000;
-
-export interface UpdateStatus {
-    version: string;
-    check: 'off' | 'pending' | 'ok' | 'failed';
-    latest?: string;
-    updateAvailable?: boolean;
-    releaseUrl?: string;
-    checkedAt?: string;
-    distribution: 'docker' | 'source';
-}
 
 type Answer = { outcome: 'ok'; latest: string; releaseUrl?: string; at: DateTime } | { outcome: 'failed'; at: DateTime };
 

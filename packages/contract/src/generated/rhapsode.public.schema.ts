@@ -6,7 +6,7 @@ const _ZodJson: z.ZodType<_JsonValue> = z.lazy(() =>
 );
 
 /**
- * generated from [ApiInfo](../../../../contracts/rhapsode.public.ck#L52)
+ * generated from [ApiInfo](../../../../contracts/rhapsode.public.ck#L63)
  */
 export const ApiInfo = z.looseObject({
     title: z.string(),
@@ -18,7 +18,7 @@ export type ApiInfo = z.infer<typeof ApiInfo>;
  * This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
  * top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
  * already has a library that types it.
- * generated from [OpenApiDocument](../../../../contracts/rhapsode.public.ck#L45)
+ * generated from [OpenApiDocument](../../../../contracts/rhapsode.public.ck#L56)
  */
 export const OpenApiDocument = z.looseObject({
     openapi: z.string(),

@@ -65,6 +65,11 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV HOME=/data \
     RHAPSODE_CONFIG=/config/rhapsode.config.json
 
+# Tells GET /update to show `docker compose pull` rather than a release page. Here rather than in
+# compose.yaml, because that file is downloaded once and never refreshed, and this is what an upgrade
+# replaces. protocol.md § 9.
+ENV RHAPSODE_DISTRIBUTION=docker
+
 # 10001 by default. Compose runs it as PUID:PGID instead, which on unraid is 99:100, so both volumes
 # are writable by any uid: a named volume keeps the mode it was created with, and a uid that cannot
 # write /data fails its first install, deep in a pip traceback.
