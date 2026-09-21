@@ -307,7 +307,7 @@ class InstallJob(BaseModel):
 
     id: str
     engine: str
-    kind: Literal["install", "pull"]
+    kind: Literal["install", "pull", "reinstall"]
     # What a pull fetches, or an install fetches in step 5.
     variant: str | None = None
     state: Literal["queued", "running", "succeeded", "failed"]

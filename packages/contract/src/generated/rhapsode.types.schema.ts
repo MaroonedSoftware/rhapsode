@@ -437,7 +437,7 @@ export type ErrorBody = z.infer<typeof ErrorBody>;
 export const InstallJob = z.looseObject({
     id: z.string(),
     engine: z.string(),
-    kind: z.enum(['install', 'pull']),
+    kind: z.enum(['install', 'pull', 'reinstall']),
     variant: z.string().optional().describe('What a pull fetches, or an install fetches in step 5.'),
     state: z.enum(['queued', 'running', 'succeeded', 'failed']),
     step: z.enum(['venv', 'packages', 'verify', 'register', 'weights']).optional(),

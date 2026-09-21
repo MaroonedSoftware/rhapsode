@@ -295,6 +295,30 @@ operation /engines/{engine}/install: {
     }
 }
 
+operation /engines/{engine}/reinstall: {
+    params: {
+        engine: string
+    }
+    post: {
+        sdk: reinstallEngine
+        # Rebuilds an installed engine in its other slot and swaps it in once it imports, so the
+        # engine keeps working until then and a failure changes nothing. The remedy for `outdated`.
+        # Costs a cold load, and whatever was installed into the old virtualenv by hand. § 10.
+        query: {
+            # As for install, and needed only where the weights may not be used commercially and the
+            # licence the last install accepted is not the one the catalog names now. § 10.
+            accept?: string
+        }
+        response: {
+            202: { application/json: InstallJob }
+            400: { application/json: ErrorBody }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
 operation /engines/{engine}/pull: {
     params: {
         engine: string

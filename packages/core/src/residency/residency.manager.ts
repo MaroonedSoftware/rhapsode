@@ -185,6 +185,42 @@ export class ResidencyManager {
     }
 
     /**
+     * Take an engine out of residency and run `swap` while nothing can load it, waiting for it to
+     * stop speaking rather than refusing. A reinstall's `register` step. § 10.
+     *
+     * `forget` refuses a speaking engine because its caller is there to be told. A reinstall's caller
+     * has usually gone, and on a box that is never quiet for long a reinstall that refused whenever
+     * the engine was speaking would never finish. Past `waitSeconds` it gives up with `conflict`,
+     * having changed nothing.
+     *
+     * It polls rather than joining `waiters`, because a release wakes exactly one waiter, and a
+     * reinstall that took a wake it could not use would leave a `/speak` asleep that could have run.
+     */
+    async replace(engineId: string, swap: () => Promise<void>, waitSeconds: number): Promise<void> {
+        const deadline = this.clock.now().plus({ seconds: waitSeconds });
+        for (;;) {
+            const swapped = await this.transition.run(async () => {
+                const resident = this.residents.get(engineId);
+                if (resident !== undefined && resident.leases > 0) return false;
+                resident?.cancelIdle?.();
+                this.residents.delete(engineId);
+                await swap();
+                return true;
+            });
+            if (swapped) {
+                // A slot may have come free, and a request waiting on one should not sleep out its
+                // deadline over a model that has already gone.
+                this.wake();
+                return;
+            }
+            if (this.clock.now() > deadline) {
+                throw new RhapsodeError('conflict', `"${engineId}" was still speaking after ${waitSeconds}s, so it was left as it was`);
+            }
+            await new Promise<void>(fulfil => this.clock.after(1, async () => fulfil()));
+        }
+    }
+
+    /**
      * Give this engine's memory back now, rather than waiting out its keep-alive. § 3.
      *
      * Refused while the engine is speaking, for `forget`'s reason: cutting off a stream in progress

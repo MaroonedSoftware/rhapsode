@@ -308,7 +308,7 @@ contract mode(loose) CatalogEntry: {
 contract mode(loose) InstallJob: {
     id: string
     engine: string
-    kind: enum(install, pull)
+    kind: enum(install, pull, reinstall)
     variant?: string                            # What a pull fetches, or an install fetches in step 5.
     state: enum(queued, running, succeeded, failed)
     step?: enum(venv, packages, verify, register, weights)

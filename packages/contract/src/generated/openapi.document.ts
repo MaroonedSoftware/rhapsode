@@ -821,6 +821,81 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/engines/{engine}/reinstall": {
+            "post": {
+                "operationId": "reinstallEngine",
+                "parameters": [
+                    {
+                        "name": "engine",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "accept",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Response 202",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InstallJob"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/engines/{engine}/pull": {
             "post": {
                 "operationId": "pullEngine",
@@ -2010,7 +2085,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "type": "string",
                         "enum": [
                             "install",
-                            "pull"
+                            "pull",
+                            "reinstall"
                         ]
                     },
                     "variant": {

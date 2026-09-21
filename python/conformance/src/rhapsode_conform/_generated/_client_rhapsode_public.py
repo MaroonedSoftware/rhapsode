@@ -20,6 +20,11 @@ InstallEngineQuery = TypedDict("InstallEngineQuery", {
 })
 
 
+ReinstallEngineQuery = TypedDict("ReinstallEngineQuery", {
+    "accept": NotRequired[str],
+})
+
+
 class EngineCapabilities200Response(TypedDict):
     status: Literal[200]
     content_type: Literal["application/json"]
@@ -263,6 +268,36 @@ class InstallEngine404Response(TypedDict):
 
 
 class InstallEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: InstallJob
+
+
+class ReinstallEngine400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine409Response(TypedDict):
     status: Literal[409]
     content_type: Literal["application/json"]
     data: ErrorBody
@@ -515,6 +550,18 @@ class RhapsodePublicClient(BaseClient):
 
     async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine400Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(400, 403, 404, 409), params=query)
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
+
+    async def reinstall_engine(self, engine: str, query: ReinstallEngineQuery | None = None) -> ReinstallEngine202Response | ReinstallEngine400Response | ReinstallEngine403Response | ReinstallEngine404Response | ReinstallEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/reinstall", method="POST", response_kind="auto", expect_statuses=(400, 403, 404, 409), params=query)
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 403:

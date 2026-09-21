@@ -1329,8 +1329,8 @@ What it costs, and what a client should say before asking for it:
 
 The refusals are an install's, reversed, and all of them come before a job exists: an engine that is
 not installed, or is not in the catalog, is `unknown_engine`; one the operator's config names is
-`conflict`, as for uninstall; one with a job queued or running is `conflict`; and a server without a
-managed file is `unsupported`.
+`conflict`, as for uninstall; and one with a job queued or running is `conflict`. A server without a
+managed file has installed nothing, so every engine it has is the operator's.
 
 **A reinstall asks for the licence only when what was accepted no longer covers it.** Where the
 catalog says `weightsCommercialUse: false`, a reinstall needs no `accept` if the managed file's

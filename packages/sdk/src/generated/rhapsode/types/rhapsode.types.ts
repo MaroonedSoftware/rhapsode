@@ -404,7 +404,7 @@ export interface ErrorBody {
 export interface InstallJob {
     id: string;
     engine: string;
-    kind: 'install' | 'pull';
+    kind: 'install' | 'pull' | 'reinstall';
     /** What a pull fetches, or an install fetches in step 5. */
     variant?: string;
     state: 'queued' | 'running' | 'succeeded' | 'failed';

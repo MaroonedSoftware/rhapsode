@@ -539,4 +539,85 @@ describe('the residency manager', () => {
             speaking.release();
         });
     });
+
+    describe('replace', () => {
+        it('swaps at once an engine that is not speaking, and takes it off the card', async () => {
+            const residency = build();
+            (await residency.acquire('tone', 'fast')).release();
+
+            let swapped = false;
+            await residency.replace(
+                'tone',
+                async () => {
+                    swapped = true;
+                },
+                600,
+            );
+
+            expect(swapped).toBe(true);
+            expect(residency.summary().resident).toBe(0);
+        });
+
+        it('waits for a speaking engine to finish rather than refusing, and swaps then', async () => {
+            // A reinstall's caller has usually gone, so a refusal here would be one nobody reads. § 10.
+            const residency = build();
+            const speaking = await residency.acquire('tone', 'fast');
+
+            let swapped = false;
+            const replacing = residency.replace(
+                'tone',
+                async () => {
+                    swapped = true;
+                },
+                600,
+            );
+            await settle();
+            await clock.advance(5);
+            expect(swapped).toBe(false);
+
+            speaking.release();
+            await settle();
+            await clock.advance(1);
+            await replacing;
+            expect(swapped).toBe(true);
+        });
+
+        it('gives up with conflict past its wait, having changed nothing', async () => {
+            const residency = build();
+            const speaking = await residency.acquire('tone', 'fast');
+
+            let swapped = false;
+            const replacing = residency.replace(
+                'tone',
+                async () => {
+                    swapped = true;
+                },
+                10,
+            );
+            const outcome = expect(replacing).rejects.toThrow(/still speaking after 10s/);
+            for (let second = 0; second < 12; second += 1) {
+                await settle();
+                await clock.advance(1);
+            }
+            await outcome;
+
+            expect(swapped).toBe(false);
+            expect(residency.summary().resident).toBe(1);
+            speaking.release();
+        });
+
+        it('does not count as a request waiting for a slot', async () => {
+            const residency = build();
+            const speaking = await residency.acquire('tone', 'fast');
+
+            const replacing = residency.replace('tone', async () => {}, 600);
+            await settle();
+            expect(residency.summary().waiting).toBe(0);
+
+            speaking.release();
+            await settle();
+            await clock.advance(1);
+            await replacing;
+        });
+    });
 });
