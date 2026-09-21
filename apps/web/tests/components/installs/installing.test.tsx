@@ -69,7 +69,7 @@ describe('installing from the page', () => {
         await user.click(within(dialog).getByRole('checkbox', { name: 'Download the turbo weights too' }));
         await user.click(within(dialog).getByRole('button', { name: 'Install under these licences' }));
 
-        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', undefined);
+        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', { accept: 'MIT' });
         expect(await screen.findByText('Installing chatterbox')).toBeInTheDocument();
         await waitFor(() => expect(FakeEventSource.latest().url).toBe('/api/installs/j1/events'));
 
@@ -104,7 +104,7 @@ describe('installing from the page', () => {
         expect(within(dialog).getByRole('checkbox', { name: 'Download the turbo weights too' })).toBeChecked();
         await user.click(within(dialog).getByRole('button', { name: 'Install under these licences' }));
 
-        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', { pull: 'turbo' });
+        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', { pull: 'turbo', accept: 'MIT' });
         expect(await screen.findByText('Weights')).toBeInTheDocument();
 
         jobs = [job({ variant: 'turbo', step: 'weights', state: 'succeeded' })];
@@ -145,6 +145,23 @@ describe('installing from the page', () => {
 
         expect(await screen.findByText('Failed at packages')).toBeInTheDocument();
         expect(screen.getByText('pip exited 1: No matching distribution found')).toBeInTheDocument();
+    });
+
+    it('warns about weights that may not be used commercially, and accepts their licence by name', async () => {
+        const user = setupUser();
+        api.catalog.mockResolvedValue([{ ...chatterbox, license: { code: 'MIT', weights: 'CC-BY-NC-4.0', weightsCommercialUse: false } }]);
+        api.installEngine.mockImplementation(async () => {
+            jobs = [job()];
+            return { status: 202, data: jobs[0] };
+        });
+        render(<CatalogPage />);
+
+        await user.click(await screen.findByRole('button', { name: 'Install' }));
+        const dialog = await screen.findByRole('dialog');
+        expect(within(dialog).getByText('Check the weights licence')).toBeInTheDocument();
+        await user.click(within(dialog).getByRole('button', { name: 'Install under these licences' }));
+
+        expect(api.installEngine).toHaveBeenCalledWith('chatterbox', { pull: 'turbo', accept: 'CC-BY-NC-4.0' });
     });
 
     it('keeps the dialog open with the refusal when the install does not start', async () => {

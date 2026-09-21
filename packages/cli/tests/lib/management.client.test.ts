@@ -94,7 +94,7 @@ describe('ManagementClient against a real core', () => {
         expect((await client.catalog()).find(entry => entry.id === 'tone')?.installed).toBe('no');
 
         const steps: string[] = [];
-        const job = await client.follow((await client.install('tone')).id, event => {
+        const job = await client.follow((await client.install('tone', 'MIT')).id, event => {
             if (event.kind === 'progress' && event.progress?.status === 'running') steps.push(event.progress.phase);
         });
 
@@ -106,7 +106,7 @@ describe('ManagementClient against a real core', () => {
     it('asks for the weights in the install itself, as a fifth step', async () => {
         const client = new ManagementClient(await start());
 
-        const accepted = await client.install('tone', 'plain');
+        const accepted = await client.install('tone', 'MIT', 'plain');
 
         expect(accepted).toMatchObject({ kind: 'install', variant: 'plain' });
     });
@@ -127,7 +127,7 @@ describe('ManagementClient against a real core', () => {
 
     it('unloads an engine that is holding nothing, because the state asked for is already true', async () => {
         const client = new ManagementClient(await start());
-        await client.follow((await client.install('tone')).id, () => {});
+        await client.follow((await client.install('tone', 'MIT')).id, () => {});
 
         expect(await client.unload('tone')).toMatchObject({ id: 'tone', model: 'unloaded' });
         expect(await client.unload('tone', 'unload')).toMatchObject({ id: 'tone', model: 'unloaded' });

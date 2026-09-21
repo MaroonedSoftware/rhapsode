@@ -129,14 +129,16 @@ async function install(engine: string, opts: InstallOptions, ctx: CliContext, cl
         if (entry.installed !== 'yes') {
             ui.info(`${entry.displayName} (${entry.package}): ${client.describeLicense(entry.license)}`);
             if (entry.license.notes !== undefined) ui.info(entry.license.notes);
-            if (!(await ui.confirm(`Install ${entry.displayName} under these licences?`, true))) {
+            // No by default where the weights are not for commercial use: pressing return through a
+            // prompt is not reading it, and that is the licence the core makes a caller name. § 10.
+            if (!(await ui.confirm(`Install ${entry.displayName} under these licences?`, entry.license.weightsCommercialUse))) {
                 ui.warn(ctx.isInteractive() ? 'Not installed.' : 'Not installed: pass --yes to accept the licences from a script.');
                 return 1;
             }
             // Asked before the install starts, and done by the same job: a wizard stopped between an
             // install and a separate pull left an engine whose first request waited on the download.
             const pull = (await wantsWeights()) ? variant : undefined;
-            const job = await follow(api, await api.install(engine, pull), `Installing ${entry.displayName}`, ui);
+            const job = await follow(api, await api.install(engine, entry.license.weights, pull), `Installing ${entry.displayName}`, ui);
             if (job.state === 'failed' && job.step === 'weights') {
                 ui.warn(`${entry.displayName} is installed, but its weights did not download. Run this again with --pull to retry.`);
             }
