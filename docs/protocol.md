@@ -960,6 +960,13 @@ is. A release that changes no shape leaves `contract` where it was; a new contra
 comes with a new package version, and the reverse is almost never true. A client reads `contract`
 to decide what it may send and never parses a package version to find out.
 
+The core reports its own package version as `version` on `GET /health`, beside `contract`, so that a
+page can show a person which release this box runs without fetching and parsing `/openapi.json`. It
+is for display. **Every question that would need two versions compared is answered by the core**:
+whether an engine is behind it (`outdated`, below) and whether a newer release exists (`GET /update`,
+below). A client that compared version strings itself would need its own ordering of them, and two
+clients would disagree about a prerelease.
+
 One version rather than one per package because § 13.5 keeps the protocol and both of its
 implementations in one repository so that they move in one commit, and that holds for a user only
 if they also move in one release. Separate versions would need a hand-kept table of which core goes
@@ -1010,10 +1017,67 @@ virtualenv**, as `workerVersion` on the engine summary of `GET /engines` and `GE
   not invent a number for. Absent means "not something this core can say", the same way a missing
   `modelBytes` means "nothing measured it".
 
-A `workerVersion` that differs from the core's own version is the signal, and the remedy is to
-reinstall that engine. It is worth a warning and never a refusal: the worker is contract-legal, it
-works, and an operator who has reasons to run an engine at another version is inside what this
+A `workerVersion` that differs from the core's own version is the signal, and the core says so
+itself: the same summaries, and each entry of `GET /catalog`, carry **`outdated: true`** for an
+engine whose `workerVersion` is not this core's version, `false` for one that matches, and nothing
+where `workerVersion` is absent. It is "differs", not "is older": a core rolled back to an earlier
+release breaks the pin the same way, and the remedy is the same. Like `workerVersion`, it is
+computed when the engine is declared and not per request, so it adds nothing to the path a
+healthcheck polls.
+
+The remedy is to reinstall that engine (§ 10), which builds a new virtualenv beside the old one and
+does not take the engine away while it does. It is worth a warning and never a refusal, and it is
+never done automatically: the worker is contract-legal, it works, a reinstall costs a cold load and
+the network, and an operator who has reasons to run an engine at another version is inside what this
 section allows.
+
+### The core asks whether it is current
+
+`GET /update` answers whether a newer release of rhapsode exists. It is open to every caller, like
+`/health` and `/catalog`: the version it reports is already `info.version` on `/openapi.json`, the
+latest release is public, and the only other thing it says is whether this box checks at all.
+
+```json
+{
+  "version": "0.1.9",
+  "check": "ok",
+  "latest": "0.2.0",
+  "updateAvailable": true,
+  "releaseUrl": "https://github.com/maroonedsoftware/rhapsode/releases/tag/v0.2.0",
+  "checkedAt": "2026-09-21T09:14:02.000Z",
+  "distribution": "docker"
+}
+```
+
+- **`check`** is `off` when the operator turned it off, `pending` before the first answer has come
+  back, `ok` once one has, and `failed` when the last attempt did not get one. `latest`,
+  `updateAvailable`, `releaseUrl` and `checkedAt` are present only with `ok`.
+- **The core asks GitHub's API for the repository's latest release**, which by GitHub's own
+  definition is neither a draft nor a prerelease, so a prerelease is never offered. The request
+  carries a `User-Agent` naming rhapsode and its version, and nothing else about the box: no token,
+  no engine list, no identifier.
+- **It asks at most once a day, and only when asked.** A request finding no answer, or one older than
+  a day, starts one check in the background and answers at once with what it has, so a first call
+  after boot reads `pending`. A failed check is retried after six hours. There is no timer: a box
+  nobody asks never phones out, and there is nothing to stop at shutdown. The route never waits on
+  the network, and nothing about the check reaches `/health`, whose answer a container's healthcheck
+  turns into a restart.
+- **`updateAvailable` is the core's comparison**, of `x.y.z` release versions. A core newer than the
+  latest release (a checkout, or an image built locally) is not offered a downgrade, and a `latest`
+  it cannot parse offers nothing.
+- **`distribution`** is `docker` in the published image and `source` everywhere else. It says which
+  instructions to show, because the core cannot follow them itself.
+
+**It is on by default**, because the failure it exists to prevent, a box that quietly stays several
+releases behind, is invisible from inside the box, and a check that has to be turned on is one only
+the operators who already watch releases will turn on. `update.check: false` in the config, or
+`RHAPSODE_UPDATE_CHECK=0` in the server's environment, turns it off, and the route then answers
+`check: off` without ever having asked.
+
+**The core does not update itself.** In the image it could only do so with the Docker socket, which
+is control of the host, and the one mechanism every operator already trusts is `docker compose pull`.
+So the core says that a release exists, and once the new image is running, `outdated` says which
+engines to reinstall.
 
 ### The core describes its own API
 
@@ -1050,6 +1114,8 @@ what one is built on.
 | --- | --- |
 | `GET /catalog` | Every engine that exists, installed or not, with both licences |
 | `POST /engines/{id}/install` | Starts an install job; `202` with the job. `?pull=turbo` fetches that variant too, and `?accept=` names the weights licence where it must be accepted |
+| `POST /engines/{id}/reinstall` | Starts a job that rebuilds an installed engine beside itself and swaps it in; `202` with the job. `?accept=` as for install |
+| `POST /installs/outdated` | Starts a reinstall for every `outdated` engine this API installed; `202` with the jobs and what it skipped |
 | `DELETE /engines/{id}` | Stops and removes an engine this API installed |
 | `POST /engines/{id}/pull` | Starts a job that downloads a variant's weights; body `{ "variant": "turbo" }` |
 | `POST /engines/{id}/unload` | Frees the model now (§ 3); `?mode=unload` keeps the process |
@@ -1106,7 +1172,9 @@ refused cheaply and cannot hold a connection.
 `installed` is `no`, `installing` or `yes`. `managed` says whether this API installed it and can
 therefore remove it; an engine the operator configured by hand is `installed: yes, managed: false`.
 `GET /engines` is unchanged and still lists only what is configured: the catalog is what exists,
-and `/engines` is what this box has.
+and `/engines` is what this box has. An installed engine's entry also carries `workerVersion` and
+`outdated` as its engine summary does (§ 9), so a page listing the catalog can say which engines an
+upgrade left behind without a second request.
 
 ### Installing
 
@@ -1114,7 +1182,8 @@ An install is four steps, and a job reports which one it is on:
 
 1. **`venv`**: create `<install.venvDir>/<id>`, with `uv venv` when uv is on the path and the
    interpreter's own `venv` module otherwise. A directory already there that no registered engine
-   points at is the remains of an install that did not finish, and is removed first. An engine
+   points at is the remains of an install that did not finish, and is removed first, and so is
+   `<id>.alt`, the second slot a reinstall uses (below). An engine
    whose dependencies install on a narrower range of Python than the SDK's says so in its catalog
    record. uv is handed the range and finds or fetches an interpreter inside it; without uv, the
    configured interpreter is asked first and the job fails naming both, because pip given an
@@ -1128,8 +1197,9 @@ An install is four steps, and a job reports which one it is on:
 3. **`verify`**: import the engine's module with the new interpreter. That is the command the core
    will spawn, minus serving, and it is the check that a virtualenv pip abandoned halfway fails,
    although its `bin/python` runs perfectly well.
-4. **`register`**: record the engine in the managed file and add it to the running registry. No
-   restart: the next `/speak` for it spawns a worker.
+4. **`register`**: record the engine in the managed file, with the weights licence the install
+   accepted, and add it to the running registry. No restart: the next `/speak` for it spawns a
+   worker.
 5. **`weights`**, only when asked: fetch a variant, exactly as a pull does (below).
 
 **An install can fetch its weights.** `POST /engines/chatterbox/install?pull=turbo` adds step 5 for
@@ -1195,10 +1265,15 @@ core never writes the operator's file. That file may carry comments that a rewri
 sit on a read-only path, and is somebody's hand-kept record of the box. One writer per file is the
 rule that keeps both honest.
 
+An entry in it is an engine entry like one in the config, plus one field the core keeps for itself:
+`accepted`, the weights licence the last install or reinstall accepted, as the `accept` query named
+it, and absent when none was needed. Boot ignores it. A reinstall reads it (below).
+
 ### Uninstalling
 
 `DELETE /engines/{id}` terminates the worker, removes the engine from the registry and from the
-managed file, and deletes its virtualenv, but only a virtualenv inside `install.venvDir`. An engine
+managed file, and deletes its virtualenv, and the other slot's if one is there, but only a virtualenv
+inside `install.venvDir`. An engine
 the operator configured is `conflict`: it is theirs to remove, by editing their file. So is an
 engine that is speaking, because an uninstall that cut a stream off would hand that caller a
 truncated file for a reason it could not have predicted; the removal happens under the same lock a
@@ -1208,6 +1283,81 @@ load takes, so nothing can start one in between. An engine that is not installed
 Weights are left alone. They live in the engine's own cache (for Chatterbox, the Hugging Face cache
 in the user's home), which other tools on the box share, and 9.7 GB is not something to delete as a
 side effect.
+
+### Reinstalling
+
+`POST /engines/{id}/reinstall` rebuilds an engine this API installed, from what this core ships, and
+swaps the new virtualenv in once it works. It is how an engine left behind by an upgrade (§ 9)
+catches up, and how a virtualenv somebody broke is mended. It answers `202` with a job whose `kind`
+is `reinstall` and whose steps are an install's first four; there is no `weights` step, because the
+weights are in a cache the old virtualenv never owned and are still there.
+
+It is its own route rather than an install over the top because the two refuse opposite things: an
+install refuses an engine that is installed, a reinstall one that is not. Before this route the
+remedy was an uninstall followed by an install, two calls with a stretch between them where the
+engine did not exist and a failed install left nothing at all.
+
+**The new virtualenv is built beside the old one, and the engine keeps working until it is ready.**
+An engine has two slots, `<install.venvDir>/<id>` and `<install.venvDir>/<id>.alt`, and the managed
+file's `venv` says which one it runs from. A reinstall removes whatever is in the other slot (the
+remains of one that did not finish), builds there, and verifies there, so the interpreter it imports
+the engine with is the one the core will spawn. A virtualenv is never moved: it is not relocatable,
+and every script in its `bin` names its own path in its first line, so a renamed one runs
+`bin/python` and breaks `bin/pip`. Two fixed slots rather than a directory per version, because a
+reinstall at the version already installed (every retry, and every checkout) would otherwise build
+over the virtualenv the engine is running from.
+
+A failure in any step before `register` fails the job and changes nothing: the engine, its
+virtualenv and its `workerVersion` are as they were.
+
+**`register` waits for the engine to stop speaking, rather than refusing.** It takes the lock a load
+takes, as an uninstall does, and while the engine holds a lease it waits for the lease to end, for
+up to ten minutes; past that the job fails with `conflict` and nothing has changed. An uninstall
+refuses instead, because its caller is present to be told; a reinstall's caller has usually gone,
+and on a busy box a reinstall that refused whenever the engine was speaking would never finish.
+Under the lock it records the new slot in the managed file, stops the old worker, and declares the
+engine again, which reads the new `workerVersion` and `outdated`. The managed file is written first,
+so a core that dies at any point after it boots on the new virtualenv, and one that dies before it
+boots on the old. The old slot is deleted last.
+
+What it costs, and what a client should say before asking for it:
+
+- **A cold load.** The old worker is stopped, so the model it held leaves the card, and the next
+  `/speak` for the engine loads it again.
+- **Anything installed into the virtualenv by hand.** A reinstall builds from the catalog record,
+  so a package an operator added to the old virtualenv with its `pip` is not in the new one.
+
+The refusals are an install's, reversed, and all of them come before a job exists: an engine that is
+not installed, or is not in the catalog, is `unknown_engine`; one the operator's config names is
+`conflict`, as for uninstall; one with a job queued or running is `conflict`; and a server without a
+managed file is `unsupported`.
+
+**A reinstall asks for the licence only when what was accepted no longer covers it.** Where the
+catalog says `weightsCommercialUse: false`, a reinstall needs no `accept` if the managed file's
+`accepted` is the catalog's `weights` exactly, because somebody accepted those terms and nothing
+since has changed them. It needs one, and is refused as an install is without it, when the entry has
+no `accepted` (an engine installed by a core that did not record one) or names another licence (the
+catalog relicensed the weights, which is the case the rule under "Accepting a weights licence"
+exists for: an upgrade is how a catalog changes). An `accept` that is sent is checked as an
+install's is, and recorded.
+
+**`POST /installs/outdated` reinstalls everything behind.** It queues one reinstall for each engine
+this API installed whose `outdated` is `true`, in id order, and answers `202` with them:
+
+```json
+{
+  "jobs": [{ "id": "01J8Z6Q4B7", "engine": "kokoro", "kind": "reinstall", "state": "queued", "createdAt": "2026-09-21T09:20:00.000Z" }],
+  "skipped": [{ "engine": "research", "reason": "licence" }]
+}
+```
+
+It never refuses as a whole. An engine it cannot reinstall without asking somebody is `skipped`
+with a reason: `licence` where a single reinstall would need `accept`, `busy` where a job for it is
+already queued or running, `uncatalogued` where the catalog no longer has it. Nothing behind is
+`jobs: []`, which is a success, so the call can sit at the end of an unattended upgrade and be run
+every night. It is a route rather than a loop in each client because the question of which engines
+it covers is the core's to answer, and the one client that can always reach an upgraded container
+is `curl`.
 
 ### Pulling weights
 
@@ -1230,7 +1380,7 @@ does not implement `fetch` answers `unsupported`, and its weights arrive on firs
 }
 ```
 
-`kind` is `install` or `pull`. `variant` is the variant a pull fetches, or an install fetches in
+`kind` is `install`, `pull` or `reinstall`. `variant` is the variant a pull fetches, or an install fetches in
 step 5; an install without it stops at `register`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
 carries `error`, an ordinary error envelope body. Its message names the command and the line of
 its output that says why it failed, not the line it printed last: pip ends a failed build with a
