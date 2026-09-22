@@ -105,12 +105,13 @@ An engine whose weights may not be used commercially installs only once its lice
 name: the wizard and the web page ask, and a direct call adds `?accept=` with the catalog's
 `weights` string, `?accept=CC-BY-NC-4.0`. Without it the install is refused, saying which licence.
 
-What it installs is recorded in `rhapsode.engines.json` beside the config file (or beside wherever
-`RHAPSODE_CONFIG` points). The server writes that file and never touches yours. Both are read at
-boot and **yours wins** where they name the same engine, so to override something about an
+What it installs is recorded in `rhapsode.db` beside the config file (or beside wherever
+`RHAPSODE_CONFIG` points). The server writes that database and never touches your file. Both are
+read at boot and **yours wins** where they name the same engine, so to override something about an
 installed engine, such as its `env`, add an entry for it to your config rather than editing the
-managed file. An engine you configured by hand cannot be uninstalled through the API: remove it from
-your file.
+database. An engine you configured by hand cannot be uninstalled through the API: remove it from
+your file. A server that finds the `rhapsode.engines.json` an older release wrote imports it and
+renames it `rhapsode.engines.json.imported`.
 
 If pip cannot verify a certificate because something on your network intercepts TLS, start the
 server with `RHAPSODE_PIP_TRUSTED_HOSTS=pypi.org,files.pythonhosted.org`. It is deliberately not
@@ -155,8 +156,8 @@ engine's virtualenv by hand, which needs a C++ compiler, then restart the engine
 ```
 
 That is from a checkout. In the Docker image the sources are under `/app/python` instead. The engine
-is not on PyPI, so pip needs a path, not a name. The virtualenv is the one `rhapsode.engines.json`
-names for it, `orpheus` or, after a reinstall, `orpheus.alt`, and a reinstall builds from the catalog
+is not on PyPI, so pip needs a path, not a name. The virtualenv is the engine's own under
+`install.venvDir`, `orpheus` or, after a reinstall, `orpheus.alt`, and a reinstall builds from the catalog
 and does not carry this over: run it again afterwards.
 
 ### Dia
@@ -332,7 +333,7 @@ docker compose up -d --remove-orphans
 
 | Mount     | What                                                        | Where in it                            |
 | --------- | ----------------------------------------------------------- | -------------------------------------- |
-| `/config` | the config, and `rhapsode.engines.json` beside it           | `rhapsode.config.json`                 |
+| `/config` | the config, and the state database beside it                | `rhapsode.config.json`, `rhapsode.db`  |
 |           | cloned voices                                               | `voices/<engine>`                      |
 | `/data`   | each engine's virtualenv                                    | `.rhapsode/venvs/<engine>`, or `<engine>.alt` after a reinstall |
 |           | the Python interpreters those virtualenvs run on            | `.local/share/uv/python`               |
@@ -344,7 +345,7 @@ tens of GB with Chatterbox and all of it can be. `/data` is the container's `HOM
 whole mechanism: everything an engine downloads already lands under `HOME`, so none of it needs to
 know it is in a container.
 
-The two are joined in one place: `rhapsode.engines.json` names virtualenvs in `/data`. Lose `/data`
+The two are joined in one place: `rhapsode.db` names virtualenvs in `/data`. Lose `/data`
 and those engines stay listed but fail to start until they are installed again, from the page or
 the wizard. Lose `/config` and the downloads survive, but the engines and voices are forgotten.
 
@@ -429,7 +430,11 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 One container, from `ghcr.io/maroonedsoftware/rhapsode`: `/config` to `/mnt/user/appdata/rhapsode`,
 `/data` to a share such as `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own
-`nobody:users`, ports 8080 and 8081, and `--stop-timeout 30` in Extra Parameters.
+`nobody:users`, ports 8080 and 8081, and `--stop-timeout 30` in Extra Parameters. Choose the user
+before the first start and keep it: the config and `rhapsode.db` are created readable and writable
+by their owner only, because the one holds the management token and the other may, so a container
+restarted as another user cannot write them. The server refuses to start naming the database rather
+than failing on the first install; `chown -R 99:100` the `/config` share to mend it.
 
 Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
 so add it to `management.origins`. That is also the moment the page reaches the install routes from

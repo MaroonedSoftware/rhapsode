@@ -49,8 +49,8 @@ export class EngineInstaller {
             throw new RhapsodeError('conflict', `"${id}" is configured in the operator's config file, which is theirs to change`);
         }
         if (this.engines.has(id)) throw new RhapsodeError('conflict', `"${id}" is already installed`);
-        if (this.managed.path === undefined) {
-            throw new RhapsodeError('unsupported', 'this server was started without a managed engines file, so it has nowhere to record an install');
+        if (this.managed.store === undefined) {
+            throw new RhapsodeError('unsupported', 'this server was started without a state database, so it has nowhere to record an install');
         }
 
         const accepted = typeof accept === 'string' ? accept : undefined;
@@ -72,7 +72,7 @@ export class EngineInstaller {
         if (!this.managed.isManaged(id)) {
             throw new RhapsodeError('conflict', `"${id}" is configured in the operator's config file; rebuild its virtualenv there`);
         }
-        // No managed-file check, unlike install: a server without one has managed nothing, so every
+        // No state-database check, unlike install: a server without one has managed nothing, so every
         // engine it has is the operator's and was refused above.
         this.refuseIfBusy(id);
         const accepted = acceptanceFor(id, record, this.managed.entry(id)?.accepted, accept);
@@ -214,7 +214,7 @@ export class EngineInstaller {
                 id,
                 async () => {
                     swapping = true;
-                    // The managed file first, so a core that dies anywhere after this boots on the new
+                    // The database first, so a core that dies anywhere after this boots on the new
                     // virtualenv, and one that dies before it boots on the old.
                     await this.managed.record(id, configured);
                     await this.workers.forget(id);

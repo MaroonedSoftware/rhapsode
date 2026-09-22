@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,8 +12,19 @@ import type { PlannedCommand } from '../src/install/install.plan.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import { CATALOG } from '../src/registry/engines.catalog.js';
 import { loadSettings, MANAGED_FILE } from '../src/registry/managed.engines.js';
+import { STATE_FILE, StateStore } from '../src/state/state.store.js';
 import { buildServer } from '../src/server.js';
 import type { RhapsodeConfig } from '../src/config.js';
+
+/** What the server recorded, read through a second handle as a person inspecting the box would. */
+function recordedIn(dir: string): { engines: Record<string, unknown> } {
+    const store = StateStore.open(join(dir, STATE_FILE));
+    try {
+        return { engines: Object.fromEntries(store.engines()) };
+    } finally {
+        store.close();
+    }
+}
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
@@ -84,7 +95,7 @@ describe('reinstalling an engine', () => {
     const post = (app: App, url: string) => app.inject({ method: 'POST', url });
     const catalogEntry = async (app: App, id: string) =>
         ((await app.inject({ method: 'GET', url: '/catalog' })).json() as CatalogEntry[]).find(entry => entry.id === id);
-    const managedEntry = (id: string) => JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8')).engines[id];
+    const managedEntry = (id: string) => recordedIn(dir).engines[id];
 
     /** Install `id` with a worker from an older release, as an upgraded box has it. */
     async function installStale(app: App, options: { version: string }, id = 'tone', query = '') {

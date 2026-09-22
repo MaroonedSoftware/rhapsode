@@ -28,6 +28,7 @@ import { openaiRoutes } from './openai/openai.routes.js';
 import { apiReferenceRoutes } from './reference/api.reference.routes.js';
 import { dialogueRoutes } from './speak/dialogue.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
+import { stateModule } from './state/state.module.js';
 import { updateModule } from './update/update.module.js';
 import { updateRoutes } from './update/update.routes.js';
 import { workerModule } from './workers/worker.module.js';
@@ -40,7 +41,10 @@ import type { RhapsodeConfig } from './config.js';
  * order is a decision rather than a detail.
  */
 export interface BuildOptions {
-    /** The engines this API installed, and where it records them. Absent, the server cannot install. */
+    /**
+     * The engines this API installed, and the state database it records them in, which the server
+     * closes when it stops. Absent, the server cannot install.
+     */
     managed?: ManagedEngines;
     /** How an install runs its commands. Replaced in tests, so an install can be driven without pip. */
     runner?: CommandRunner;
@@ -60,6 +64,8 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
     // this order means shutdown unwinds speak, then residency, then the workers. Registering the
     // worker module last would kill the children out from under streams still reading them.
     const modules: ServerKitModule[] = [
+        // First, so the state database closes after everything that might write to it.
+        stateModule(options.managed?.store),
         managementModule(settings),
         engineModule(settings, options.managed),
         workerModule(settings),
