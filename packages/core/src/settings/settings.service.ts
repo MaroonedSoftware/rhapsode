@@ -1,11 +1,13 @@
 import { nestKeys } from '@maroonedsoftware/appconfig';
 import type { Logger } from '@maroonedsoftware/logger';
-import type { SettingField, Settings, SettingsValues } from '@rhapsode/contract';
+import type { SettingField, Settings, SettingsPatch, SettingsValues } from '@rhapsode/contract';
 
 import { DEFAULTS, ENGINE_SETTINGS, SETTINGS, type RhapsodeConfig, type SettingApplies } from '../config.js';
+import { RhapsodeError } from '../errors/rhapsode.error.js';
 import { resolveInstallSettings } from '../install/install.settings.js';
+import { isLoopbackOrigin } from '../management/management.access.policy.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
-import type { ResidencyPolicy } from '../residency/residency.manager.js';
+import type { ResidencyManager, ResidencyPolicy } from '../residency/residency.manager.js';
 import { residencyPolicyFrom } from '../residency/residency.policy.js';
 import type { StateStore } from '../state/state.store.js';
 import { resolveUpdateSettings, type UpdateSettings } from '../update/update.settings.js';
@@ -34,6 +36,8 @@ export class SettingsService {
         /** Everything the server was built from: the file with the database over it. */
         boot: RhapsodeConfig,
         private readonly engines: EngineRegistry,
+        /** Late, because the residency manager is built from this service's policy. */
+        private readonly residency: () => Pick<ResidencyManager, 'rearmExpiry'>,
         logger: Logger,
         private readonly env: NodeJS.ProcessEnv = process.env,
     ) {
@@ -55,6 +59,99 @@ export class SettingsService {
             }
         }
         return { values: running.values, fields };
+    }
+
+    /**
+     * Write a patch to the database, and apply at once the settings that can be. § 10.
+     *
+     * Everything that can be refused is refused before anything is written, and the write is one
+     * transaction, so a refused patch changes nothing even where some of its keys were allowed.
+     */
+    async apply(patch: SettingsPatch, caller: SettingsCaller): Promise<void> {
+        const store = this.store;
+        if (store === undefined) {
+            throw new RhapsodeError('unsupported', 'this server was started without a state database, so it has nowhere to keep a setting');
+        }
+        const changes = flatten(patch);
+        if (changes.length === 0) return;
+
+        for (const [key] of changes) {
+            const engine = engineOf(key);
+            if (engine !== undefined && !this.engines.has(engine)) throw RhapsodeError.unknownEngine(engine, this.engines.ids());
+        }
+        for (const origin of patch.management?.origins ?? []) {
+            if (!isOrigin(origin)) {
+                throw new RhapsodeError(
+                    'bad_request',
+                    `"${origin}" in management.origins is not an origin: that is a scheme, a host and a port, such as http://tower:8081, with nothing after them`,
+                );
+            }
+        }
+        this.refuseLockout(patch, caller, store, changes);
+
+        store.transaction(() => {
+            for (const [key, value] of changes) store.setSetting(key, value ?? undefined);
+        });
+        await this.applyLive(store, changes);
+    }
+
+    /**
+     * A change after which its caller's next request would be refused. Judged on what the next
+     * start would use, since both settings it covers wait for one. § 10.
+     */
+    private refuseLockout(patch: SettingsPatch, caller: SettingsCaller, store: StateStore, changes: Change[]): void {
+        const pending = new Map(store.settings());
+        for (const [key, value] of changes) {
+            if (value === null) pending.delete(key);
+            else pending.set(key, value);
+        }
+        const next = valuesOf(overlay(this.operator, nestKeys(Object.fromEntries(pending), '.')), this.env);
+
+        // Only a token admits a caller from another machine, and without one the management routes
+        // answer this machine alone.
+        if (patch.management?.token !== undefined && !caller.local && next.token === undefined) {
+            throw new RhapsodeError(
+                'conflict',
+                'a caller on another machine cannot leave this server without a management token: its next request would be refused. Do it from the machine running rhapsode',
+            );
+        }
+        // A page on this machine is admitted by its origin whatever the list says.
+        if (
+            patch.management?.origins !== undefined &&
+            caller.origin !== undefined &&
+            !isLoopbackOrigin(caller.origin) &&
+            !next.values.management.origins.includes(caller.origin)
+        ) {
+            throw new RhapsodeError(
+                'conflict',
+                `management.origins would no longer list ${caller.origin}, the page making this change, which would then be refused. Keep it in the list, or change it from another page`,
+            );
+        }
+    }
+
+    /**
+     * The live settings from the database as it now stands, into the objects the residency manager
+     * and the update checker hold. Setting all of them rather than the ones patched costs nothing,
+     * and cannot leave one stale.
+     */
+    private async applyLive(store: StateStore, changes: Change[]): Promise<void> {
+        const live = overlay(this.operator, nestKeys(Object.fromEntries(store.settings()), '.'));
+        Object.assign(this.residencyPolicy, residencyPolicyFrom(live));
+        // Through the resolver, so RHAPSODE_UPDATE_CHECK=0 still turns it off whatever was written. § 9.
+        Object.assign(this.update, resolveUpdateSettings(live, this.env));
+
+        let rearm = changes.some(([key]) => key === 'residency.keepAliveSeconds');
+        for (const engine of new Set(changes.map(([key]) => engineOf(key)).filter(id => id !== undefined))) {
+            // The database, then the operator's entry, then what the install recorded: the order the
+            // engine's entry was merged in at boot.
+            const seconds =
+                store.setting(`engines.${engine}.keepAliveSeconds`) ??
+                this.operator.engines?.[engine]?.keepAliveSeconds ??
+                store.engine(engine)?.keepAliveSeconds;
+            this.engines.retune(engine, typeof seconds === 'number' ? seconds : undefined);
+            rearm = true;
+        }
+        if (rearm) await this.residency().rearmExpiry();
     }
 
     /** Restart settings as the server was built, live ones as they are now. */
@@ -98,6 +195,46 @@ export class SettingsService {
             return 'config';
         }
         return 'default';
+    }
+}
+
+/** What the lockout rules need to know about who is asking. § 10. */
+export interface SettingsCaller {
+    /** On this machine, as the management guard decides it. */
+    local: boolean;
+    /** The page's `Origin`, when a browser sent one. */
+    origin?: string;
+}
+
+/** One setting a patch names, by dotted key; `null` clears it from the database. */
+type Change = [key: string, value: unknown];
+
+/** A patch as the settings it names. A group or engine the patch leaves out names nothing. */
+function flatten(patch: SettingsPatch): Change[] {
+    const changes: Change[] = [];
+    for (const [group, members] of Object.entries(patch)) {
+        if (group === 'engines' || members === undefined) continue;
+        for (const [name, value] of Object.entries(members as Record<string, unknown>)) {
+            if (value !== undefined) changes.push([`${group}.${name}`, value]);
+        }
+    }
+    for (const [engine, members] of Object.entries(patch.engines ?? {})) {
+        for (const [name, value] of Object.entries(members)) {
+            if (value !== undefined) changes.push([`engines.${engine}.${name}`, value]);
+        }
+    }
+    return changes;
+}
+
+const engineOf = (key: string): string | undefined => (key.startsWith('engines.') ? key.split('.')[1] : undefined);
+
+/** `http://tower:8081`, exactly: what a browser sends as `Origin`, and nothing a browser never would. */
+function isOrigin(text: string): boolean {
+    try {
+        const url = new URL(text);
+        return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === text;
+    } catch {
+        return false;
     }
 }
 

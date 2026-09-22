@@ -1252,6 +1252,9 @@ with nothing after the host and port. A per-engine setting for an engine that is
 is `unknown_engine`. The contract's numbers are coerced, as its booleans are (§ 10, "Installing"),
 so `"8080"` is read as 8080; `null` is not a number and always means "clear".
 
+A server started without a state database (a core embedded as a library can be) answers
+`unsupported`, because it has nowhere to keep a setting, as it has nowhere to record an install.
+
 **A change that would lock its caller out is `conflict`.** Two, and both are checked before
 anything is written:
 

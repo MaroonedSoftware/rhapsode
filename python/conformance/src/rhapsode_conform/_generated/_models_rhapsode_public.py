@@ -70,6 +70,57 @@ class SettingField(BaseModel):
     # A value waiting for a restart. For management.token, `true` and never the token.
     saved: Any | None = None
 
+# A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and
+# every member nullable: `null` clears the database's value and the file's, or the default, shows
+# through again. The ranges here are the ones a value is refused outside of; § 10 lists them.
+class SettingsServerPatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    port: int | None = None
+    host: str | None = None
+    shutdown_grace_ms: int | None = Field(alias="shutdownGraceMs", default=None)
+
+class SettingsLogPatch(BaseModel):
+    level: Literal["error", "warn", "info", "debug", "trace"] | None = None
+
+class SettingsResidencyPatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    max_resident_models: int | None = Field(alias="maxResidentModels", default=None)
+    eviction_wait_seconds: int | None = Field(alias="evictionWaitSeconds", default=None)
+    keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
+
+class SettingsWorkersPatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    socket_dir: str | None = Field(alias="socketDir", default=None)
+    voice_dir: str | None = Field(alias="voiceDir", default=None)
+    startup_timeout_seconds: int | None = Field(alias="startupTimeoutSeconds", default=None)
+    drain_grace_ms: int | None = Field(alias="drainGraceMs", default=None)
+    max_restarts: int | None = Field(alias="maxRestarts", default=None)
+    restart_decay_seconds: int | None = Field(alias="restartDecaySeconds", default=None)
+
+class SettingsInstallPatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    venv_dir: str | None = Field(alias="venvDir", default=None)
+    source_dir: str | None = Field(alias="sourceDir", default=None)
+    python: str | None = None
+
+class SettingsManagementPatch(BaseModel):
+    # Empty is no token, even where the file has one.
+    token: str | None = None
+    # The whole list, replacing the file's rather than adding to it.
+    origins: list[str] | None = None
+
+class SettingsUpdatePatch(BaseModel):
+    check: bool | None = None
+
+class SettingsEnginePatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
+
 # This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
 # top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
 # already has a library that types it.
@@ -90,6 +141,16 @@ class SettingsValues(BaseModel):
     update: SettingsUpdate
     # One per engine in the registry.
     engines: dict[str, SettingsEngine]
+
+class SettingsPatch(BaseModel):
+    server: SettingsServerPatch | None = None
+    log: SettingsLogPatch | None = None
+    residency: SettingsResidencyPatch | None = None
+    workers: SettingsWorkersPatch | None = None
+    install: SettingsInstallPatch | None = None
+    management: SettingsManagementPatch | None = None
+    update: SettingsUpdatePatch | None = None
+    engines: dict[str, SettingsEnginePatch] | None = None
 
 class Settings(BaseModel):
     values: SettingsValues

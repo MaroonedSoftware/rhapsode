@@ -390,6 +390,79 @@ describe('the residency manager', () => {
             await clock.advance(600);
             expect(workers.calls).toEqual(['tone:load:fast']);
         });
+
+        describe('changed while a model sits idle', () => {
+            // PATCH /settings changes the policy object the manager holds, then re-arms. § 10.
+            const holding = (keepAliveSeconds: number) => {
+                const policy: ResidencyPolicy = { maxResidentModels: 1, evictionWaitSeconds: 30, keepAliveSeconds };
+                return { policy, residency: new ResidencyManager(workers, engines, silent(), policy, clock) };
+            };
+
+            it('counts a shorter keep-alive from the last use, so a model already past it goes now', async () => {
+                const { policy, residency } = holding(300);
+                (await residency.acquire('tone', 'fast')).release();
+                await clock.advance(100);
+
+                policy.keepAliveSeconds = 60;
+                await residency.rearmExpiry();
+                await clock.advance(0);
+
+                expect(workers.calls).toContain('tone:stop:evict');
+                expect(residency.summary().resident).toBe(0);
+            });
+
+            it('moves the deadline /residency reports when the keep-alive grows', async () => {
+                const { policy, residency } = holding(60);
+                (await residency.acquire('tone', 'fast')).release();
+                const lastUsed = clock.now();
+                await clock.advance(30);
+
+                policy.keepAliveSeconds = 600;
+                await residency.rearmExpiry();
+                await clock.advance(40);
+
+                expect(residency.summary().resident).toBe(1);
+                expect(residency.models()[0]!.expiresAt).toBe(lastUsed.plus({ seconds: 600 }).toISO());
+                expect(clock.armed).toBe(1);
+            });
+
+            it('takes an engine’s own keep-alive changed in the registry', async () => {
+                const { residency } = holding(600);
+                engines.declare({ id: 'tone', displayName: 'Tone', license: MIT, keepAliveSeconds: 600 });
+                (await residency.acquire('tone', 'fast')).release();
+                await clock.advance(10);
+
+                engines.retune('tone', 20);
+                await residency.rearmExpiry();
+                await clock.advance(10);
+
+                expect(residency.summary().resident).toBe(0);
+            });
+
+            it('drops the deadline for a keep-alive of -1', async () => {
+                const { policy, residency } = holding(60);
+                (await residency.acquire('tone', 'fast')).release();
+
+                policy.keepAliveSeconds = -1;
+                await residency.rearmExpiry();
+
+                expect(residency.models()[0]).not.toHaveProperty('expiresAt');
+                expect(clock.armed).toBe(0);
+            });
+
+            it('leaves a model being spoken alone, and gives it the new keep-alive when it is let go', async () => {
+                const { policy, residency } = holding(600);
+                const lease = await residency.acquire('tone', 'fast');
+
+                policy.keepAliveSeconds = 5;
+                await residency.rearmExpiry();
+                expect(clock.armed).toBe(0);
+
+                lease.release();
+                await clock.advance(5);
+                expect(residency.summary().resident).toBe(0);
+            });
+        });
     });
 
     describe('what is on the card', () => {

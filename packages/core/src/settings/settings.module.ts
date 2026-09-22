@@ -3,6 +3,7 @@ import { Logger } from '@maroonedsoftware/logger';
 
 import type { RhapsodeConfig } from '../config.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
+import { ResidencyManager } from '../residency/residency.manager.js';
 import type { StateStore } from '../state/state.store.js';
 import { SettingsService } from './settings.service.js';
 
@@ -19,7 +20,17 @@ export const settingsModule = (settings: RhapsodeConfig, store: StateStore | und
     async setup(registry) {
         registry
             .register(SettingsService)
-            .useFactory(container => new SettingsService(store, operator, settings, container.get(EngineRegistry), container.get(Logger)))
+            .useFactory(
+                container =>
+                    new SettingsService(
+                        store,
+                        operator,
+                        settings,
+                        container.get(EngineRegistry),
+                        () => container.get(ResidencyManager),
+                        container.get(Logger),
+                    ),
+            )
             .asSingleton();
     },
 });

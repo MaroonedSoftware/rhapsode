@@ -1140,6 +1140,82 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         }
                     }
                 }
+            },
+            "patch": {
+                "operationId": "updateSettings",
+                "description": "One transaction: a patch that is refused changes nothing. Answers the whole document after",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SettingsPatch"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Settings"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable entity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/v1/audio/speech": {
@@ -2523,6 +2599,228 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "values",
                     "fields"
                 ]
+            },
+            "SettingsServerPatch": {
+                "type": "object",
+                "properties": {
+                    "port": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 65535
+                    },
+                    "host": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 1
+                    },
+                    "shutdownGraceMs": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    }
+                },
+                "description": "A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and\nevery member nullable: `null` clears the database's value and the file's, or the default, shows\nthrough again. The ranges here are the ones a value is refused outside of; § 10 lists them."
+            },
+            "SettingsLogPatch": {
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "error",
+                            "warn",
+                            "info",
+                            "debug",
+                            "trace"
+                        ]
+                    }
+                }
+            },
+            "SettingsResidencyPatch": {
+                "type": "object",
+                "properties": {
+                    "maxResidentModels": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    },
+                    "evictionWaitSeconds": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "keepAliveSeconds": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": -1
+                    }
+                }
+            },
+            "SettingsWorkersPatch": {
+                "type": "object",
+                "properties": {
+                    "socketDir": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 1
+                    },
+                    "voiceDir": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 1
+                    },
+                    "startupTimeoutSeconds": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    },
+                    "drainGraceMs": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "maxRestarts": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "restartDecaySeconds": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    }
+                }
+            },
+            "SettingsInstallPatch": {
+                "type": "object",
+                "properties": {
+                    "venvDir": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 1
+                    },
+                    "sourceDir": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 1
+                    },
+                    "python": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 1
+                    }
+                }
+            },
+            "SettingsManagementPatch": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Empty is no token, even where the file has one."
+                    },
+                    "origins": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The whole list, replacing the file's rather than adding to it."
+                    }
+                }
+            },
+            "SettingsUpdatePatch": {
+                "type": "object",
+                "properties": {
+                    "check": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    }
+                }
+            },
+            "SettingsEnginePatch": {
+                "type": "object",
+                "properties": {
+                    "keepAliveSeconds": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": -1
+                    }
+                }
+            },
+            "SettingsPatch": {
+                "type": "object",
+                "properties": {
+                    "server": {
+                        "$ref": "#/components/schemas/SettingsServerPatch"
+                    },
+                    "log": {
+                        "$ref": "#/components/schemas/SettingsLogPatch"
+                    },
+                    "residency": {
+                        "$ref": "#/components/schemas/SettingsResidencyPatch"
+                    },
+                    "workers": {
+                        "$ref": "#/components/schemas/SettingsWorkersPatch"
+                    },
+                    "install": {
+                        "$ref": "#/components/schemas/SettingsInstallPatch"
+                    },
+                    "management": {
+                        "$ref": "#/components/schemas/SettingsManagementPatch"
+                    },
+                    "update": {
+                        "$ref": "#/components/schemas/SettingsUpdatePatch"
+                    },
+                    "engines": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/SettingsEnginePatch"
+                        }
+                    }
+                }
             },
             "OpenAISpeechRequest": {
                 "type": "object",

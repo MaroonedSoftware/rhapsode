@@ -467,12 +467,86 @@ contract mode(loose) Settings: {
     fields: array(SettingField)
 }
 
+# A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and
+# every member nullable: `null` clears the database's value and the file's, or the default, shows
+# through again. The ranges here are the ones a value is refused outside of; § 10 lists them.
+contract SettingsServerPatch: {
+    port?: null | int(min=1, max=65535)
+    host?: null | string(min=1)
+    shutdownGraceMs?: null | int(min=0)
+}
+
+contract SettingsLogPatch: {
+    level?: null | enum(error, warn, info, debug, trace)
+}
+
+contract SettingsResidencyPatch: {
+    maxResidentModels?: null | int(min=1)
+    evictionWaitSeconds?: null | int(min=0)
+    keepAliveSeconds?: null | int(min=-1)
+}
+
+contract SettingsWorkersPatch: {
+    socketDir?: null | string(min=1)
+    voiceDir?: null | string(min=1)
+    startupTimeoutSeconds?: null | int(min=1)
+    drainGraceMs?: null | int(min=0)
+    maxRestarts?: null | int(min=0)
+    restartDecaySeconds?: null | int(min=0)
+}
+
+contract SettingsInstallPatch: {
+    venvDir?: null | string(min=1)
+    sourceDir?: null | string(min=1)
+    python?: null | string(min=1)
+}
+
+contract SettingsManagementPatch: {
+    token?: null | string                       # Empty is no token, even where the file has one.
+    origins?: null | array(string)              # The whole list, replacing the file's rather than adding to it.
+}
+
+contract SettingsUpdatePatch: {
+    check?: null | boolean
+}
+
+contract SettingsEnginePatch: {
+    keepAliveSeconds?: null | int(min=-1)
+}
+
+contract SettingsPatch: {
+    server?: SettingsServerPatch
+    log?: SettingsLogPatch
+    residency?: SettingsResidencyPatch
+    workers?: SettingsWorkersPatch
+    install?: SettingsInstallPatch
+    management?: SettingsManagementPatch
+    update?: SettingsUpdatePatch
+    engines?: record(string, SettingsEnginePatch)
+}
+
 operation /settings: {
     get: {
         sdk: settings
         response: {
             200: { application/json: Settings }
             403: { application/json: ErrorBody }
+        }
+    }
+    patch: {
+        # One transaction: a patch that is refused changes nothing. Answers the whole document after
+        # the write. A change that would lock its caller out is a 409. § 10.
+        sdk: updateSettings
+        request: {
+            application/json: SettingsPatch
+        }
+        response: {
+            200: { application/json: Settings }
+            400: { application/json: ErrorBody }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
         }
     }
 }

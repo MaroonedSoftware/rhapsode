@@ -107,6 +107,118 @@ export const SettingField = z.looseObject({
 export type SettingField = z.infer<typeof SettingField>;
 
 /**
+ * A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and
+ * every member nullable: `null` clears the database's value and the file's, or the default, shows
+ * through again. The ranges here are the ones a value is refused outside of; § 10 lists them.
+ * generated from [SettingsServerPatch](../../../../contracts/rhapsode.public.ck#L473)
+ */
+export const SettingsServerPatch = z.strictObject({
+    port: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(1).max(65535))
+        .nullable()
+        .optional(),
+    host: z.string().min(1).nullable().optional(),
+    shutdownGraceMs: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(0))
+        .nullable()
+        .optional(),
+});
+export type SettingsServerPatch = z.infer<typeof SettingsServerPatch>;
+
+/**
+ * generated from [SettingsLogPatch](../../../../contracts/rhapsode.public.ck#L479)
+ */
+export const SettingsLogPatch = z.strictObject({
+    level: z.enum(['error', 'warn', 'info', 'debug', 'trace']).nullable().optional(),
+});
+export type SettingsLogPatch = z.infer<typeof SettingsLogPatch>;
+
+/**
+ * generated from [SettingsResidencyPatch](../../../../contracts/rhapsode.public.ck#L483)
+ */
+export const SettingsResidencyPatch = z.strictObject({
+    maxResidentModels: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(1))
+        .nullable()
+        .optional(),
+    evictionWaitSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(0))
+        .nullable()
+        .optional(),
+    keepAliveSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(-1))
+        .nullable()
+        .optional(),
+});
+export type SettingsResidencyPatch = z.infer<typeof SettingsResidencyPatch>;
+
+/**
+ * generated from [SettingsWorkersPatch](../../../../contracts/rhapsode.public.ck#L489)
+ */
+export const SettingsWorkersPatch = z.strictObject({
+    socketDir: z.string().min(1).nullable().optional(),
+    voiceDir: z.string().min(1).nullable().optional(),
+    startupTimeoutSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(1))
+        .nullable()
+        .optional(),
+    drainGraceMs: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(0))
+        .nullable()
+        .optional(),
+    maxRestarts: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(0))
+        .nullable()
+        .optional(),
+    restartDecaySeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(0))
+        .nullable()
+        .optional(),
+});
+export type SettingsWorkersPatch = z.infer<typeof SettingsWorkersPatch>;
+
+/**
+ * generated from [SettingsInstallPatch](../../../../contracts/rhapsode.public.ck#L498)
+ */
+export const SettingsInstallPatch = z.strictObject({
+    venvDir: z.string().min(1).nullable().optional(),
+    sourceDir: z.string().min(1).nullable().optional(),
+    python: z.string().min(1).nullable().optional(),
+});
+export type SettingsInstallPatch = z.infer<typeof SettingsInstallPatch>;
+
+/**
+ * generated from [SettingsManagementPatch](../../../../contracts/rhapsode.public.ck#L504)
+ */
+export const SettingsManagementPatch = z.strictObject({
+    token: z.string().nullable().optional().describe('Empty is no token, even where the file has one.'),
+    origins: z.array(z.string()).nullable().optional().describe("The whole list, replacing the file's rather than adding to it."),
+});
+export type SettingsManagementPatch = z.infer<typeof SettingsManagementPatch>;
+
+/**
+ * generated from [SettingsUpdatePatch](../../../../contracts/rhapsode.public.ck#L509)
+ */
+export const SettingsUpdatePatch = z.strictObject({
+    check: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .nullable()
+        .optional(),
+});
+export type SettingsUpdatePatch = z.infer<typeof SettingsUpdatePatch>;
+
+/**
+ * generated from [SettingsEnginePatch](../../../../contracts/rhapsode.public.ck#L513)
+ */
+export const SettingsEnginePatch = z.strictObject({
+    keepAliveSeconds: z
+        .preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(-1))
+        .nullable()
+        .optional(),
+});
+export type SettingsEnginePatch = z.infer<typeof SettingsEnginePatch>;
+
+/**
  * This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
  * top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
  * already has a library that types it.
@@ -135,6 +247,21 @@ export const SettingsValues = z.looseObject({
     engines: z.record(z.string(), SettingsEngine).describe('One per engine in the registry.'),
 });
 export type SettingsValues = z.infer<typeof SettingsValues>;
+
+/**
+ * generated from [SettingsPatch](../../../../contracts/rhapsode.public.ck#L517)
+ */
+export const SettingsPatch = z.strictObject({
+    server: SettingsServerPatch.optional(),
+    log: SettingsLogPatch.optional(),
+    residency: SettingsResidencyPatch.optional(),
+    workers: SettingsWorkersPatch.optional(),
+    install: SettingsInstallPatch.optional(),
+    management: SettingsManagementPatch.optional(),
+    update: SettingsUpdatePatch.optional(),
+    engines: z.record(z.string(), SettingsEnginePatch).optional(),
+});
+export type SettingsPatch = z.infer<typeof SettingsPatch>;
 
 /**
  * generated from [Settings](../../../../contracts/rhapsode.public.ck#L465)
