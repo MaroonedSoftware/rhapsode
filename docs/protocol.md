@@ -178,7 +178,8 @@ places.
 
 ### Core policy, not worker policy
 
-The worker obeys; the core decides. Default policy, all configurable:
+The worker obeys; the core decides. Default policy, all of it settable, and without a restart
+(§ 10, "Settings"):
 
 - `maxResidentModels` (default 1, which is the right answer for one GPU)
 - LRU eviction when a `/speak` needs a model and the budget is full
@@ -1070,9 +1071,11 @@ latest release is public, and the only other thing it says is whether this box c
 
 **It is on by default**, because the failure it exists to prevent, a box that quietly stays several
 releases behind, is invisible from inside the box, and a check that has to be turned on is one only
-the operators who already watch releases will turn on. `update.check: false` in the config, or
-`RHAPSODE_UPDATE_CHECK=0` in the server's environment, turns it off, and the route then answers
-`check: off` without ever having asked.
+the operators who already watch releases will turn on. `update.check: false` in the config or the
+settings (§ 10), or `RHAPSODE_UPDATE_CHECK=0` in the server's environment, turns it off, and the
+route then answers `check: off` without ever having asked. The environment can only turn it off:
+a setting of `true` does not override `RHAPSODE_UPDATE_CHECK=0`, because whoever set the
+environment decided the box would not phone out, and a page is not the place to overrule them.
 
 **The core does not update itself.** In the image it could only do so with the Docker socket, which
 is control of the host, and the one mechanism every operator already trusts is `docker compose pull`.
@@ -1122,6 +1125,8 @@ what one is built on.
 | `GET /installs` | Every job this process knows about, newest first |
 | `GET /installs/{job}` | One job |
 | `GET /installs/{job}/events` | The job's progress as server-sent events |
+| `GET /settings` | Every setting: the value in use, where it came from, and whether a change to it applies now |
+| `PATCH /settings` | Changes some of them; those that can apply now do, the rest wait for the next start |
 
 ### Who may call them
 
@@ -1152,6 +1157,118 @@ make a caller less trusted: leaving it out gains a local caller nothing it did n
 
 The guard runs before the request body is read and before any stream opens, so a refused caller is
 refused cheaply and cannot hold a connection.
+
+### Settings
+
+Everything in the config file can also be changed through the API, so that a person can configure
+the box from a page or a terminal without editing a file and restarting. Configuring used to mean
+finding the file (inside a container, on a volume), editing JSON by hand with no check that a value
+was allowed until the next boot refused it, and a restart that dropped every model on the card
+whether or not the change needed one.
+
+**Where a value comes from.** Three layers, each over the one before: the defaults, the operator's
+config file, and the settings in the state database (below). **The database wins.** The file is what
+a box starts with, the database is what it has been told since, and `PATCH /settings` writes only
+the database. A setting cleared from the database falls back to the file's value, and then to the
+default. The file is still never written by the core, for the reasons under "The state database",
+and it still has to exist first: it is what says where the database is.
+
+The reverse order, the file over the database, was the rule for engines and was considered here. It
+makes every value the file names read-only on the page, and the file is exactly where a first boot
+puts values (the Docker image seeds four), so the settings a person would most want to change are
+the ones a page could not.
+
+**`GET /settings`** answers the whole document:
+
+```json
+{
+  "values": {
+    "server": { "port": 8080, "host": "::", "shutdownGraceMs": 20000 },
+    "log": { "level": "info" },
+    "residency": { "maxResidentModels": 1, "evictionWaitSeconds": 30, "keepAliveSeconds": 300 },
+    "workers": { "socketDir": "/tmp/rhapsode", "voiceDir": "/config/voices", "startupTimeoutSeconds": 60, "drainGraceMs": 10000, "maxRestarts": 5, "restartDecaySeconds": 300 },
+    "install": { "venvDir": "/data/.rhapsode/venvs", "sourceDir": "/app/python", "python": "3.12" },
+    "management": { "tokenSet": true, "origins": [] },
+    "update": { "check": true },
+    "engines": { "kokoro": { "keepAliveSeconds": 900 } }
+  },
+  "fields": [
+    { "key": "residency.keepAliveSeconds", "source": "default", "applies": "live" },
+    { "key": "server.port", "source": "config", "applies": "restart", "saved": 9090 },
+    { "key": "engines.kokoro.keepAliveSeconds", "source": "database", "applies": "live" }
+  ]
+}
+```
+
+- **`values` is what the running process is using**, not what is saved. A setting that waits for a
+  restart shows its old value here until the restart.
+- **`fields` has one entry per setting**, by dotted key. `source` is the layer the value came from:
+  `default`, `config` or `database`. `applies` is `live` or `restart`. `saved` is present only when
+  the database holds a value the process is not using yet, which is a change waiting for a restart,
+  and a client says so.
+- **The token is never in it.** `management.tokenSet` says whether one is configured. The token is a
+  root password for the box (above), and a document read to draw a form is not a place to carry one.
+- **`engines` has an entry for each engine in the registry**, holding the settings that are per
+  engine. The engine's entry itself (its virtualenv, its module, its `env`) is not a setting: it is
+  what the install recorded or the operator wrote, and it is changed by reinstalling or by editing
+  the file.
+
+**`PATCH /settings`** takes any part of `values`, and answers the whole document as it stands after
+the write. `null` clears a setting from the database. `management.token` is written as a string,
+`management.tokenSet` is never written, and a key the document does not have is `bad_request`, so
+a misspelt setting is refused rather than saved and ignored. An array replaces the one below it
+rather than adding to it: `management.origins` set in the database is the whole list. The write is
+one transaction, so a patch that is refused changes nothing, even where some of its keys were
+allowed.
+
+**What applies now, and what waits.** Five settings apply as soon as they are written:
+`residency.maxResidentModels`, `residency.evictionWaitSeconds`, `residency.keepAliveSeconds`, each
+engine's `keepAliveSeconds`, and `update.check`. They are the ones the core reads when it uses them
+rather than once at boot, and they are the ones a person tunes while watching a box run: a
+keep-alive is set by seeing how long a model sits idle on the card, and a restart to try a value
+would drop the model being measured. A change to either keep-alive moves the deadline of every model
+idle now, rather than from its next request, because a deadline nobody sees move reads as a setting
+that did nothing. A lower `maxResidentModels` evicts nothing on its own: the next load that needs the
+room evicts, by § 3's rules, exactly as it would have.
+
+Everything else waits for the next start, for a reason each:
+
+- `server.port` and `server.host` are the socket the request that changed them arrived on.
+- `workers.*` and `install.*` are read by a worker or an install as it starts, and several are
+  directories that engines and voices already live in. Changing one moves nothing: an engine
+  installed under the old `install.venvDir` runs from there until it is reinstalled, and voices
+  under the old `workers.voiceDir` are not found under the new one. Move them first.
+- `management.token` and `management.origins` are what the Docker image's proxy is built from when
+  the container starts (it presents the token for the page). Applied live, the core would refuse
+  the page its own proxy serves until the next start, which is the same restart later with a broken
+  page in between.
+- `log.level` and `server.shutdownGraceMs` are read once, when the server is built.
+
+**Refusals.** A value out of range is `bad_request`, naming the setting: a port outside 1 to 65535,
+a keep-alive below `-1`, a `maxResidentModels` below 1, a negative wait or grace, a `log.level`
+outside `debug`, `info`, `warn`, `error`, an origin that is not an absolute `http` or `https` origin
+with nothing after the host and port. A per-engine setting for an engine that is not in the registry
+is `unknown_engine`. The contract's numbers are coerced, as its booleans are (§ 10, "Installing"),
+so `"8080"` is read as 8080; `null` is not a number and always means "clear".
+
+**A change that would lock its caller out is `conflict`.** Two, and both are checked before
+anything is written:
+
+- A caller that is not local may not clear the token or set it empty. It could only have been
+  admitted by the token, and without one the management routes answer loopback callers only, so
+  its next request, and every one after, would be `forbidden`.
+- A caller whose `Origin` is not this machine's own may not leave that origin out of
+  `management.origins`. Its page would be refused from the next start on. A page on this machine is
+  admitted by its origin whatever the list says, so it is never refused this.
+
+Neither rule stops an operator: at the machine, or from a page they have listed, both changes are
+allowed, and the file and the database are theirs to edit by hand.
+
+**Both routes are management routes**, behind the guard above, reading included. `GET /settings`
+names directories on the box, the origins it trusts and whether it has a token, which is a map for
+somebody deciding where to push next, and a page that cannot change settings has no use for it
+either. The web page and `pnpm wizard settings` are the two clients, and the page has nothing the
+wizard does not (§ 12).
 
 ### The catalog
 
@@ -1197,7 +1314,7 @@ An install is four steps, and a job reports which one it is on:
 3. **`verify`**: import the engine's module with the new interpreter. That is the command the core
    will spawn, minus serving, and it is the check that a virtualenv pip abandoned halfway fails,
    although its `bin/python` runs perfectly well.
-4. **`register`**: record the engine in the managed file, with the weights licence the install
+4. **`register`**: record the engine in the state database, with the weights licence the install
    accepted, and add it to the running registry. No restart: the next `/speak` for it spawns a
    worker.
 5. **`weights`**, only when asked: fetch a variant, exactly as a pull does (below).
@@ -1226,7 +1343,7 @@ through the API. Weakening certificate verification stays a decision made on the
 Installing an engine that is already installed or already installing is `conflict`, and so is
 installing one the operator's config names, even disabled: that entry would win over whatever the
 install recorded. An id that is not in the catalog is `unknown_engine`. A server started without a
-managed file (a core embedded as a library can be) answers `unsupported`, because it has nowhere to
+state database (a core embedded as a library can be) answers `unsupported`, because it has nowhere to
 record the result.
 
 ### Accepting a weights licence
@@ -1257,23 +1374,46 @@ was configured by the operator, whose own file is their decision. A client still
 a person. The web page and the wizard send `accept` only once somebody has seen both licences and
 said yes, and the wizard with nobody at the terminal accepts only when given `--yes`.
 
-### The managed file
+### The state database
 
-The core records what it installed in `rhapsode.engines.json`, beside the config file, and reads it
-at boot underneath the config: **where both name the same engine, the operator's config wins.** The
-core never writes the operator's file. That file may carry comments that a rewrite would lose, may
-sit on a read-only path, and is somebody's hand-kept record of the box. One writer per file is the
-rule that keeps both honest.
+The core keeps what it has been told in `rhapsode.db`, a SQLite database beside the config file:
+the engines it installed, and the settings written through `PATCH /settings`. **The core never
+writes the operator's file.** That file may carry comments that a rewrite would lose, may sit on a
+read-only path, and is somebody's hand-kept record of the box. One writer per file is the rule that
+keeps both honest.
 
-An entry in it is an engine entry like one in the config, plus one field the core keeps for itself:
-`accepted`, the weights licence the last install or reinstall accepted, as the `accept` query named
-it, and absent when none was needed. Boot ignores it. A reinstall reads it (below).
+It is a database rather than the JSON file it replaces, `rhapsode.engines.json`, because there are
+now two writers, installs and settings, and a file rewritten whole by each needs both to hold one
+lock to avoid losing the other's write. SQLite gives each a transaction, and it ships with Node, so
+it costs no dependency and no build step. It is not a database server: rhapsode is one process on
+one box, and a second service to install, upgrade and back up would buy nothing that one file does
+not.
+
+- **It keeps its journal only while writing.** A backup of the config directory taken while the
+  core runs is then the database as of its last write. Write-ahead logging would leave the latest
+  writes in a second file beside it, which a copy of the one file misses.
+- **It is opened, and written to once, at boot**, so a database the core cannot write to fails the
+  start naming its path, rather than the first install hours later.
+- **A core that finds `rhapsode.engines.json` beside the config imports it** into the database in
+  one transaction and renames it `rhapsode.engines.json.imported`. It is left there rather than
+  deleted so that a downgrade has something to go back to.
+
+**Engines keep the rule the file had: where the operator's config and the database name the same
+engine, the operator's config wins.** It is the opposite of the rule for settings, on purpose. An
+engine entry is what makes an engine exist, and an operator who configured one by hand is the only
+party who can remove it (an uninstall refuses theirs, below). Were the database's entry to win, an
+install over an operator's engine would replace it until somebody opened the database, and removing
+the engine from the file would no longer remove it. A setting only tunes something that exists.
+
+An engine's entry is an engine entry like one in the config, plus one field the core keeps for
+itself: `accepted`, the weights licence the last install or reinstall accepted, as the `accept`
+query named it, and absent when none was needed. Boot ignores it. A reinstall reads it (below).
 
 ### Uninstalling
 
 `DELETE /engines/{id}` terminates the worker, removes the engine from the registry and from the
-managed file, and deletes its virtualenv, and the other slot's if one is there, but only a virtualenv
-inside `install.venvDir`. An engine
+state database, along with its per-engine settings, and deletes its virtualenv, and the other slot's
+if one is there, but only a virtualenv inside `install.venvDir`. An engine
 the operator configured is `conflict`: it is theirs to remove, by editing their file. So is an
 engine that is speaking, because an uninstall that cut a stream off would hand that caller a
 truncated file for a reason it could not have predicted; the removal happens under the same lock a
@@ -1298,8 +1438,8 @@ remedy was an uninstall followed by an install, two calls with a stretch between
 engine did not exist and a failed install left nothing at all.
 
 **The new virtualenv is built beside the old one, and the engine keeps working until it is ready.**
-An engine has two slots, `<install.venvDir>/<id>` and `<install.venvDir>/<id>.alt`, and the managed
-file's `venv` says which one it runs from. A reinstall removes whatever is in the other slot (the
+An engine has two slots, `<install.venvDir>/<id>` and `<install.venvDir>/<id>.alt`, and the `venv`
+in its state database entry says which one it runs from. A reinstall removes whatever is in the other slot (the
 remains of one that did not finish), builds there, and verifies there, so the interpreter it imports
 the engine with is the one the core will spawn. A virtualenv is never moved: it is not relocatable,
 and every script in its `bin` names its own path in its first line, so a renamed one runs
@@ -1315,10 +1455,10 @@ takes, as an uninstall does, and while the engine holds a lease it waits for the
 up to ten minutes; past that the job fails with `conflict` and nothing has changed. An uninstall
 refuses instead, because its caller is present to be told; a reinstall's caller has usually gone,
 and on a busy box a reinstall that refused whenever the engine was speaking would never finish.
-Under the lock it records the new slot in the managed file, stops the old worker, and declares the
-engine again, which reads the new `workerVersion` and `outdated`. The managed file is written first,
-so a core that dies at any point after it boots on the new virtualenv, and one that dies before it
-boots on the old. The old slot is deleted last.
+Under the lock it records the new slot in the state database, stops the old worker, and declares
+the engine again, which reads the new `workerVersion` and `outdated`. The database is committed
+first, so a core that dies at any point after it boots on the new virtualenv, and one that dies
+before it boots on the old. The old slot is deleted last.
 
 What it costs, and what a client should say before asking for it:
 
@@ -1330,10 +1470,10 @@ What it costs, and what a client should say before asking for it:
 The refusals are an install's, reversed, and all of them come before a job exists: an engine that is
 not installed, or is not in the catalog, is `unknown_engine`; one the operator's config names is
 `conflict`, as for uninstall; and one with a job queued or running is `conflict`. A server without a
-managed file has installed nothing, so every engine it has is the operator's.
+state database has installed nothing, so every engine it has is the operator's.
 
 **A reinstall asks for the licence only when what was accepted no longer covers it.** Where the
-catalog says `weightsCommercialUse: false`, a reinstall needs no `accept` if the managed file's
+catalog says `weightsCommercialUse: false`, a reinstall needs no `accept` if the engine's recorded
 `accepted` is the catalog's `weights` exactly, because somebody accepted those terms and nothing
 since has changed them. It needs one, and is refused as an install is without it, when the entry has
 no `accepted` (an engine installed by a core that did not record one) or names another licence (the
