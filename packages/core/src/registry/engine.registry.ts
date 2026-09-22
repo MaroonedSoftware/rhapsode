@@ -2,6 +2,7 @@ import { Injectable } from 'injectkit';
 
 import type { EngineSummary, License } from '@rhapsode/contract';
 
+import { CORE_VERSION } from '../core.version.js';
 import { installedWorkerVersion } from './worker.version.js';
 
 /** What an engine is, before anything has tried to run it. */
@@ -72,6 +73,17 @@ export class EngineRegistry {
         return this.workerVersions.get(id);
     }
 
+    /**
+     * Whether an upgrade left this engine's pin behind, so that no client compares versions. § 9.
+     *
+     * "Differs" rather than "older": a core rolled back breaks the pin the same way, and the remedy
+     * is the same reinstall. Undefined where `workerVersion` is, rather than guessed.
+     */
+    outdated(id: string): boolean | undefined {
+        const workerVersion = this.workerVersion(id);
+        return workerVersion === undefined ? undefined : workerVersion !== CORE_VERSION;
+    }
+
     has(id: string): boolean {
         return this.entries.has(id);
     }
@@ -96,6 +108,7 @@ export class EngineRegistry {
         return [...this.entries.values()].map(entry => {
             const state = this.state(entry.id);
             const workerVersion = this.workerVersion(entry.id);
+            const outdated = this.outdated(entry.id);
             return {
                 id: entry.id,
                 displayName: entry.displayName,
@@ -106,6 +119,7 @@ export class EngineRegistry {
                 ...(state.variant === undefined ? {} : { variant: state.variant }),
                 ...(state.lastError === undefined ? {} : { lastError: state.lastError }),
                 ...(workerVersion === undefined ? {} : { workerVersion }),
+                ...(outdated === undefined ? {} : { outdated }),
             };
         });
     }

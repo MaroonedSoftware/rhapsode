@@ -182,6 +182,32 @@ class ResidentModel(BaseModel):
     # What the worker measured the model taking, where it could.
     size_bytes: int | None = Field(alias="sizeBytes", default=None)
 
+# Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+class UpdateStatus(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    # This core.
+    version: str
+    # off: turned off. pending: no answer yet. failed: the last attempt got none.
+    check: Literal["off", "pending", "ok", "failed"]
+    # The latest release, without its `v`. Present with `ok`.
+    latest: str | None = None
+    # Whether `latest` is newer than this core. Present with `ok`.
+    update_available: bool | None = Field(alias="updateAvailable", default=None)
+    # The release's page, for its notes.
+    release_url: str | None = Field(alias="releaseUrl", default=None)
+    # ISO 8601, UTC. When `latest` was read.
+    checked_at: str | None = Field(alias="checkedAt", default=None)
+    # Which upgrade instructions apply.
+    distribution: Literal["docker", "source"]
+
+# An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+# reinstall would have to ask somebody about. § 10.
+class ReinstallSkipped(BaseModel):
+    engine: str
+    # Needs `accept`; has a job already; the catalog no longer has it.
+    reason: Literal["licence", "busy", "uncatalogued"]
+
 class PullRequest(BaseModel):
     # Absent means the engine's default variant.
     variant: str | None = None
@@ -235,6 +261,9 @@ class EngineSummary(BaseModel):
     # differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
     # includes every remote engine. protocol.md § 9.
     worker_version: str | None = Field(alias="workerVersion", default=None)
+    # Whether `workerVersion` differs from this core's version, so no client compares the two.
+    # Absent exactly when `workerVersion` is. A warning, never a refusal. protocol.md § 9.
+    outdated: bool | None = None
 
 # What exists, installed or not. `/engines` is what this box has; this is what it could have, with
 # both licences, because the weights licence is only worth reading before the install.
@@ -250,6 +279,10 @@ class CatalogEntry(BaseModel):
     installed: Literal["no", "installing", "yes"]
     # Installed through the API, so removable by it.
     managed: bool
+    # As on EngineSummary, for an installed engine. § 9.
+    worker_version: str | None = Field(alias="workerVersion", default=None)
+    # As on EngineSummary. § 9.
+    outdated: bool | None = None
 
 # The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
 # and a worker has no opinion about how long anything stays resident. protocol.md § 3.
@@ -281,7 +314,7 @@ class InstallJob(BaseModel):
 
     id: str
     engine: str
-    kind: Literal["install", "pull"]
+    kind: Literal["install", "pull", "reinstall"]
     # What a pull fetches, or an install fetches in step 5.
     variant: str | None = None
     state: Literal["queued", "running", "succeeded", "failed"]
@@ -326,6 +359,8 @@ class CurrentVariant(Variant):
 
 class CoreHealth(BaseModel):
     contract: int
+    # The running core's package version, for display. Not the contract. § 9.
+    version: str
     status: Literal["ok", "degraded"]
     engines: list[EngineSummary]
     residency: ResidencySummary
@@ -335,6 +370,11 @@ class EngineDialogueRequest(DialogueRequest):
     model_config = ConfigDict(populate_by_name=True)
 
     keep_alive_seconds: int | None = Field(alias="keepAliveSeconds", default=None)
+
+class ReinstallOutdated(BaseModel):
+    # One reinstall per outdated engine this API installed, in id order.
+    jobs: list[InstallJob]
+    skipped: list[ReinstallSkipped]
 
 class Capabilities(BaseModel):
     # The contract major this worker settled on. § 9.

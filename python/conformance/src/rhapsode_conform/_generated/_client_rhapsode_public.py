@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ResidencyDetail, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice
 
 
 UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
@@ -16,6 +16,11 @@ UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
 
 InstallEngineQuery = TypedDict("InstallEngineQuery", {
     "pull": NotRequired[str],
+    "accept": NotRequired[str],
+})
+
+
+ReinstallEngineQuery = TypedDict("ReinstallEngineQuery", {
     "accept": NotRequired[str],
 })
 
@@ -268,6 +273,36 @@ class InstallEngine409Response(TypedDict):
     data: ErrorBody
 
 
+class ReinstallEngine202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: InstallJob
+
+
+class ReinstallEngine400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 class PullEngine202Response(TypedDict):
     status: Literal[202]
     content_type: Literal["application/json"]
@@ -299,6 +334,18 @@ class InstallJobs200Response(TypedDict):
 
 
 class InstallJobs403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class ReinstallOutdated202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: ReinstallOutdated
+
+
+class ReinstallOutdated403Response(TypedDict):
     status: Literal[403]
     content_type: Literal["application/json"]
     data: ErrorBody
@@ -354,6 +401,13 @@ class RhapsodePublicClient(BaseClient):
         """
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
+
+    async def update_status(self) -> UpdateStatus:
+        """
+        Open to every caller, like /health. It never waits on the network: a first call after boot
+        """
+        result = await self._fetch("/update", method="GET")
+        return UpdateStatus.model_validate(result)
 
     async def residency(self) -> ResidencyDetail:
         """
@@ -518,6 +572,18 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
 
+    async def reinstall_engine(self, engine: str, query: ReinstallEngineQuery | None = None) -> ReinstallEngine202Response | ReinstallEngine400Response | ReinstallEngine403Response | ReinstallEngine404Response | ReinstallEngine409Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/reinstall", method="POST", response_kind="auto", expect_statuses=(400, 403, 404, 409), params=query)
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
+
     async def pull_engine(self, engine: str, body: PullRequest) -> PullEngine202Response | PullEngine403Response | PullEngine404Response | PullEngine409Response:
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/pull", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(403, 404, 409))
         if _status == 403:
@@ -533,6 +599,12 @@ class RhapsodePublicClient(BaseClient):
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "application/json", "data": _INSTALL_JOBS_RESPONSE_200.validate_python(result) }
+
+    async def reinstall_outdated(self) -> ReinstallOutdated202Response | ReinstallOutdated403Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full("/installs/outdated", method="POST", response_kind="auto", expect_statuses=(403,))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": ReinstallOutdated.model_validate(result) }
 
     async def install_job(self, job: str) -> InstallJob200Response | InstallJob403Response | InstallJob404Response:
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(str(job), safe='')}", method="GET", response_kind="auto", expect_statuses=(403, 404))

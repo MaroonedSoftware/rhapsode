@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
+import type { InstallJob, ReinstallOutdated } from '@maroonedsoftware/rhapsode-sdk';
 
 import { sdk } from './client';
 import { queryKeys } from './query.keys';
@@ -23,14 +23,16 @@ export function useInstallJob(id: string | undefined) {
 }
 
 /**
- * What changes when a job starts or ends: the catalog's `installed`, and the job list.
+ * What changes when a job starts or ends: the catalog's `installed` and `outdated`, the engine list
+ * a reinstall gives a new `workerVersion`, and the job list.
  *
- * Invalidated rather than patched. The core is the one writer of both, and a guess at what it now
- * says is the answer the page would have to take back when the refetch lands.
+ * Invalidated rather than patched. The core is the one writer of all three, and a guess at what it
+ * now says is the answer the page would have to take back when the refetch lands.
  */
 export function invalidateAfterJob(queryClient: QueryClient): Promise<void> {
     return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.catalog() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.engines() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.installs.all() }),
     ]).then(() => undefined);
 }
@@ -61,6 +63,29 @@ export function useUninstallEngine() {
         mutationFn: async (engine: string) => {
             unwrap(await sdk.public.uninstallEngine(engine));
         },
+        onSettled: () => invalidateAfterJob(queryClient),
+    });
+}
+
+/**
+ * Rebuild an installed engine beside itself and swap it in. `accept` is the weights licence the
+ * dialog showed, sent as install sends it: the core checks it either way, and asks for it only
+ * where what the last install accepted no longer covers the weights. § 10.
+ */
+export function useReinstallEngine() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ engine, accept }: { engine: string; accept: string }) =>
+            unwrap<InstallJob>(await sdk.public.reinstallEngine(engine, { accept })),
+        onSettled: () => invalidateAfterJob(queryClient),
+    });
+}
+
+/** A reinstall for every outdated engine this server installed. The core decides which. § 10. */
+export function useReinstallOutdated() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async () => unwrap<ReinstallOutdated>(await sdk.public.reinstallOutdated()),
         onSettled: () => invalidateAfterJob(queryClient),
     });
 }

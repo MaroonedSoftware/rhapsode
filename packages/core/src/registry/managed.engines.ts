@@ -47,6 +47,11 @@ export class ManagedEngines {
         return this.operatorOwned.has(id);
     }
 
+    /** What the managed file says of an engine, which is where a reinstall finds what was accepted. */
+    entry(id: string): ConfiguredEngine | undefined {
+        return this.entries.get(id);
+    }
+
     async record(id: string, entry: ConfiguredEngine): Promise<void> {
         this.entries.set(id, entry);
         await this.persist();

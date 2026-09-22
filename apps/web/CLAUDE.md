@@ -63,7 +63,9 @@ and the job list rather than patching them: the core is their only writer.
 **`useResidency` is the one polled query, and the only one that should be.** Every other document
 changes when something on the page asks it to, and a keep-alive runs out on its own, so without the
 poll a row sits on screen minutes after its model has gone. Anything else that wants a `refetchInterval`
-probably wants an invalidation instead.
+probably wants an invalidation instead. `useUpdateStatus` refetches only while the core's first check
+is `pending` and stops at its answer, which is the core waiting on GitHub rather than a document
+changing on its own.
 
 **`unwrap` is for an operation that declares refusals.** `GET /residency` declares none, so the SDK
 hands back the document itself and the query uses it directly, as `useEngines` does. Passing a bare

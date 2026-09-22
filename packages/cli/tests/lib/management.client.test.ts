@@ -65,6 +65,7 @@ describe('ManagementClient against a real core', () => {
 
     beforeEach(() => {
         dir = mkdtempSync(join(tmpdir(), 'rh-cli-'));
+        workerVersion = undefined;
     });
 
     afterEach(async () => {
@@ -73,15 +74,27 @@ describe('ManagementClient against a real core', () => {
         rmSync(dir, { recursive: true, force: true });
     });
 
+    /** The `rhapsode-worker` the fake runner puts in each venv it builds. */
+    let workerVersion: string | undefined;
+
     async function start(): Promise<string> {
         const runner: CommandRunner = async (command, onLine) => {
             onLine(`ran ${command.step}`, 'stdout');
-            if (command.step === 'venv') mkdirSync(command.args.at(-1)!, { recursive: true });
+            if (command.step !== 'venv') return;
+            mkdirSync(command.args.at(-1)!, { recursive: true });
+            if (workerVersion !== undefined) {
+                mkdirSync(join(command.args.at(-1)!, 'lib', 'python3.12', 'site-packages', `rhapsode_worker-${workerVersion}.dist-info`), {
+                    recursive: true,
+                });
+            }
         };
+        // A GitHub that is always on 0.0.1, so no test here asks the real one.
+        const github = (async () => new Response(JSON.stringify({ tag_name: 'v0.0.1' }), { status: 200 })) as typeof fetch;
         const { settings, managed } = await loadSettings(join(dir, 'rhapsode.config.json'));
         running = await buildServer({ ...settings, install: { venvDir: join(dir, 'venvs') } }, new RhapsodeJsonLogger('error', () => {}), {
             managed,
             runner,
+            fetch: github,
         });
         await running.app.listen({ host: '127.0.0.1', port: 0 });
         const address = running.app.server.address();
@@ -139,6 +152,37 @@ describe('ManagementClient against a real core', () => {
 
         expect(refused).toBeInstanceOf(ManagementError);
         expect(refused).toMatchObject({ code: 'unknown_engine', status: 404 });
+    });
+
+    it('lists engines with what an upgrade left behind, and reinstalls them all', async () => {
+        workerVersion = '0.0.1';
+        const client = new ManagementClient(await start());
+        await client.follow((await client.install('tone', 'MIT')).id, () => {});
+
+        expect(await client.engines()).toEqual([expect.objectContaining({ id: 'tone', workerVersion: '0.0.1', outdated: true })]);
+
+        const answer = await client.reinstallOutdated();
+        expect(answer.skipped).toEqual([]);
+        expect(answer.jobs.map(job => [job.engine, job.kind])).toEqual([['tone', 'reinstall']]);
+        expect((await client.follow(answer.jobs[0]!.id, () => {})).state).toBe('succeeded');
+    });
+
+    it('reinstalls one engine, and turns a refusal into the protocol’s code', async () => {
+        const client = new ManagementClient(await start());
+        expect(await client.reinstall('tone').catch((error: unknown) => error)).toMatchObject({ code: 'unknown_engine', status: 404 });
+
+        await client.follow((await client.install('tone', 'MIT')).id, () => {});
+        const job = await client.reinstall('tone', 'MIT');
+        expect(job).toMatchObject({ engine: 'tone', kind: 'reinstall' });
+        expect((await client.follow(job.id, () => {})).state).toBe('succeeded');
+    });
+
+    it('reads the update status, which answers at once whatever GitHub is doing', async () => {
+        const client = new ManagementClient(await start());
+
+        const status = await client.updateStatus();
+        expect(['pending', 'ok']).toContain(status.check);
+        expect(status.distribution).toBe('source');
     });
 
     it('says nothing is answering, rather than failing with a socket error', async () => {

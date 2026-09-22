@@ -23,6 +23,17 @@ operation /health: {
     }
 }
 
+operation /update: {
+    get: {
+        # Open to every caller, like /health. It never waits on the network: a first call after boot
+        # answers `pending` and starts the check, which runs at most once a day. § 9.
+        sdk: updateStatus
+        response: {
+            200: { application/json: UpdateStatus }
+        }
+    }
+}
+
 operation /residency: {
     get: {
         # What is on the card, for an operator asking where their memory went. Reads the core's own
@@ -284,6 +295,30 @@ operation /engines/{engine}/install: {
     }
 }
 
+operation /engines/{engine}/reinstall: {
+    params: {
+        engine: string
+    }
+    post: {
+        sdk: reinstallEngine
+        # Rebuilds an installed engine in its other slot and swaps it in once it imports, so the
+        # engine keeps working until then and a failure changes nothing. The remedy for `outdated`.
+        # Costs a cold load, and whatever was installed into the old virtualenv by hand. § 10.
+        query: {
+            # As for install, and needed only where the weights may not be used commercially and the
+            # licence the last install accepted is not the one the catalog names now. § 10.
+            accept?: string
+        }
+        response: {
+            202: { application/json: InstallJob }
+            400: { application/json: ErrorBody }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
 operation /engines/{engine}/pull: {
     params: {
         engine: string
@@ -307,6 +342,19 @@ operation /installs: {
         sdk: installJobs
         response: {
             200: { application/json: array(InstallJob) }
+            403: { application/json: ErrorBody }
+        }
+    }
+}
+
+operation /installs/outdated: {
+    post: {
+        sdk: reinstallOutdated
+        # A reinstall for every `outdated` engine this API installed. Never refused as a whole: what
+        # it cannot reinstall without asking is `skipped`, and nothing behind is `jobs: []`, so it can
+        # end an unattended upgrade every night. § 10.
+        response: {
+            202: { application/json: ReinstallOutdated }
             403: { application/json: ErrorBody }
         }
     }

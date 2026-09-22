@@ -18,14 +18,20 @@ export const catalogRoutes: FastifyPluginAsync = async app => {
         const managed = request.container.get(ManagedEngines);
         const jobs = request.container.get(InstallJobs);
 
-        return Object.entries(CATALOG).map(([id, record]): CatalogEntry => ({
-            id,
-            displayName: record.displayName,
-            license: record.license,
-            package: record.package,
-            ...(record.defaultVariant === undefined ? {} : { defaultVariant: record.defaultVariant }),
-            installed: engines.has(id) ? 'yes' : jobs.pending(id)?.kind === 'install' ? 'installing' : 'no',
-            managed: managed.isManaged(id),
-        }));
+        return Object.entries(CATALOG).map(([id, record]): CatalogEntry => {
+            const workerVersion = engines.workerVersion(id);
+            const outdated = engines.outdated(id);
+            return {
+                id,
+                displayName: record.displayName,
+                license: record.license,
+                package: record.package,
+                ...(record.defaultVariant === undefined ? {} : { defaultVariant: record.defaultVariant }),
+                installed: engines.has(id) ? 'yes' : jobs.pending(id)?.kind === 'install' ? 'installing' : 'no',
+                managed: managed.isManaged(id),
+                ...(workerVersion === undefined ? {} : { workerVersion }),
+                ...(outdated === undefined ? {} : { outdated }),
+            };
+        });
     });
 };

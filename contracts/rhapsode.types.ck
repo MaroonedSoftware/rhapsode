@@ -241,6 +241,9 @@ contract mode(loose) EngineSummary: {
     # differs from the core's version is a pin an upgrade broke. Absent where nothing can say, which
     # includes every remote engine. protocol.md § 9.
     workerVersion?: string
+    # Whether `workerVersion` differs from this core's version, so no client compares the two.
+    # Absent exactly when `workerVersion` is. A warning, never a refusal. protocol.md § 9.
+    outdated?: boolean
 }
 
 contract mode(loose) ResidencySummary: {
@@ -267,9 +270,21 @@ contract mode(loose) ResidencyDetail: ResidencySummary & {
 
 contract mode(loose) CoreHealth: {
     contract: int
+    version: string                             # The running core's package version, for display. Not the contract. § 9.
     status: enum(ok, degraded)
     engines: array(EngineSummary)
     residency: ResidencySummary
+}
+
+# Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+contract mode(loose) UpdateStatus: {
+    version: string                             # This core.
+    check: enum(off, pending, ok, failed)       # off: turned off. pending: no answer yet. failed: the last attempt got none.
+    latest?: string                             # The latest release, without its `v`. Present with `ok`.
+    updateAvailable?: boolean                   # Whether `latest` is newer than this core. Present with `ok`.
+    releaseUrl?: string                         # The release's page, for its notes.
+    checkedAt?: string                          # ISO 8601, UTC. When `latest` was read.
+    distribution: enum(docker, source)          # Which upgrade instructions apply.
 }
 
 ############################################################################################
@@ -286,12 +301,14 @@ contract mode(loose) CatalogEntry: {
     defaultVariant?: string
     installed: enum(no, installing, yes)
     managed: boolean                            # Installed through the API, so removable by it.
+    workerVersion?: string                      # As on EngineSummary, for an installed engine. § 9.
+    outdated?: boolean                          # As on EngineSummary. § 9.
 }
 
 contract mode(loose) InstallJob: {
     id: string
     engine: string
-    kind: enum(install, pull)
+    kind: enum(install, pull, reinstall)
     variant?: string                            # What a pull fetches, or an install fetches in step 5.
     state: enum(queued, running, succeeded, failed)
     step?: enum(venv, packages, verify, register, weights)
@@ -299,6 +316,18 @@ contract mode(loose) InstallJob: {
     startedAt?: string
     finishedAt?: string
     error?: ErrorDetail                         # Present exactly when `state` is `failed`.
+}
+
+# An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+# reinstall would have to ask somebody about. § 10.
+contract mode(loose) ReinstallSkipped: {
+    engine: string
+    reason: enum(licence, busy, uncatalogued)   # Needs `accept`; has a job already; the catalog no longer has it.
+}
+
+contract mode(loose) ReinstallOutdated: {
+    jobs: array(InstallJob)                     # One reinstall per outdated engine this API installed, in id order.
+    skipped: array(ReinstallSkipped)
 }
 
 contract PullRequest: {

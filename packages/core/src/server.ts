@@ -28,6 +28,8 @@ import { openaiRoutes } from './openai/openai.routes.js';
 import { apiReferenceRoutes } from './reference/api.reference.routes.js';
 import { dialogueRoutes } from './speak/dialogue.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
+import { updateModule } from './update/update.module.js';
+import { updateRoutes } from './update/update.routes.js';
 import { workerModule } from './workers/worker.module.js';
 import type { RhapsodeConfig } from './config.js';
 
@@ -42,6 +44,8 @@ export interface BuildOptions {
     managed?: ManagedEngines;
     /** How an install runs its commands. Replaced in tests, so an install can be driven without pip. */
     runner?: CommandRunner;
+    /** How the update check reaches GitHub. Replaced in tests, so none of them ever does. § 9. */
+    fetch?: typeof fetch;
 }
 
 export async function buildServer(settings: RhapsodeConfig, logger?: Logger, options: BuildOptions = {}): Promise<ServerKitServerBuilder> {
@@ -60,6 +64,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         engineModule(settings, options.managed),
         workerModule(settings),
         residencyModule(settings),
+        updateModule(settings, options.fetch),
         // Last, so it shuts down first: a running pip is stopped before the workers it would register.
         installModule(settings, options.runner),
     ];
@@ -88,6 +93,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         // OpenAI's speech route, translated into the one above. § 11.
         { plugin: openaiRoutes },
         { plugin: catalogRoutes },
+        { plugin: updateRoutes },
         { plugin: installRoutes },
         // Given the lifecycle signal so a shutdown closes open event streams rather than waiting
         // out the grace period for clients that would otherwise watch forever.

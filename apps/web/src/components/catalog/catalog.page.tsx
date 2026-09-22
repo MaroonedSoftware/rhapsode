@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { Button, Card, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
-import { IconDownload, IconPackage, IconTrash } from '@tabler/icons-react';
+import { Alert, Button, Card, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { IconDownload, IconPackage, IconRefresh, IconTrash } from '@tabler/icons-react';
 import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useCatalog } from '../../api/catalog.queries';
-import { useInstallEngine, useInstallJobs, usePullEngine, useUninstallEngine } from '../../api/installs.queries';
+import {
+    useInstallEngine,
+    useInstallJobs,
+    usePullEngine,
+    useReinstallEngine,
+    useReinstallOutdated,
+    useUninstallEngine,
+} from '../../api/installs.queries';
 import { apiErrorCode } from '../../api/sdk.error';
 import { InstallModal } from '../installs/install.modal';
 import { JobPanel } from '../installs/job.panel';
@@ -15,7 +22,9 @@ import { ErrorAlert } from '../shared/error.alert';
 import { notifyFailure, notifySuccess } from '../shared/notify';
 import { PageHeader } from '../shared/page.header';
 import { PageSkeleton } from '../shared/page.skeleton';
+import { severityColor } from '../shared/status';
 import { EngineCard } from './engine.card';
+import { LicenseLine } from './license.line';
 import { LoadedModels } from './loaded.models';
 
 /** Every engine that exists, with both licences, which of them this box has, and the means to change that. */
@@ -25,9 +34,12 @@ export function CatalogPage() {
     const install = useInstallEngine();
     const pull = usePullEngine();
     const uninstall = useUninstallEngine();
+    const reinstall = useReinstallEngine();
+    const reinstallAll = useReinstallOutdated();
 
     const [installing, setInstalling] = useState<CatalogEntry | undefined>(undefined);
     const [removing, setRemoving] = useState<CatalogEntry | undefined>(undefined);
+    const [rebuilding, setRebuilding] = useState<CatalogEntry | undefined>(undefined);
     const [watching, setWatching] = useState<string | undefined>(undefined);
 
     // The job list is a management route and the catalog is not, so a page opened from another
@@ -37,6 +49,8 @@ export function CatalogPage() {
     const pending = (engine: string): InstallJob | undefined =>
         jobs.data?.find(job => job.engine === engine && (job.state === 'queued' || job.state === 'running'));
     const shown = watching ?? jobs.data?.[0]?.id;
+    // The core decides what is behind; the page only counts what it was told, and only what it may rebuild.
+    const behind = (catalog.data ?? []).filter(entry => entry.managed && entry.outdated === true && pending(entry.id) === undefined);
 
     const confirmInstall = (pull: string | undefined) => {
         if (installing === undefined) return;
@@ -73,6 +87,37 @@ export function CatalogPage() {
         });
     };
 
+    const confirmReinstall = () => {
+        if (rebuilding === undefined) return;
+        // The licence the dialog showed, as install sends it. The core asks for it only where what the
+        // last install accepted no longer covers the weights, and checks it wherever it is sent. § 10.
+        reinstall.mutate(
+            { engine: rebuilding.id, accept: rebuilding.license.weights },
+            {
+                onSuccess: job => {
+                    setRebuilding(undefined);
+                    setWatching(job.id);
+                },
+            },
+        );
+    };
+
+    const startReinstallAll = () =>
+        reinstallAll.mutate(undefined, {
+            onSuccess: ({ jobs: started, skipped }) => {
+                if (started[0] !== undefined) setWatching(started[0].id);
+                const licence = skipped.filter(entry => entry.reason === 'licence').map(entry => entry.engine);
+                if (licence.length > 0) {
+                    notifyFailure(
+                        'Some engines were left alone',
+                        undefined,
+                        `${licence.join(', ')}: the weights licence has to be accepted again, so reinstall ${licence.length === 1 ? 'it' : 'each one'} from its card.`,
+                    );
+                }
+            },
+            onError: error => notifyFailure('Reinstalling did not start', error, 'The server did not answer.'),
+        });
+
     const actions = (entry: CatalogEntry) => {
         if (!managed) return undefined;
         const busy = pending(entry.id);
@@ -99,6 +144,19 @@ export function CatalogPage() {
         }
         return (
             <>
+                {/* Only what this page installed and an upgrade left behind. A hand-configured engine is the operator's to rebuild. */}
+                {entry.managed && entry.outdated === true ? (
+                    <Button
+                        size="xs"
+                        leftSection={<IconRefresh size={14} />}
+                        onClick={() => {
+                            reinstall.reset();
+                            setRebuilding(entry);
+                        }}
+                    >
+                        Reinstall
+                    </Button>
+                ) : undefined}
                 {entry.defaultVariant === undefined ? undefined : (
                     <Button
                         variant="light"
@@ -136,6 +194,23 @@ export function CatalogPage() {
                 description="Every engine rhapsode knows about, with the licence for its code and, separately, for its weights."
             />
             {managed ? undefined : <ErrorAlert tone="info" title="Installing is only for the machine running rhapsode" error={jobs.error} />}
+            {managed && behind.length > 0 ? (
+                <Alert
+                    color={severityColor.warning}
+                    title={`${behind.length === 1 ? 'One engine was' : `${behind.length} engines were`} installed by an earlier release`}
+                >
+                    <Group justify="space-between" align="center" gap="sm">
+                        <Text size="sm" maw={640}>
+                            {behind.map(entry => entry.displayName).join(', ')} still {behind.length === 1 ? 'works' : 'work'}, but never{' '}
+                            {behind.length === 1 ? 'sends' : 'send'} anything added to rhapsode since. Reinstalling builds each a new virtualenv
+                            beside its old one, so nothing stops working while it runs.
+                        </Text>
+                        <Button size="xs" leftSection={<IconRefresh size={14} />} loading={reinstallAll.isPending} onClick={startReinstallAll}>
+                            Reinstall all
+                        </Button>
+                    </Group>
+                </Alert>
+            ) : undefined}
             {catalog.isPending ? (
                 <PageSkeleton variant="card" />
             ) : catalog.isError ? (
@@ -190,6 +265,29 @@ export function CatalogPage() {
             >
                 Its worker is stopped and its virtualenv deleted. Downloaded weights stay where the engine put them, because other tools on this
                 machine may share that cache.
+            </ConfirmModal>
+            <ConfirmModal
+                opened={rebuilding !== undefined}
+                onClose={() => setRebuilding(undefined)}
+                onConfirm={confirmReinstall}
+                title={rebuilding ? `Reinstall ${rebuilding.displayName}?` : ''}
+                confirmLabel="Reinstall"
+                confirming={reinstall.isPending}
+                error={reinstall.error ?? undefined}
+            >
+                <Stack gap="xs">
+                    <Text size="sm">
+                        The server builds a new virtualenv beside the current one and switches to it once it works, so {rebuilding?.displayName} keeps
+                        working until then. Its next request loads the model again, and any package installed into the old virtualenv by hand is not
+                        carried over. Its weights stay where they are.
+                    </Text>
+                    {rebuilding === undefined || rebuilding.license.weightsCommercialUse ? undefined : (
+                        <>
+                            <LicenseLine license={rebuilding.license} />
+                            <Text size="sm">Reinstalling accepts the weights licence as it stands now.</Text>
+                        </>
+                    )}
+                </Stack>
             </ConfirmModal>
         </Stack>
     );

@@ -28,6 +28,24 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/update": {
+            "get": {
+                "operationId": "updateStatus",
+                "description": "Open to every caller, like /health. It never waits on the network: a first call after boot",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateStatus"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/residency": {
             "get": {
                 "operationId": "residency",
@@ -803,6 +821,81 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/engines/{engine}/reinstall": {
+            "post": {
+                "operationId": "reinstallEngine",
+                "parameters": [
+                    {
+                        "name": "engine",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "accept",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Response 202",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InstallJob"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/engines/{engine}/pull": {
             "post": {
                 "operationId": "pullEngine",
@@ -883,6 +976,33 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                                     "items": {
                                         "$ref": "#/components/schemas/InstallJob"
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/installs/outdated": {
+            "post": {
+                "operationId": "reinstallOutdated",
+                "responses": {
+                    "202": {
+                        "description": "Response 202",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReinstallOutdated"
                                 }
                             }
                         }
@@ -1747,6 +1867,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "workerVersion": {
                         "type": "string",
                         "description": "`rhapsode-worker` as installed in this engine's venv, read from the venv rather than asked of\nthe worker so that a `down` engine still answers. A diagnostic, never negotiation: one that\ndiffers from the core's version is a pin an upgrade broke. Absent where nothing can say, which\nincludes every remote engine. protocol.md § 9."
+                    },
+                    "outdated": {
+                        "type": "boolean",
+                        "description": "Whether `workerVersion` differs from this core's version, so no client compares the two.\nAbsent exactly when `workerVersion` is. A warning, never a refusal. protocol.md § 9."
                     }
                 },
                 "required": [
@@ -1847,6 +1971,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "contract": {
                         "type": "integer"
                     },
+                    "version": {
+                        "type": "string",
+                        "description": "The running core's package version, for display. Not the contract. § 9."
+                    },
                     "status": {
                         "type": "string",
                         "enum": [
@@ -1866,10 +1994,60 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 },
                 "required": [
                     "contract",
+                    "version",
                     "status",
                     "engines",
                     "residency"
                 ]
+            },
+            "UpdateStatus": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "description": "This core."
+                    },
+                    "check": {
+                        "type": "string",
+                        "enum": [
+                            "off",
+                            "pending",
+                            "ok",
+                            "failed"
+                        ],
+                        "description": "off: turned off. pending: no answer yet. failed: the last attempt got none."
+                    },
+                    "latest": {
+                        "type": "string",
+                        "description": "The latest release, without its `v`. Present with `ok`."
+                    },
+                    "updateAvailable": {
+                        "type": "boolean",
+                        "description": "Whether `latest` is newer than this core. Present with `ok`."
+                    },
+                    "releaseUrl": {
+                        "type": "string",
+                        "description": "The release's page, for its notes."
+                    },
+                    "checkedAt": {
+                        "type": "string",
+                        "description": "ISO 8601, UTC. When `latest` was read."
+                    },
+                    "distribution": {
+                        "type": "string",
+                        "enum": [
+                            "docker",
+                            "source"
+                        ],
+                        "description": "Which upgrade instructions apply."
+                    }
+                },
+                "required": [
+                    "version",
+                    "check",
+                    "distribution"
+                ],
+                "description": "Whether a newer release exists, asked by the core so that no client orders versions. § 9."
             },
             "CatalogEntry": {
                 "type": "object",
@@ -1901,6 +2079,14 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "managed": {
                         "type": "boolean",
                         "description": "Installed through the API, so removable by it."
+                    },
+                    "workerVersion": {
+                        "type": "string",
+                        "description": "As on EngineSummary, for an installed engine. § 9."
+                    },
+                    "outdated": {
+                        "type": "boolean",
+                        "description": "As on EngineSummary. § 9."
                     }
                 },
                 "required": [
@@ -1926,7 +2112,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "type": "string",
                         "enum": [
                             "install",
-                            "pull"
+                            "pull",
+                            "reinstall"
                         ]
                     },
                     "variant": {
@@ -1973,6 +2160,50 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "kind",
                     "state",
                     "createdAt"
+                ]
+            },
+            "ReinstallSkipped": {
+                "type": "object",
+                "properties": {
+                    "engine": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "licence",
+                            "busy",
+                            "uncatalogued"
+                        ],
+                        "description": "Needs `accept`; has a job already; the catalog no longer has it."
+                    }
+                },
+                "required": [
+                    "engine",
+                    "reason"
+                ],
+                "description": "An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single\nreinstall would have to ask somebody about. § 10."
+            },
+            "ReinstallOutdated": {
+                "type": "object",
+                "properties": {
+                    "jobs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InstallJob"
+                        },
+                        "description": "One reinstall per outdated engine this API installed, in id order."
+                    },
+                    "skipped": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReinstallSkipped"
+                        }
+                    }
+                },
+                "required": [
+                    "jobs",
+                    "skipped"
                 ]
             },
             "PullRequest": {

@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { CONTRACT_MAJOR } from '@rhapsode/contract';
 
+import { CORE_VERSION } from '../core.version.js';
 import { EngineRegistry } from '../registry/engine.registry.js';
 import { ResidencyManager } from '../residency/residency.manager.js';
 
@@ -19,6 +20,8 @@ export const healthRoutes: FastifyPluginAsync = async app => {
 
         return {
             contract: CONTRACT_MAJOR,
+            // A constant read at module load, so the path a healthcheck polls does no I/O for it.
+            version: CORE_VERSION,
             status: engines.some(engine => engine.process === 'failed') ? 'degraded' : 'ok',
             engines,
             // From the residency manager rather than the registry, because a wait at

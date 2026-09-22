@@ -6,7 +6,7 @@ import { managementGuard } from '../management/management.module.js';
 import { EngineInstaller } from './engine.installer.js';
 import { InstallJobs } from './install.jobs.js';
 
-/** Install, uninstall, and the job reads. All behind the management guard. protocol.md § 10. */
+/** Install, reinstall, uninstall, and the job reads. All behind the management guard. protocol.md § 10. */
 export const installRoutes: FastifyPluginAsync = async app => {
     app.post<{ Params: { engine: string }; Querystring: { pull?: unknown; accept?: unknown } }>(
         '/engines/:engine/install',
@@ -21,6 +21,15 @@ export const installRoutes: FastifyPluginAsync = async app => {
             // Left for the installer to refuse when it is not one string, because only it knows the
             // licence the refusal has to name.
             const job = request.container.get(EngineInstaller).install(request.params.engine, pull, accept);
+            return reply.status(202).send(job);
+        },
+    );
+
+    app.post<{ Params: { engine: string }; Querystring: { accept?: unknown } }>(
+        '/engines/:engine/reinstall',
+        { onRequest: managementGuard },
+        async (request, reply) => {
+            const job = request.container.get(EngineInstaller).reinstall(request.params.engine, request.query.accept);
             return reply.status(202).send(job);
         },
     );
@@ -40,6 +49,10 @@ export const installRoutes: FastifyPluginAsync = async app => {
         await request.container.get(EngineInstaller).uninstall(request.params.engine);
         return reply.status(204).send();
     });
+
+    app.post('/installs/outdated', { onRequest: managementGuard }, async (request, reply) =>
+        reply.status(202).send(request.container.get(EngineInstaller).reinstallOutdated()),
+    );
 
     app.get('/installs', { onRequest: managementGuard }, async request => request.container.get(InstallJobs).list());
 

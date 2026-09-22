@@ -244,7 +244,7 @@ export const WorkerHealth = z.looseObject({
 export type WorkerHealth = z.infer<typeof WorkerHealth>;
 
 /**
- * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L246)
+ * generated from [ResidencySummary](../../../../contracts/rhapsode.types.ck#L249)
  */
 export const ResidencySummary = z.looseObject({
     resident: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
@@ -256,7 +256,7 @@ export type ResidencySummary = z.infer<typeof ResidencySummary>;
 
 /**
  * One model on the card, and what the core knows about it. protocol.md § 3.
- * generated from [ResidentModel](../../../../contracts/rhapsode.types.ck#L254)
+ * generated from [ResidentModel](../../../../contracts/rhapsode.types.ck#L257)
  */
 export const ResidentModel = z.looseObject({
     engine: z.string(),
@@ -277,7 +277,36 @@ export const ResidentModel = z.looseObject({
 export type ResidentModel = z.infer<typeof ResidentModel>;
 
 /**
- * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L304)
+ * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+ * generated from [UpdateStatus](../../../../contracts/rhapsode.types.ck#L280)
+ */
+export const UpdateStatus = z.looseObject({
+    version: z.string().describe('This core.'),
+    check: z.enum(['off', 'pending', 'ok', 'failed']).describe('off: turned off. pending: no answer yet. failed: the last attempt got none.'),
+    latest: z.string().optional().describe('The latest release, without its `v`. Present with `ok`.'),
+    updateAvailable: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .optional()
+        .describe('Whether `latest` is newer than this core. Present with `ok`.'),
+    releaseUrl: z.string().optional().describe("The release's page, for its notes."),
+    checkedAt: z.string().optional().describe('ISO 8601, UTC. When `latest` was read.'),
+    distribution: z.enum(['docker', 'source']).describe('Which upgrade instructions apply.'),
+});
+export type UpdateStatus = z.infer<typeof UpdateStatus>;
+
+/**
+ * An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
+ * reinstall would have to ask somebody about. § 10.
+ * generated from [ReinstallSkipped](../../../../contracts/rhapsode.types.ck#L323)
+ */
+export const ReinstallSkipped = z.looseObject({
+    engine: z.string(),
+    reason: z.enum(['licence', 'busy', 'uncatalogued']).describe('Needs `accept`; has a job already; the catalog no longer has it.'),
+});
+export type ReinstallSkipped = z.infer<typeof ReinstallSkipped>;
+
+/**
+ * generated from [PullRequest](../../../../contracts/rhapsode.types.ck#L333)
  */
 export const PullRequest = z.strictObject({
     variant: z.string().optional().describe("Absent means the engine's default variant."),
@@ -287,7 +316,7 @@ export type PullRequest = z.infer<typeof PullRequest>;
 /**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
- * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L310)
+ * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck#L339)
  */
 export const FeedProgress = z.looseObject({
     phase: z.string().describe("The job's step."),
@@ -337,13 +366,19 @@ export const EngineSummary = z.looseObject({
         .describe(
             "`rhapsode-worker` as installed in this engine's venv, read from the venv rather than asked of\nthe worker so that a `down` engine still answers. A diagnostic, never negotiation: one that\ndiffers from the core's version is a pin an upgrade broke. Absent where nothing can say, which\nincludes every remote engine. protocol.md § 9.",
         ),
+    outdated: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .optional()
+        .describe(
+            "Whether `workerVersion` differs from this core's version, so no client compares the two.\nAbsent exactly when `workerVersion` is. A warning, never a refusal. protocol.md § 9.",
+        ),
 });
 export type EngineSummary = z.infer<typeof EngineSummary>;
 
 /**
  * What exists, installed or not. `/engines` is what this box has; this is what it could have, with
  * both licences, because the weights licence is only worth reading before the install.
- * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L281)
+ * generated from [CatalogEntry](../../../../contracts/rhapsode.types.ck#L296)
  */
 export const CatalogEntry = z.looseObject({
     id: z.string(),
@@ -355,6 +390,11 @@ export const CatalogEntry = z.looseObject({
     managed: z
         .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
         .describe('Installed through the API, so removable by it.'),
+    workerVersion: z.string().optional().describe('As on EngineSummary, for an installed engine. § 9.'),
+    outdated: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .optional()
+        .describe('As on EngineSummary. § 9.'),
 });
 export type CatalogEntry = z.infer<typeof CatalogEntry>;
 
@@ -403,12 +443,12 @@ export const ErrorBody = z.looseObject({
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
 /**
- * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L291)
+ * generated from [InstallJob](../../../../contracts/rhapsode.types.ck#L308)
  */
 export const InstallJob = z.looseObject({
     id: z.string(),
     engine: z.string(),
-    kind: z.enum(['install', 'pull']),
+    kind: z.enum(['install', 'pull', 'reinstall']),
     variant: z.string().optional().describe('What a pull fetches, or an install fetches in step 5.'),
     state: z.enum(['queued', 'running', 'succeeded', 'failed']),
     step: z.enum(['venv', 'packages', 'verify', 'register', 'weights']).optional(),
@@ -420,7 +460,7 @@ export const InstallJob = z.looseObject({
 export type InstallJob = z.infer<typeof InstallJob>;
 
 /**
- * generated from [ResidencyDetail](../../../../contracts/rhapsode.types.ck#L264)
+ * generated from [ResidencyDetail](../../../../contracts/rhapsode.types.ck#L267)
  */
 export const ResidencyDetail = ResidencySummary.extend({
     models: z.array(ResidentModel),
@@ -428,7 +468,7 @@ export const ResidencyDetail = ResidencySummary.extend({
 export type ResidencyDetail = z.infer<typeof ResidencyDetail>;
 
 /**
- * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L317)
+ * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck#L346)
  */
 export const FeedEvent = z.looseObject({
     id: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()).describe('The Last-Event-ID resume key.'),
@@ -459,10 +499,11 @@ export const CurrentVariant = Variant.extend({
 export type CurrentVariant = z.infer<typeof CurrentVariant>;
 
 /**
- * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L268)
+ * generated from [CoreHealth](../../../../contracts/rhapsode.types.ck#L271)
  */
 export const CoreHealth = z.looseObject({
     contract: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int()),
+    version: z.string().describe("The running core's package version, for display. Not the contract. § 9."),
     status: z.enum(['ok', 'degraded']),
     engines: z.array(EngineSummary),
     residency: ResidencySummary,
@@ -477,6 +518,15 @@ export const EngineDialogueRequest = DialogueRequest.extend({
     keepAliveSeconds: z.preprocess(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v), z.number().int().min(-1)).optional(),
 });
 export type EngineDialogueRequest = z.infer<typeof EngineDialogueRequest>;
+
+/**
+ * generated from [ReinstallOutdated](../../../../contracts/rhapsode.types.ck#L328)
+ */
+export const ReinstallOutdated = z.looseObject({
+    jobs: z.array(InstallJob).describe('One reinstall per outdated engine this API installed, in id order.'),
+    skipped: z.array(ReinstallSkipped),
+});
+export type ReinstallOutdated = z.infer<typeof ReinstallOutdated>;
 
 /**
  * generated from [Capabilities](../../../../contracts/rhapsode.types.ck#L107)

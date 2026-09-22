@@ -66,6 +66,13 @@ rather than about the contract.
         "python": "python3"
     },
 
+    "update": {
+        // Whether GET /update asks GitHub for the latest release: at most once a day, only when
+        // something asks, with a User-Agent and nothing else. RHAPSODE_UPDATE_CHECK=0 in the
+        // server's environment turns it off too. On by default. Protocol § 9.
+        "check": true
+    },
+
     "engines": {
         "tone": { "venv": "/opt/rhapsode/venvs/tone" },
         "chatterbox": {
@@ -148,7 +155,9 @@ engine's virtualenv by hand, which needs a C++ compiler, then restart the engine
 ```
 
 That is from a checkout. In the Docker image the sources are under `/app/python` instead. The engine
-is not on PyPI, so pip needs a path, not a name.
+is not on PyPI, so pip needs a path, not a name. The virtualenv is the one `rhapsode.engines.json`
+names for it, `orpheus` or, after a reinstall, `orpheus.alt`, and a reinstall builds from the catalog
+and does not carry this over: run it again afterwards.
 
 ### Dia
 
@@ -223,41 +232,77 @@ docker compose up -d     # the server on 127.0.0.1:8080, the page on http://loca
 One image, `ghcr.io/maroonedsoftware/rhapsode`. Each release publishes it for amd64 and arm64,
 tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
 shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
-it installs the engines that were released with it. `docker compose pull` followed by
-`docker compose up -d` upgrades in place, keeping both volumes.
+it installs the engines that were released with it.
 
-### Upgrading leaves the engines behind
+### Upgrading
 
-**Reinstall every engine after a core upgrade.** Keeping `/data` is what makes the upgrade cheap,
-and it is also what strands the engines: the virtualenvs live there, so an upgraded core comes up
-talking to workers built against the version it replaced. `docs/protocol.md` § 9 pins an engine to
-the core's version at install time, and an upgrade is the one thing that breaks that pin.
+The page's header shows the version the server runs, and a banner appears on every page once a newer
+release is out. `GET /update` is what it reads: the core asks GitHub for the latest release at most
+once a day, only when something asks, and `update.check: false` turns that off (protocol.md § 9).
 
-Nothing fails when it happens, which is the whole problem. Contract negotiation refuses a worker
-that is too **new** and says nothing about one that is too old, and a feature added within a
-contract major is an optional field the stale worker simply never sends. A core upgraded from 0.1.3
-to 0.1.6 went on speaking through a worker from 0.1.2 and only stopped reporting `sizeBytes` in
-`GET /residency`, which reads as a card that cannot be measured rather than as an engine that needs
-reinstalling.
-
-Two things will tell you. `GET /engines` carries each engine's `workerVersion` beside its state, and
-it is read from the virtualenv rather than asked of the worker, so an engine that is `down` still
-answers. From a checkout, `pnpm wizard doctor` compares every local engine against the core and
-names the ones that differ. Neither is an error: a stale worker is contract-legal and works, and
-`docs/protocol.md` § 9 leaves you free to run an engine at a version of your choosing.
-
-The remedy is cheap, because both caches are in `/data` and survive: uninstalling and reinstalling
-chatterbox on an upgraded box took 55 seconds and downloaded nothing, against the 93 seconds and
-6.2 GB its first install cost. An install refuses an engine that is already installed, so it is two
-calls, through the page's proxy, which carries the management token:
+The container cannot replace itself, so the upgrade is yours to run, beside `compose.yaml`:
 
 ```bash
-curl -X DELETE http://127.0.0.1:8081/api/engines/chatterbox
-pnpm wizard install chatterbox --server http://127.0.0.1:8081/api
+docker compose pull && docker compose up -d
 ```
 
-Uninstalling leaves the weights where the engine put them, which is why the second line has nothing
-to download. A voice cloned into `/config/voices` is untouched either way.
+Both volumes are kept. If you pinned `RHAPSODE_VERSION`, change it first, or the pull fetches the
+version you already have.
+
+**Then reinstall the engines the page marks as behind.** Keeping `/data` is what makes the upgrade
+cheap, and it is also what strands the engines: the virtualenvs live there, so an upgraded core comes
+up talking to workers built against the version it replaced. `docs/protocol.md` § 9 pins an engine
+to the core's version at install time, and an upgrade is the one thing that breaks that pin.
+
+Nothing fails when it happens, which is why the core says so itself. Contract negotiation refuses a
+worker that is too **new** and says nothing about one that is too old, and a feature added within a
+contract major is an optional field the stale worker simply never sends. A core upgraded from 0.1.3
+to 0.1.6 went on speaking through a worker from 0.1.2 and only stopped reporting `sizeBytes` in
+`GET /residency`, which read as a card that could not be measured rather than as an engine that
+needed reinstalling. So every engine on `GET /engines`, and every installed one on `GET /catalog`,
+carries `outdated: true` when its worker is not this core's version, and the page marks it "Behind
+this server". It is a warning, never an error: a stale worker is contract-legal and works.
+
+"Reinstall all" on the Engines page does every engine that is behind. From the host, through the
+page's proxy, which carries the management token:
+
+```bash
+curl -fsS -X POST http://127.0.0.1:8081/api/installs/outdated
+```
+
+or from a checkout, `pnpm wizard reinstall --all --server http://127.0.0.1:8081/api`, which follows
+each job. A reinstall builds the new virtualenv beside the old one and switches to it once it works,
+so the engine keeps answering while it runs, and a failure leaves it as it was. It is cheap, because
+the caches are in `/data` and survive: rebuilding chatterbox on an upgraded box took 55 seconds and
+downloaded nothing, against the 93 seconds and 6.2 GB its first install cost. Two things do not
+carry over: the model the old worker held, so the next request loads it cold, and any package
+installed into the old virtualenv by hand, such as Orpheus's `[llama]` extra above.
+
+An engine whose weights may not be used commercially is reinstalled without asking while the
+catalog names the licence its install accepted. If an upgrade relicensed the weights, "Reinstall
+all" skips it and says so, and its own Reinstall button shows the new licence first. An engine
+installed by a release that recorded no acceptance asks once. A voice cloned into `/config/voices`
+is untouched either way.
+
+### Unattended upgrades
+
+A box nobody watches can upgrade itself from cron on the host, because the last step is one request
+that is never refused as a whole and does nothing when nothing is behind:
+
+```bash
+# /etc/cron.d/rhapsode: every night at 04:30, from the directory holding compose.yaml
+30 4 * * * root cd /srv/rhapsode && docker compose pull -q && docker compose up -d --wait && curl -fsS -X POST http://127.0.0.1:8081/api/installs/outdated
+```
+
+`--wait` holds the line until the new container is healthy, so the reinstall reaches the new core.
+What it prints is the reinstall's answer: the jobs it queued, and in `skipped` each engine it left
+for a person, `licence` for weights that need accepting again, `busy` for one that already had a job.
+
+Pin the minor line for this, `RHAPSODE_VERSION=0.1` in the compose environment, so that the box takes
+patch releases on its own and waits for you at the next minor one. Anything else that replaces a
+container when its image changes works as well as `docker compose pull`, but it cannot run the
+reinstall, so the `curl` still needs a cron line of its own. A box that must not phone out sets
+`update.check: false` and loses nothing here: the pull does not depend on the check.
 
 From a checkout, `compose.build.yaml` builds it from `docker/Dockerfile` instead, tagged `local` so
 that a build never passes for a release. It is what the Docker smoke test runs:
@@ -289,7 +334,7 @@ docker compose up -d --remove-orphans
 | --------- | ----------------------------------------------------------- | -------------------------------------- |
 | `/config` | the config, and `rhapsode.engines.json` beside it           | `rhapsode.config.json`                 |
 |           | cloned voices                                               | `voices/<engine>`                      |
-| `/data`   | each engine's virtualenv                                    | `.rhapsode/venvs/<engine>`             |
+| `/data`   | each engine's virtualenv                                    | `.rhapsode/venvs/<engine>`, or `<engine>.alt` after a reinstall |
 |           | the Python interpreters those virtualenvs run on            | `.local/share/uv/python`               |
 |           | weights: Chatterbox's Hugging Face cache, Kokoro's own      | `.cache/huggingface`, `.cache/rhapsode` |
 |           | pip's and uv's download caches                              | `.cache/pip`, `.cache/uv`              |
@@ -443,17 +488,30 @@ rules and the reasons.
 ```json
 {
     "contract": 1,
+    "version": "0.1.9",
     "status": "ok",
     "engines": [
-        { "id": "tone", "process": "up", "model": "loaded", "variant": "plain", "restarts": 0, "workerVersion": "0.1.6" }
+        {
+            "id": "tone",
+            "process": "up",
+            "model": "loaded",
+            "variant": "plain",
+            "restarts": 0,
+            "workerVersion": "0.1.6",
+            "outdated": true
+        }
     ],
     "residency": { "resident": 1, "max": 1, "waiting": 0 }
 }
 ```
 
-`workerVersion` is the `rhapsode-worker` installed in that engine's virtualenv, and one that is not
-this server's own version is an engine an upgrade left behind: see "Upgrading leaves the engines
-behind" above. It is absent for a remote engine, which has no virtualenv here.
+`version` is the server's own. `workerVersion` is the `rhapsode-worker` installed in that engine's
+virtualenv, and `outdated` says whether it differs from `version`, which is an engine an upgrade left
+behind: see "Upgrading" above. Both are absent for a remote engine, which has no virtualenv here.
+
+`GET /update` is the one to poll for a release, once a day or less: it answers `updateAvailable`
+without waiting on GitHub. From a checkout, `pnpm wizard update --exit-code` exits 2 when a release
+is out or an engine is behind, for a monitor that wants a status rather than JSON.
 
 `residency.waiting` above zero with `blockedBy` set is the case that looks like a hang and is not: at
 `maxResidentModels: 1`, a five-minute synthesis on one engine makes a request for another wait. It
