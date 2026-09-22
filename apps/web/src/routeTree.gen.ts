@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReferenceRouteImport } from './routes/reference'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TryRouteImport } from './routes/try'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const ReferenceRoute = ReferenceRouteImport.update({
   path: '/reference',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TryRoute = TryRouteImport.update({
   id: '/try',
   path: '/try',
@@ -32,30 +38,34 @@ const TryRoute = TryRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/reference': typeof ReferenceRoute
+  '/settings': typeof SettingsRoute
   '/try': typeof TryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/reference': typeof ReferenceRoute
+  '/settings': typeof SettingsRoute
   '/try': typeof TryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/reference': typeof ReferenceRoute
+  '/settings': typeof SettingsRoute
   '/try': typeof TryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/reference' | '/try'
+  fullPaths: '/' | '/reference' | '/settings' | '/try'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/reference' | '/try'
-  id: '__root__' | '/' | '/reference' | '/try'
+  to: '/' | '/reference' | '/settings' | '/try'
+  id: '__root__' | '/' | '/reference' | '/settings' | '/try'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ReferenceRoute: typeof ReferenceRoute
+  SettingsRoute: typeof SettingsRoute
   TryRoute: typeof TryRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReferenceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/try': {
       id: '/try'
       path: '/try'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ReferenceRoute: ReferenceRoute,
+  SettingsRoute: SettingsRoute,
   TryRoute: TryRoute,
 }
 export const routeTree = rootRouteImport

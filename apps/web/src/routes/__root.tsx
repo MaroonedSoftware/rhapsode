@@ -21,7 +21,8 @@ export function RootLayout() {
                 <Group h="100%" px="md" gap="lg" wrap="nowrap">
                     <Group gap="xs" wrap="nowrap">
                         <RhapsodeMark />
-                        <Text fw={650} size="lg">
+                        {/* The mark alone on a phone: with four pages the name pushed the last off the edge. */}
+                        <Text fw={650} size="lg" visibleFrom="sm">
                             Rhapsode
                         </Text>
                     </Group>
@@ -46,6 +47,13 @@ export function RootLayout() {
                             renderRoot={(props: object) => <Link to="/reference" {...props} />}
                         >
                             API
+                        </Button>
+                        <Button
+                            variant={pathname === '/settings' ? 'light' : 'subtle'}
+                            size="compact-sm"
+                            renderRoot={(props: object) => <Link to="/settings" {...props} />}
+                        >
+                            Settings
                         </Button>
                     </Group>
                     <CoreVersion />

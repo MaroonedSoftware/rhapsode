@@ -6,12 +6,13 @@ rather than about the contract.
 ## Configuration
 
 `rhapsode.config.json` beside the binary, or wherever `RHAPSODE_CONFIG` points. It is what the box
-starts with. After that, any setting below can be changed with `pnpm wizard settings <key> <value>`,
-or `PATCH /settings` (protocol.md § 10), which write `rhapsode.db` beside the file and never the
+starts with. After that, any setting below can be changed on the web page's **Settings**, with
+`pnpm wizard settings <key> <value>`, or `PATCH /settings` (protocol.md § 10), which write `rhapsode.db` beside the file and never the
 file itself. **A value in the database wins over the file**, so a setting changed that way stays
 changed although the file still says otherwise, and `pnpm wizard settings <key> --unset` goes back to
-the file's value. Residency, each engine's keep-alive and `update.check` apply at once; the rest
-wait for a restart, and `pnpm wizard settings` lists which are waiting. Engine entries are the
+the file's value (**Reset** on the page). Residency, each engine's keep-alive and `update.check`
+apply at once; the rest wait for a restart, and the page and `pnpm wizard settings` both say which
+are waiting. Engine entries are the
 exception: the file's entry for an engine wins over the one an install recorded (protocol.md § 10,
 "The state database").
 
@@ -192,7 +193,8 @@ the clip's `transcript` (protocol.md § 7), and clones best from 5 to 10 seconds
 ## The web page
 
 `apps/web` is a page for the same routes: the catalog with both licences, and install, pull and
-uninstall with each job's progress as it happens. It is a static app, and it talks to the core
+uninstall with each job's progress as it happens, and **Settings**, which changes what
+`pnpm wizard settings` does and says which changes wait for a restart. It is a static app, and it talks to the core
 through a proxy on its own origin at `/api`, so the core needs no CORS.
 
 ```bash
@@ -445,8 +447,9 @@ restarted as another user cannot write them. The server refuses to start naming 
 than failing on the first install; `chown -R 99:100` the `/config` share to mend it.
 
 Opened as `http://tower:8081` rather than from the server itself, the page's origin is not loopback,
-so add it to `management.origins`. That is also the moment the page reaches the install routes from
-the LAN, which the section above describes the cost of.
+so add it to `management.origins`. That is also the moment the page reaches the install routes and
+**Settings** from the LAN, which the section above describes the cost of. Until it is listed the page
+cannot reach Settings either, so the first time, add it to the file under `/config` and restart.
 
 ## Voices
 
