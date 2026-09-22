@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
     title: Rhapsode worker protocol
-    version: 0.1.10
+    version: 0.1.11
 paths:
     /health:
         get:

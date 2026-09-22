@@ -2,6 +2,55 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.11
+
+- The server keeps the engines it installed in `rhapsode.db`, a SQLite database beside the config
+  file, rather than in `rhapsode.engines.json` (`protocol.md` § 10, "The state database"). A server
+  that finds the old file imports it once and renames it `rhapsode.engines.json.imported`, so an
+  upgrade needs nothing done by hand and a downgrade has the file to go back to. It is the ground for
+  settings changed through the API, which make a second writer, and a transaction each is what keeps
+  an install and a settings change from losing each other's write. SQLite ships with Node, so this
+  adds no dependency, but it needs Node 22.13 or newer. The database is created readable by its owner
+  only and is written once at boot, so a container restarted as a different user than the one that
+  created it refuses to start and names the file, rather than failing at the first install.
+- `GET /settings` answers every setting the server has: the value the running process is using, the
+  layer it came from (the default, the config file, or the state database), and whether a change to it
+  applies at once or at the next start (`protocol.md` § 10, "Settings"). A change waiting for a restart
+  shows as `saved` beside the value still in use. It is a management route, reading included, because
+  it names directories on the box and the origins it trusts, and it never carries the management token:
+  `tokenSet` says whether there is one. The SDK has it as `settings()`.
+- `PATCH /settings` changes settings without editing the config file (`protocol.md` § 10, "Settings").
+  It writes the state database, which wins over the file, and `null` clears a setting so the file's
+  value, or the default, shows through again. The residency settings, each engine's keep-alive and
+  `update.check` apply at once: a keep-alive changed while a model sits idle moves its deadline from
+  when it was last used, so a shorter one frees a model already past it. Everything else is saved for
+  the next start and shows as `saved` until then. A patch is one transaction, refused whole if any of
+  it is out of range, misspelt, or names an engine that is not installed. Two changes are refused as
+  `conflict` because they would lock their caller out: a caller on another machine leaving the server
+  with no management token, and a page leaving its own origin out of `management.origins`.
+  `RHAPSODE_UPDATE_CHECK=0` still turns the update check off whatever is written. The SDK has it as
+  `updateSettings()`.
+- `pnpm wizard settings` lists every setting the running server has, where each came from and whether
+  a change to it applies now or at the next start, with a column for any change waiting on a restart.
+  `pnpm wizard settings <key>` shows one, `pnpm wizard settings <key> <value>` changes it and
+  `--unset` clears it back to the config file's value or the default, all through `/settings`, so the
+  wizard and the web page cannot disagree about what a setting is (`protocol.md` § 10). A value is read
+  as the kind the setting already has: a number, true or false, or a comma-separated list. `-` reads
+  it from stdin, which is how to give a management token without it landing in the shell's history.
+  It is one command in the shape of `git config` rather than `settings set` and `settings unset`,
+  because a `settings` that both listed and held subcommands took `--server` from under them.
+- The web page has a **Settings** page (`protocol.md` § 10, "Settings"): every setting in cards by what
+  it is for, each saying whether its value came from `rhapsode.config.json`, the default, or a change
+  made here, and whether a change applies now or at the next restart. A card saves only what was changed
+  in it, **Reset** puts a setting back to the file's value or the default, and the changes waiting for
+  a restart are listed at the top. The management token is never shown: the page says whether one is
+  set, takes a new one or generates it in the browser, and asks before removing it. A page opened from
+  another machine is told that settings are only for the machine running rhapsode, as it is for
+  installs. On a phone the header shows the mark without the name, so all four pages fit.
+- `POST /update/check` asks GitHub for the latest release now rather than waiting out the day the core keeps an answer, and answers with the same document as `GET /update` once GitHub has. It is open to every caller and returns an answer under five minutes old as it is, so it cannot make the box ask more than twelve times an hour, and it asks nothing while the check is turned off. `protocol.md` § 9.
+- `pnpm wizard update` asks the server to check GitHub now, through `POST /update/check`, rather than reading an answer that may be a day old, so it reports a release published minutes ago.
+- The web page has a "Check for updates" button beside the version in its header, which asks the server to check GitHub now. A newer release brings up the upgrade banner at once; otherwise the page says this is the latest release, or that the server could not reach GitHub. The button is absent while the check is turned off, and on a phone it is an icon whose tooltip carries the version.
+
 ## 0.1.10
 
 - `GET /health` now carries the core's own `version`, and every engine summary on `/engines` and `/health`, and every installed entry of `/catalog`, carries `outdated`: `true` when the `rhapsode-worker` in that engine's virtualenv is not this core's version, which is what an upgrade leaves behind. The core does the comparison so that no client has to order version strings. The catalog also carries `workerVersion` now. `protocol.md` § 9.
