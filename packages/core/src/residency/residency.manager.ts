@@ -321,8 +321,12 @@ export class ResidencyManager {
         const seconds = this.keepAliveFor(resident);
         if (seconds < 0) return;
 
-        resident.expiresAt = this.clock.now().plus({ seconds });
-        resident.cancelIdle = this.clock.after(seconds, async () => {
+        // From the last use rather than from now. The same thing when a request has just let go,
+        // which is every call but one: a keep-alive changed while the model sat idle (§ 10), where
+        // the model has already spent some of it.
+        resident.expiresAt = resident.lastUsedAt.plus({ seconds });
+        const remaining = Math.max(0, resident.expiresAt.diff(this.clock.now()).as('seconds'));
+        resident.cancelIdle = this.clock.after(remaining, async () => {
             await this.transition.run(async () => {
                 // A timer's view is always stale. Cancelling covers the model that was picked up
                 // again, but not a callback already on its way when that happened, so the deadline
@@ -339,6 +343,27 @@ export class ResidencyManager {
     /** What the request asked for, then the engine's own answer, then the server's. § 3. */
     private keepAliveFor(resident: Resident): number {
         return resident.keepAliveSeconds ?? this.engines.entry(resident.engineId)?.keepAliveSeconds ?? this.policy.keepAliveSeconds;
+    }
+
+    /**
+     * Put a new deadline on every model nobody is holding, for a keep-alive changed through
+     * `PATCH /settings`. protocol.md § 10.
+     *
+     * Without it a change reaches only models released after it, and `GET /residency` goes on showing
+     * the old deadline for one sitting idle, which reads as a setting that did nothing. A model now
+     * past its new deadline goes at once. A model being spoken has no deadline to move, and gets the
+     * new one when it is let go.
+     */
+    async rearmExpiry(): Promise<void> {
+        await this.transition.run(async () => {
+            for (const resident of this.residents.values()) {
+                if (resident.leases > 0) continue;
+                resident.cancelIdle?.();
+                resident.cancelIdle = undefined;
+                resident.expiresAt = undefined;
+                this.armExpiry(resident);
+            }
+        });
     }
 
     /**

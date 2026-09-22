@@ -15,7 +15,7 @@ import type {
     UpdateStatus,
     Voice,
 } from '../rhapsode/types/rhapsode.types.js';
-import type { OpenApiDocument } from './types/rhapsode.public.js';
+import type { OpenApiDocument, Settings, SettingsPatch } from './types/rhapsode.public.js';
 
 export class PublicClient {
     constructor(private fetch: SdkFetch) {}
@@ -448,6 +448,54 @@ export class PublicClient {
                 return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             default:
                 return { status: 200, contentType: 'text/event-stream', data: await result.text() };
+        }
+    }
+
+    async settings(): Promise<
+        { status: 200; contentType: 'application/json'; data: Settings } | { status: 403; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const result = await this.fetch(`/settings`, {
+            method: 'GET',
+            expectStatuses: [403],
+        });
+        switch (result.status) {
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 200, contentType: 'application/json', data: await parseJson<Settings>(result) };
+        }
+    }
+
+    /** @description One transaction: a patch that is refused changes nothing. Answers the whole document after */
+    async updateSettings(
+        body: SettingsPatch,
+    ): Promise<
+        | { status: 200; contentType: 'application/json'; data: Settings }
+        | { status: 400; contentType: 'application/json'; data: ErrorBody }
+        | { status: 403; contentType: 'application/json'; data: ErrorBody }
+        | { status: 404; contentType: 'application/json'; data: ErrorBody }
+        | { status: 409; contentType: 'application/json'; data: ErrorBody }
+        | { status: 422; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const result = await this.fetch(`/settings`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body, bigIntReplacer),
+            expectStatuses: [400, 403, 404, 409, 422],
+        });
+        switch (result.status) {
+            case 400:
+                return { status: 400, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 404:
+                return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 409:
+                return { status: 409, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 422:
+                return { status: 422, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 200, contentType: 'application/json', data: await parseJson<Settings>(result) };
         }
     }
 }

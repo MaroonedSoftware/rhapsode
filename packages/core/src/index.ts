@@ -6,7 +6,7 @@
  */
 
 export { buildServer, type BuildOptions } from './server.js';
-export { DEFAULTS, type RhapsodeConfig } from './config.js';
+export { DEFAULTS, ENGINE_SETTINGS, SETTINGS, type RhapsodeConfig, type SettingApplies } from './config.js';
 export { RhapsodeError, TAXONOMY, type ErrorCode } from './errors/rhapsode.error.js';
 export { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 export { EngineRegistry, type EngineEntry, type EngineState } from './registry/engine.registry.js';
@@ -15,7 +15,9 @@ export { CORE_VERSION } from './core.version.js';
 export { CATALOG, type CatalogRecord } from './registry/engines.catalog.js';
 export { managementGuard } from './management/management.module.js';
 export { isLocalCaller, isLoopback, isLoopbackOrigin, MANAGEMENT_ACCESS_POLICY } from './management/management.access.policy.js';
-export { loadSettings, ManagedEngines, MANAGED_FILE, type ConfiguredEngine } from './registry/managed.engines.js';
+export { loadSettings, ManagedEngines, MANAGED_FILE, type ConfiguredEngine, type LoadedSettings } from './registry/managed.engines.js';
+export { StateStore, STATE_FILE } from './state/state.store.js';
+export { SettingsService } from './settings/settings.service.js';
 export { WorkerClient, type SpokenResponse } from './workers/worker.client.js';
 export { WorkerRegistry } from './workers/worker.registry.js';
 export { LocalWorkerHandle, RemoteWorkerHandle, resolveCommand, type WorkerHandle } from './workers/worker.handle.js';

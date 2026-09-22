@@ -28,10 +28,13 @@ import { openaiRoutes } from './openai/openai.routes.js';
 import { apiReferenceRoutes } from './reference/api.reference.routes.js';
 import { dialogueRoutes } from './speak/dialogue.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
+import { settingsModule } from './settings/settings.module.js';
+import { settingsRoutes } from './settings/settings.routes.js';
+import { stateModule } from './state/state.module.js';
 import { updateModule } from './update/update.module.js';
 import { updateRoutes } from './update/update.routes.js';
 import { workerModule } from './workers/worker.module.js';
-import type { RhapsodeConfig } from './config.js';
+import { DEFAULTS, type RhapsodeConfig } from './config.js';
 
 /**
  * Everything a running rhapsode is, assembled but not started.
@@ -40,31 +43,42 @@ import type { RhapsodeConfig } from './config.js';
  * order is a decision rather than a detail.
  */
 export interface BuildOptions {
-    /** The engines this API installed, and where it records them. Absent, the server cannot install. */
+    /**
+     * The engines this API installed, and the state database it records them in, which the server
+     * closes when it stops. Absent, the server cannot install.
+     */
     managed?: ManagedEngines;
     /** How an install runs its commands. Replaced in tests, so an install can be driven without pip. */
     runner?: CommandRunner;
     /** How the update check reaches GitHub. Replaced in tests, so none of them ever does. § 9. */
     fetch?: typeof fetch;
+    /**
+     * The operator's config file on its own, which is how `/settings` knows a value came from it.
+     * Absent, the settings the server is built from count as the file. § 10.
+     */
+    operator?: RhapsodeConfig;
 }
 
 export async function buildServer(settings: RhapsodeConfig, logger?: Logger, options: BuildOptions = {}): Promise<ServerKitServerBuilder> {
     // AppConfig is keyed by string at its edges, and RhapsodeConfig is the typed view of the same
     // object. Services take their own section rather than this, which is ServerKit's rule.
     const config = new AppConfig(settings as unknown as Record<string, unknown>);
-    const log = logger ?? new RhapsodeJsonLogger((settings.log?.level ?? 'info') as LogLevel);
+    const log = logger ?? new RhapsodeJsonLogger((settings.log?.level ?? DEFAULTS.logLevel) as LogLevel);
 
-    const builder = new ServerKitServerBuilder({ host: settings.server?.host ?? '::' });
+    const builder = new ServerKitServerBuilder({ host: settings.server?.host ?? DEFAULTS.host });
 
     // Registration order is the shutdown contract: ServerKit runs `shutdown` hooks in reverse, so
     // this order means shutdown unwinds speak, then residency, then the workers. Registering the
     // worker module last would kill the children out from under streams still reading them.
     const modules: ServerKitModule[] = [
+        // First, so the state database closes after everything that might write to it.
+        stateModule(options.managed?.store),
+        settingsModule(settings, options.managed?.store, options.operator),
         managementModule(settings),
         engineModule(settings, options.managed),
         workerModule(settings),
-        residencyModule(settings),
-        updateModule(settings, options.fetch),
+        residencyModule(),
+        updateModule(options.fetch),
         // Last, so it shuts down first: a running pip is stopped before the workers it would register.
         installModule(settings, options.runner),
     ];
@@ -94,6 +108,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         { plugin: openaiRoutes },
         { plugin: catalogRoutes },
         { plugin: updateRoutes },
+        { plugin: settingsRoutes },
         { plugin: installRoutes },
         // Given the lifecycle signal so a shutdown closes open event streams rather than waiting
         // out the grace period for clients that would otherwise watch forever.

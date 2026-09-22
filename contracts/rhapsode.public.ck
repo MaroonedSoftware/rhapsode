@@ -390,3 +390,163 @@ operation /installs/{job}/events: {
     }
 }
 
+
+############################################################################################
+# Settings. protocol.md § 10, "Settings". Both routes are management routes, reading included:
+# the document names directories on the box and the origins it trusts.
+#
+# Here rather than in rhapsode.types.ck because a worker has no settings of the core's to read, and
+# the types file is also the Python worker SDK's models.
+############################################################################################
+
+contract mode(loose) SettingsServer: {
+    port: int
+    host: string
+    shutdownGraceMs: int
+}
+
+contract mode(loose) SettingsLog: {
+    level: enum(error, warn, info, debug, trace)
+}
+
+contract mode(loose) SettingsResidency: {
+    maxResidentModels: int
+    evictionWaitSeconds: int
+    keepAliveSeconds: int
+}
+
+contract mode(loose) SettingsWorkers: {
+    socketDir: string
+    voiceDir: string
+    startupTimeoutSeconds: int
+    drainGraceMs: int
+    maxRestarts: int
+    restartDecaySeconds: int
+}
+
+contract mode(loose) SettingsInstall: {
+    venvDir: string
+    sourceDir?: string                          # Absent when there is neither a setting nor a checkout to find.
+    python: string
+}
+
+contract mode(loose) SettingsManagement: {
+    tokenSet: boolean                           # Never the token itself, which is a root password for the box.
+    origins: array(string)
+}
+
+contract mode(loose) SettingsUpdate: {
+    check: boolean
+}
+
+contract mode(loose) SettingsEngine: {
+    keepAliveSeconds?: int                      # Absent when the engine uses residency.keepAliveSeconds.
+}
+
+# What the running process is using. A setting waiting for a restart shows its old value here.
+contract mode(loose) SettingsValues: {
+    server: SettingsServer
+    log: SettingsLog
+    residency: SettingsResidency
+    workers: SettingsWorkers
+    install: SettingsInstall
+    management: SettingsManagement
+    update: SettingsUpdate
+    engines: record(string, SettingsEngine)     # One per engine in the registry.
+}
+
+contract mode(loose) SettingField: {
+    key: string                                 # Dotted: residency.keepAliveSeconds, engines.kokoro.keepAliveSeconds.
+    source: enum(default, config, database)     # The layer the value in use came from.
+    applies: enum(live, restart)                # Whether a change takes effect when it is written.
+    saved?: json                                # A value waiting for a restart. For management.token, `true` and never the token.
+}
+
+contract mode(loose) Settings: {
+    values: SettingsValues
+    fields: array(SettingField)
+}
+
+# A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and
+# every member nullable: `null` clears the database's value and the file's, or the default, shows
+# through again. The ranges here are the ones a value is refused outside of; § 10 lists them.
+contract SettingsServerPatch: {
+    port?: null | int(min=1, max=65535)
+    host?: null | string(min=1)
+    shutdownGraceMs?: null | int(min=0)
+}
+
+contract SettingsLogPatch: {
+    level?: null | enum(error, warn, info, debug, trace)
+}
+
+contract SettingsResidencyPatch: {
+    maxResidentModels?: null | int(min=1)
+    evictionWaitSeconds?: null | int(min=0)
+    keepAliveSeconds?: null | int(min=-1)
+}
+
+contract SettingsWorkersPatch: {
+    socketDir?: null | string(min=1)
+    voiceDir?: null | string(min=1)
+    startupTimeoutSeconds?: null | int(min=1)
+    drainGraceMs?: null | int(min=0)
+    maxRestarts?: null | int(min=0)
+    restartDecaySeconds?: null | int(min=0)
+}
+
+contract SettingsInstallPatch: {
+    venvDir?: null | string(min=1)
+    sourceDir?: null | string(min=1)
+    python?: null | string(min=1)
+}
+
+contract SettingsManagementPatch: {
+    token?: null | string                       # Empty is no token, even where the file has one.
+    origins?: null | array(string)              # The whole list, replacing the file's rather than adding to it.
+}
+
+contract SettingsUpdatePatch: {
+    check?: null | boolean
+}
+
+contract SettingsEnginePatch: {
+    keepAliveSeconds?: null | int(min=-1)
+}
+
+contract SettingsPatch: {
+    server?: SettingsServerPatch
+    log?: SettingsLogPatch
+    residency?: SettingsResidencyPatch
+    workers?: SettingsWorkersPatch
+    install?: SettingsInstallPatch
+    management?: SettingsManagementPatch
+    update?: SettingsUpdatePatch
+    engines?: record(string, SettingsEnginePatch)
+}
+
+operation /settings: {
+    get: {
+        sdk: settings
+        response: {
+            200: { application/json: Settings }
+            403: { application/json: ErrorBody }
+        }
+    }
+    patch: {
+        # One transaction: a patch that is refused changes nothing. Answers the whole document after
+        # the write. A change that would lock its caller out is a 409. § 10.
+        sdk: updateSettings
+        request: {
+            application/json: SettingsPatch
+        }
+        response: {
+            200: { application/json: Settings }
+            400: { application/json: ErrorBody }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+            422: { application/json: ErrorBody }
+        }
+    }
+}

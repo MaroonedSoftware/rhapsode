@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,8 +12,19 @@ import type { PlannedCommand } from '../src/install/install.plan.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import { CATALOG } from '../src/registry/engines.catalog.js';
 import { loadSettings, MANAGED_FILE } from '../src/registry/managed.engines.js';
+import { STATE_FILE, StateStore } from '../src/state/state.store.js';
 import { buildServer } from '../src/server.js';
 import type { RhapsodeConfig } from '../src/config.js';
+
+/** What the server recorded, read through a second handle as a person inspecting the box would. */
+function recordedIn(dir: string): { engines: Record<string, unknown> } {
+    const store = StateStore.open(join(dir, STATE_FILE));
+    try {
+        return { engines: Object.fromEntries(store.engines()) };
+    } finally {
+        store.close();
+    }
+}
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
@@ -84,7 +95,7 @@ describe('reinstalling an engine', () => {
     const post = (app: App, url: string) => app.inject({ method: 'POST', url });
     const catalogEntry = async (app: App, id: string) =>
         ((await app.inject({ method: 'GET', url: '/catalog' })).json() as CatalogEntry[]).find(entry => entry.id === id);
-    const managedEntry = (id: string) => JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8')).engines[id];
+    const managedEntry = (id: string) => recordedIn(dir).engines[id];
 
     /** Install `id` with a worker from an older release, as an upgraded box has it. */
     async function installStale(app: App, options: { version: string }, id = 'tone', query = '') {
@@ -110,6 +121,26 @@ describe('reinstalling an engine', () => {
         expect(managedEntry('tone')).toEqual({ venv: join(venvDir, 'tone.alt') });
         expect(existsSync(join(venvDir, 'tone'))).toBe(false);
         expect(await catalogEntry(app, 'tone')).toMatchObject({ installed: 'yes', workerVersion: CORE_VERSION, outdated: false });
+    });
+
+    it('keeps a keep-alive set through /settings, which what the install recorded does not carry', async () => {
+        // Built from the install's record alone, the new entry dropped it until the next start,
+        // while GET /settings went on saying it was set. § 10.
+        const options = { version: '0.0.1' };
+        const app = await start(fakeRunner(options).runner);
+        await installStale(app, options);
+        const patched = await app.inject({
+            method: 'PATCH',
+            url: '/settings',
+            payload: { engines: { tone: { keepAliveSeconds: 45 } } },
+            headers: { 'content-type': 'application/json' },
+        });
+        expect(patched.statusCode).toBe(200);
+
+        expect((await settled(app, (await post(app, '/engines/tone/reinstall')).json().id)).state).toBe('succeeded');
+
+        expect((await app.inject({ method: 'GET', url: '/settings' })).json().values.engines).toEqual({ tone: { keepAliveSeconds: 45 } });
+        expect(managedEntry('tone')).not.toHaveProperty('keepAliveSeconds');
     });
 
     it('flips back to the first slot on the next reinstall, so there are never more than two', async () => {

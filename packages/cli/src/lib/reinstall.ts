@@ -12,7 +12,7 @@ export const REINSTALL_COST = 'its next request loads the model cold, and anythi
  * Reinstall one engine, asking for its weights licence only if the server does.
  *
  * The client cannot know whether the licence the last install accepted still covers the weights,
- * because that is in the server's managed file, so it asks without `accept` first and takes a
+ * because that is in the server's state database, so it asks without `accept` first and takes a
  * refusal naming the query as the server saying somebody has to agree again. § 10.
  */
 export async function reinstallOne(api: ManagementClient, client: Client, ui: Ui, entry: CatalogEntry): Promise<number> {

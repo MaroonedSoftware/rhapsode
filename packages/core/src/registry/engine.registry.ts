@@ -96,6 +96,19 @@ export class EngineRegistry {
         return this.entries.get(id);
     }
 
+    /**
+     * Change an engine's own keep-alive, or drop it with `undefined` so the server's applies. § 10.
+     *
+     * Not `declare`, which would rebuild the entry and read the virtualenv's worker version again for
+     * a change that touches neither. The worker keeps its handle: nothing it was started with moved.
+     */
+    retune(id: string, keepAliveSeconds: number | undefined): void {
+        const entry = this.entries.get(id);
+        if (entry === undefined) return;
+        const { keepAliveSeconds: _previous, ...rest } = entry;
+        this.entries.set(id, keepAliveSeconds === undefined ? rest : { ...rest, keepAliveSeconds });
+    }
+
     state(id: string): EngineState {
         return this.states.get(id) ?? { process: 'down', model: 'unloaded', restarts: 0 };
     }

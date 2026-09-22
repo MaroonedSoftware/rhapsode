@@ -5,7 +5,9 @@ import {
     InstallJob,
     ReinstallOutdated,
     ResidencyDetail,
+    Settings,
     UpdateStatus,
+    type SettingsPatch,
     type License,
 } from '@rhapsode/contract';
 
@@ -147,6 +149,16 @@ export class ManagementClient {
     async unload(engine: string, mode: 'terminate' | 'unload' = 'terminate'): Promise<EngineSummary> {
         const query = mode === 'terminate' ? '' : `?mode=${mode}`;
         return EngineSummary.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/unload${query}`));
+    }
+
+    /** Every setting, where each came from, and what waits for a restart. Never the token. § 10. */
+    async settings(): Promise<Settings> {
+        return Settings.parse(await this.json('GET', '/settings'));
+    }
+
+    /** Change some settings; `null` clears one. Answers every setting as it stands after. § 10. */
+    async updateSettings(patch: SettingsPatch): Promise<Settings> {
+        return Settings.parse(await this.json('PATCH', '/settings', patch));
     }
 
     /** Stream a job's events to `onEvent` until its last one, then hang up and return the job. */

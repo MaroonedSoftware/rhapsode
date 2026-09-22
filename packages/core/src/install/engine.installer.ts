@@ -49,8 +49,8 @@ export class EngineInstaller {
             throw new RhapsodeError('conflict', `"${id}" is configured in the operator's config file, which is theirs to change`);
         }
         if (this.engines.has(id)) throw new RhapsodeError('conflict', `"${id}" is already installed`);
-        if (this.managed.path === undefined) {
-            throw new RhapsodeError('unsupported', 'this server was started without a managed engines file, so it has nowhere to record an install');
+        if (this.managed.store === undefined) {
+            throw new RhapsodeError('unsupported', 'this server was started without a state database, so it has nowhere to record an install');
         }
 
         const accepted = typeof accept === 'string' ? accept : undefined;
@@ -72,7 +72,7 @@ export class EngineInstaller {
         if (!this.managed.isManaged(id)) {
             throw new RhapsodeError('conflict', `"${id}" is configured in the operator's config file; rebuild its virtualenv there`);
         }
-        // No managed-file check, unlike install: a server without one has managed nothing, so every
+        // No state-database check, unlike install: a server without one has managed nothing, so every
         // engine it has is the operator's and was refused above.
         this.refuseIfBusy(id);
         const accepted = acceptanceFor(id, record, this.managed.entry(id)?.accepted, accept);
@@ -192,10 +192,21 @@ export class EngineInstaller {
 
         context.step('register');
         const configured = { venv, ...(accepted === undefined ? {} : { accepted }) };
-        const entry = entryFrom(id, configured);
+        const entry = entryFrom(id, { ...configured, ...this.settingsFor(id) });
         await this.managed.record(id, configured);
         await this.workers.forget(id);
         this.engines.declare(entry);
+    }
+
+    /**
+     * The engine's own settings, written through `PATCH /settings` and kept apart from what an install
+     * records. Merged into the entry here because boot merges them the same way, and an entry built
+     * from the record alone dropped a keep-alive until the next start while `GET /settings` went on
+     * reporting it. § 10.
+     */
+    private settingsFor(id: string): { keepAliveSeconds?: number } {
+        const keepAliveSeconds = this.managed.store?.setting(`engines.${id}.keepAliveSeconds`);
+        return typeof keepAliveSeconds === 'number' ? { keepAliveSeconds } : {};
     }
 
     private async rebuild(id: string, record: CatalogRecord, accepted: string | undefined, context: JobContext): Promise<void> {
@@ -207,14 +218,14 @@ export class EngineInstaller {
         context.step('register');
         const { accepted: _previous, ...kept } = this.managed.entry(id) ?? {};
         const configured = { ...kept, venv: next, ...(accepted === undefined ? {} : { accepted }) };
-        const entry = entryFrom(id, configured);
+        const entry = entryFrom(id, { ...configured, ...this.settingsFor(id) });
         let swapping = false;
         try {
             await this.residency.replace(
                 id,
                 async () => {
                     swapping = true;
-                    // The managed file first, so a core that dies anywhere after this boots on the new
+                    // The database first, so a core that dies anywhere after this boots on the new
                     // virtualenv, and one that dies before it boots on the old.
                     await this.managed.record(id, configured);
                     await this.workers.forget(id);

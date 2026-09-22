@@ -124,6 +124,16 @@ describe('ManagementClient against a real core', () => {
         expect(accepted).toMatchObject({ kind: 'install', variant: 'plain' });
     });
 
+    it('reads the settings and changes one, the way the web page does', async () => {
+        const client = new ManagementClient(await start());
+        expect((await client.settings()).values.residency.keepAliveSeconds).toBe(300);
+
+        const after = await client.updateSettings({ residency: { keepAliveSeconds: 900 } });
+
+        expect(after.values.residency.keepAliveSeconds).toBe(900);
+        expect(after.fields.find(field => field.key === 'residency.keepAliveSeconds')?.source).toBe('database');
+    });
+
     it('turns a refusal into the protocol’s code and message', async () => {
         const client = new ManagementClient(await start());
         const refused = await client.pull('chatterbox').catch((error: unknown) => error);

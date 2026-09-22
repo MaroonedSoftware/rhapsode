@@ -16,9 +16,20 @@ import { installEnvironment } from '../src/install/command.runner.js';
 import { planInstall, type PlannedCommand } from '../src/install/install.plan.js';
 import { checkoutPythonDir, resolveInstallSettings, sourceFor } from '../src/install/install.settings.js';
 import { CATALOG } from '../src/registry/engines.catalog.js';
-import { loadSettings, MANAGED_FILE } from '../src/registry/managed.engines.js';
+import { loadSettings } from '../src/registry/managed.engines.js';
+import { STATE_FILE, StateStore } from '../src/state/state.store.js';
 import { buildServer } from '../src/server.js';
 import type { RhapsodeConfig } from '../src/config.js';
+
+/** What the server recorded, read through a second handle as a person inspecting the box would. */
+function recordedIn(dir: string): { engines: Record<string, unknown> } {
+    const store = StateStore.open(join(dir, STATE_FILE));
+    try {
+        return { engines: Object.fromEntries(store.engines()) };
+    } finally {
+        store.close();
+    }
+}
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
@@ -236,7 +247,7 @@ describe('the install routes', () => {
         expect(job.variant).toBeUndefined();
         expect(ran.map(command => command.step)).toEqual(['venv', 'packages', 'packages', 'verify']);
 
-        const recorded = JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8'));
+        const recorded = recordedIn(dir);
         expect(recorded).toEqual({ engines: { tone: { venv: join(venvDir, 'tone') } } });
 
         const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
@@ -256,7 +267,7 @@ describe('the install routes', () => {
         expect(job).toMatchObject({ state: 'failed', step: 'packages' });
         expect(job.error).toMatchObject({ code: 'internal', retryable: false });
         expect(job.error?.message).toMatch(/No matching distribution found/);
-        expect(existsSync(join(dir, MANAGED_FILE))).toBe(false);
+        expect(recordedIn(dir)).toEqual({ engines: {} });
         expect((await app.inject({ method: 'GET', url: '/engines' })).json()).toEqual([]);
     });
 
@@ -307,7 +318,7 @@ describe('the install routes', () => {
 
         expect(removed.statusCode).toBe(204);
         expect(existsSync(join(venvDir, 'tone'))).toBe(false);
-        expect(JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8'))).toEqual({ engines: {} });
+        expect(recordedIn(dir)).toEqual({ engines: {} });
         expect((await app.inject({ method: 'GET', url: '/engines' })).json()).toEqual([]);
     });
 
@@ -385,7 +396,7 @@ describe('the install routes', () => {
         const job = await settled(app, accepted.json().id);
 
         expect(job).toMatchObject({ state: 'failed', step: 'weights', variant: 'turbo' });
-        expect(JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8')).engines).toHaveProperty('chatterbox');
+        expect(recordedIn(dir).engines).toHaveProperty('chatterbox');
         const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
         expect(engines.map((engine: { id: string }) => engine.id)).toEqual(['chatterbox']);
     });
@@ -437,7 +448,7 @@ describe('the install routes', () => {
             const app = await start(fakeRunner().runner);
             await settled(app, (await install(app, 'research', '?accept=CC-BY-NC-4.0')).json().id);
 
-            const recorded = JSON.parse(readFileSync(join(dir, MANAGED_FILE), 'utf8'));
+            const recorded = recordedIn(dir);
             expect(recorded.engines.research).toEqual({ venv: join(venvDir, 'research'), accepted: 'CC-BY-NC-4.0' });
             // And boot ignores it: the engine comes back from the file as any other does.
             expect((await app.inject({ method: 'GET', url: '/engines' })).json()[0]).toMatchObject({ id: 'research' });

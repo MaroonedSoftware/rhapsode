@@ -49,8 +49,11 @@ try {
 }
 
 // Read through the server's own loader, so the token the proxy presents is the one the server will
-// accept, including after an operator edits it or removes it.
-const { settings } = await loadSettings(configPath);
+// accept, including after an operator edits it or removes it, or changes it through the API, which
+// writes the state database rather than this file. Closed at once, so the server below holds the
+// only handle on the database.
+const { settings, store } = await loadSettings(configPath);
+store.close();
 const token = settings.management?.token;
 await rm(staleTokenPath, { force: true });
 

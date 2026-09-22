@@ -20,6 +20,9 @@ const STDERR_RING_LINES = 40;
 /** `sun_path` is 104 bytes on macOS and 108 on Linux, and the failure is an opaque EINVAL at bind. */
 const MAX_SOCKET_PATH = 100;
 
+/** Per user, so two people's cores on one box do not share one directory of sockets. */
+export const defaultSocketDir = (): string => join(tmpdir(), `rhapsode-${process.getuid?.() ?? 0}`);
+
 export interface SupervisorOptions {
     socketDir?: string;
     /**
@@ -351,7 +354,7 @@ export class LocalWorkerHandle implements WorkerHandle {
     }
 
     private async allocateSocket(): Promise<string> {
-        const directory = this.options.socketDir ?? join(tmpdir(), `rhapsode-${process.getuid?.() ?? 0}`);
+        const directory = this.options.socketDir ?? defaultSocketDir();
         await mkdir(directory, { recursive: true, mode: 0o700 });
 
         // The random suffix stops a restarted worker colliding with a socket its predecessor has

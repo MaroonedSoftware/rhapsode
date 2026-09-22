@@ -5,7 +5,7 @@ from urllib.parse import quote
 from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
-from ._models_rhapsode_public import OpenApiDocument
+from ._models_rhapsode_public import OpenApiDocument, Settings, SettingsPatch
 from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice
 
 
@@ -387,6 +387,54 @@ class InstallJobEvents404Response(TypedDict):
     data: ErrorBody
 
 
+class Settings200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: Settings
+
+
+class Settings403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UpdateSettings200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: Settings
+
+
+class UpdateSettings400Response(TypedDict):
+    status: Literal[400]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UpdateSettings403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UpdateSettings404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UpdateSettings409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class UpdateSettings422Response(TypedDict):
+    status: Literal[422]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 _ENGINES_RESPONSE: TypeAdapter[list[EngineSummary]] = TypeAdapter(list[EngineSummary])
 _ENGINE_VOICES_RESPONSE_200: TypeAdapter[list[Voice]] = TypeAdapter(list[Voice])
 _CATALOG_RESPONSE: TypeAdapter[list[CatalogEntry]] = TypeAdapter(list[CatalogEntry])
@@ -624,3 +672,26 @@ class RhapsodePublicClient(BaseClient):
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "text/event-stream", "data": result }
+
+    async def settings(self) -> Settings200Response | Settings403Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full("/settings", method="GET", response_kind="auto", expect_statuses=(403,))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": Settings.model_validate(result) }
+
+    async def update_settings(self, body: SettingsPatch) -> UpdateSettings200Response | UpdateSettings400Response | UpdateSettings403Response | UpdateSettings404Response | UpdateSettings409Response | UpdateSettings422Response:
+        """
+        One transaction: a patch that is refused changes nothing. Answers the whole document after
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full("/settings", method="PATCH", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 403, 404, 409, 422))
+        if _status == 400:
+            return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 422:
+            return { "status": 422, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": Settings.model_validate(result) }

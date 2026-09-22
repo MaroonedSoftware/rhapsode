@@ -14,6 +14,7 @@ import { pythonVersion } from './checks/python.version.js';
 import installCommand from './commands/install.command.js';
 import psCommand from './commands/ps.command.js';
 import reinstallCommand from './commands/reinstall.command.js';
+import settingsCommand from './commands/settings.command.js';
 import setupCommand from './commands/setup.command.js';
 import unloadCommand from './commands/unload.command.js';
 import updateCommand from './commands/update.command.js';
@@ -21,7 +22,7 @@ import updateCommand from './commands/update.command.js';
 const app = await createCliApp({
     name: 'wizard',
     description:
-        'rhapsode developer CLI: first-run setup, a doctor for this checkout, engine installs and reinstalls, updates, and what is on the card',
+        'rhapsode developer CLI: first-run setup, a doctor for this checkout, engine installs and reinstalls, updates, settings, and what is on the card',
     version: '0.0.0',
     commands: [
         { path: ['setup'], module: setupCommand },
@@ -30,6 +31,7 @@ const app = await createCliApp({
         { path: ['update'], module: updateCommand as CommandModule },
         { path: ['ps'], module: psCommand as CommandModule },
         { path: ['unload'], module: unloadCommand as CommandModule },
+        { path: ['settings'], module: settingsCommand as CommandModule },
     ],
     // In the order a fresh checkout has to satisfy them, so the first red line is the one to fix.
     checks: [

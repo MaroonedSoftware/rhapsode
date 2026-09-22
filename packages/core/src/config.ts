@@ -78,8 +78,8 @@ export interface RhapsodeConfig {
         Partial<EngineEntry> & {
             enabled?: boolean;
             /**
-             * The weights licence the last install or reinstall accepted. The core writes it in the
-             * managed file for a reinstall to read, and boot ignores it. protocol.md § 10.
+             * The weights licence the last install or reinstall accepted. The core records it in the
+             * state database for a reinstall to read, and boot ignores it. protocol.md § 10.
              */
             accepted?: string;
         }
@@ -88,6 +88,8 @@ export interface RhapsodeConfig {
 
 export const DEFAULTS = {
     port: 8080,
+    host: '::',
+    logLevel: 'info',
     shutdownGraceMs: 20_000,
     maxResidentModels: 1,
     evictionWaitSeconds: 30,
@@ -97,3 +99,40 @@ export const DEFAULTS = {
     maxRestarts: 5,
     restartDecaySeconds: 300,
 } as const;
+
+/** Whether a change to a setting takes effect when it is written, or at the next start. § 10. */
+export type SettingApplies = 'live' | 'restart';
+
+/**
+ * Every server-wide setting `/settings` reads and writes, by dotted key. protocol.md § 10, "Settings".
+ *
+ * The one list: the settings document, the patch's validation and the wizard's table are all drawn
+ * from it, so a setting cannot be readable in one and missing from another. A setting is `live` only
+ * where the core reads it at the moment it uses it; the spec says why each of the rest waits.
+ */
+export const SETTINGS: Readonly<Record<string, SettingApplies>> = {
+    'server.port': 'restart',
+    'server.host': 'restart',
+    'server.shutdownGraceMs': 'restart',
+    'log.level': 'restart',
+    'residency.maxResidentModels': 'live',
+    'residency.evictionWaitSeconds': 'live',
+    'residency.keepAliveSeconds': 'live',
+    'workers.socketDir': 'restart',
+    'workers.voiceDir': 'restart',
+    'workers.startupTimeoutSeconds': 'restart',
+    'workers.drainGraceMs': 'restart',
+    'workers.maxRestarts': 'restart',
+    'workers.restartDecaySeconds': 'restart',
+    'install.venvDir': 'restart',
+    'install.sourceDir': 'restart',
+    'install.python': 'restart',
+    'management.token': 'restart',
+    'management.origins': 'restart',
+    'update.check': 'live',
+};
+
+/** The settings each engine has, under `engines.<id>.`. The engine's entry itself is not one. */
+export const ENGINE_SETTINGS: Readonly<Record<string, SettingApplies>> = {
+    keepAliveSeconds: 'live',
+};

@@ -6,15 +6,19 @@ rules, so that somebody who knows one knows the other.
 
 ## What it is for
 
-Three pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
+Four pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
 uninstall with each job followed as it happens, and § 3's "On the card": what is loaded, how big it
 is, when it expires, and the means to unload it now. **Try it** (`/try`) is § 6 and § 7: say a line with
 an installed engine, offering only what the chosen variant's capability document claims, and list,
 preview, clone, blend and delete its voices. **API** (`/reference`) is § 9: every route, drawn from the
 `GET /openapi.json` the core serves, never from a copy of its own, so it describes the core it is
-talking to. Its route is not `/api`, which is the proxy's prefix. The page holds no logic the API
-lacks and gets no route of its own. If the page needs something the API does not offer, the API
-grows it, in the spec first.
+talking to. Its route is not `/api`, which is the proxy's prefix. **Settings** (`/settings`) is § 10's
+"Settings": every setting, where its value came from and whether a change applies now, one card per
+group, each saving only what was changed in it. `src/components/settings/settings.fields.ts` holds only
+words (labels and help); which settings exist, their values and when a change applies all come from
+`GET /settings`, and a setting the file has no words for is still shown under its key. The page holds
+no logic the API lacks and gets no route of its own. If the page needs something the API does not
+offer, the API grows it, in the spec first.
 
 **The capability document decides what is offered.** Cues, deliveries, dials and languages come
 from the chosen variant and nothing is hardcoded per engine. A new engine appears correctly with

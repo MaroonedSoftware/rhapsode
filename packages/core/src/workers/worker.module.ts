@@ -9,8 +9,12 @@ import { EngineRegistry } from '../registry/engine.registry.js';
 import type { SupervisorOptions } from './worker.handle.js';
 import { WorkerRegistry } from './worker.registry.js';
 
-export const workerModule = (settings: RhapsodeConfig): ServerKitModule => {
-    const options: SupervisorOptions = {
+/**
+ * The supervisor's options from settings, with the defaults filled in. Shared with `/settings`, which
+ * reports what the workers are using, so the defaults live here and nowhere else.
+ */
+export function resolveWorkerOptions(settings: RhapsodeConfig): SupervisorOptions {
+    return {
         socketDir: settings.workers?.socketDir,
         voiceDir: resolve(settings.workers?.voiceDir ?? join(homedir(), '.rhapsode', 'voices')),
         startupTimeoutSeconds: settings.workers?.startupTimeoutSeconds ?? DEFAULTS.startupTimeoutSeconds,
@@ -18,6 +22,10 @@ export const workerModule = (settings: RhapsodeConfig): ServerKitModule => {
         maxRestarts: settings.workers?.maxRestarts ?? DEFAULTS.maxRestarts,
         restartDecaySeconds: settings.workers?.restartDecaySeconds ?? DEFAULTS.restartDecaySeconds,
     };
+}
+
+export const workerModule = (settings: RhapsodeConfig): ServerKitModule => {
+    const options = resolveWorkerOptions(settings);
 
     return {
         name: 'workers',
