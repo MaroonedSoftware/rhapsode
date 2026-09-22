@@ -132,6 +132,11 @@ export class ManagementClient {
         return UpdateStatus.parse(await this.json('GET', '/update'));
     }
 
+    /** Ask GitHub now, for a person who asked. At most one real request in five minutes. § 9. */
+    async checkForUpdate(): Promise<UpdateStatus> {
+        return UpdateStatus.parse(await this.json('POST', '/update/check'));
+    }
+
     async pull(engine: string, variant?: string): Promise<InstallJob> {
         return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/pull`, variant === undefined ? {} : { variant }));
     }
