@@ -1,6 +1,6 @@
 {
     "name": "rhapsode",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "private": true,
     "description": "A multi-engine speech server: one contract, many TTS models.",
     "type": "module",
