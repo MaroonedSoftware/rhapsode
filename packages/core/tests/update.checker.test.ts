@@ -149,6 +149,68 @@ describe('the update checker', () => {
     });
 });
 
+describe('checking now', () => {
+    it('asks at once and answers with what GitHub said, which is what the button is for', async () => {
+        // The case that asked for it: 0.1.10 was out, and the answer held from before said 0.1.9 until
+        // the next morning.
+        const { fetcher, calls } = github(release('v0.1.9'), release('v0.1.10'));
+        const time = clock();
+        const checker = new UpdateChecker(on, silent(), fetcher, time.now, '0.1.9');
+        checker.status();
+        await checker.refreshIfDue();
+        time.advance(1);
+
+        expect(await checker.checkNow()).toMatchObject({ check: 'ok', latest: '0.1.10', updateAvailable: true });
+        expect(calls).toHaveLength(2);
+    });
+
+    it('asks from nothing, without a read before it', async () => {
+        const checker = new UpdateChecker(on, silent(), github(release('v0.2.0')).fetcher, clock().now, '0.1.9');
+
+        expect(await checker.checkNow()).toMatchObject({ check: 'ok', latest: '0.2.0' });
+    });
+
+    it('returns an answer under five minutes old as it is, however often it is pressed', async () => {
+        const { fetcher, calls } = github(release('v0.2.0'));
+        const time = { now: DateTime.fromISO('2026-09-21T09:00:00Z', { zone: 'utc' }) };
+        const checker = new UpdateChecker(on, silent(), fetcher, () => time.now, '0.1.9');
+
+        await checker.checkNow();
+        time.now = time.now.plus({ minutes: 4 });
+        for (let i = 0; i < 10; i += 1) await checker.checkNow();
+        expect(calls).toHaveLength(1);
+
+        time.now = time.now.plus({ minutes: 2 });
+        await checker.checkNow();
+        expect(calls).toHaveLength(2);
+    });
+
+    it('waits on the check in flight rather than starting a second', async () => {
+        const { fetcher, calls } = github(release('v0.2.0'));
+        const checker = new UpdateChecker(on, silent(), fetcher, clock().now, '0.1.9');
+
+        checker.status();
+        const answers = await Promise.all([checker.checkNow(), checker.checkNow()]);
+
+        expect(calls).toHaveLength(1);
+        expect(answers.every(answer => answer.check === 'ok')).toBe(true);
+    });
+
+    it('answers a failure as failed, not by throwing', async () => {
+        const checker = new UpdateChecker(on, silent(), github(new Error('getaddrinfo ENOTFOUND api.github.com')).fetcher, clock().now, '0.1.9');
+
+        expect(await checker.checkNow()).toMatchObject({ check: 'failed' });
+    });
+
+    it('asks nothing when the check is off, because a button does not overrule the operator', async () => {
+        const { fetcher, calls } = github(release('v0.2.0'));
+        const checker = new UpdateChecker({ check: false, distribution: 'docker' }, silent(), fetcher, clock().now, '0.1.9');
+
+        expect(await checker.checkNow()).toEqual({ version: '0.1.9', distribution: 'docker', check: 'off' });
+        expect(calls).toHaveLength(0);
+    });
+});
+
 describe('update settings', () => {
     it('checks by default, and the config can turn it off', () => {
         expect(resolveUpdateSettings({}, {}).check).toBe(true);

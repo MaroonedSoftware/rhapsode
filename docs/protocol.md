@@ -1077,6 +1077,26 @@ route then answers `check: off` without ever having asked. The environment can o
 a setting of `true` does not override `RHAPSODE_UPDATE_CHECK=0`, because whoever set the
 environment decided the box would not phone out, and a page is not the place to overrule them.
 
+**`POST /update/check` asks now.** A day is the right wait for a box nobody is looking at and the
+wrong one for a person who has just read that a release is out: on the box this was written for,
+0.1.10 was published at 11:50 and the answer the core held from before it said 0.1.9 until the next
+morning. So a caller can ask for a check, which answers with the same document as `GET /update`
+once GitHub has, waiting at most the check's own ten-second timeout. It takes no body.
+
+- **It is open to every caller**, like `GET /update`, because the person asking is often at a page
+  opened from another machine, and the answer is public.
+- **It cannot make the box phone out more than once in five minutes.** An answer less than five
+  minutes old is returned as it is, and a request arriving while a check is in flight waits for that
+  one. That is what lets an open route start outbound traffic: pressed as fast as anyone can, it asks
+  GitHub twelve times an hour, a fifth of the sixty GitHub allows an address without a token, so a
+  box behind a shared address cannot spend its neighbours' allowance.
+- **It does not override `off`.** With the check turned off it answers `check: off` without
+  asking, for the reason the environment cannot turn it back on: somebody decided this box does not
+  phone out, and a button is not the place to overrule them.
+- **A failure is an answer, not an error.** GitHub unreachable is `check: failed` with a `200`,
+  exactly as `GET /update` reports it, and the next background check follows the six-hour retry as
+  before. An answer from here stands for a day like any other.
+
 **The core does not update itself.** In the image it could only do so with the Docker socket, which
 is control of the host, and the one mechanism every operator already trusts is `docker compose pull`.
 So the core says that a release exists, and once the new image is running, `outdated` says which

@@ -187,6 +187,12 @@ describe('ManagementClient against a real core', () => {
         expect((await client.follow(job.id, () => {})).state).toBe('succeeded');
     });
 
+    it('asks for the latest release now, and gets the answer rather than pending', async () => {
+        const client = new ManagementClient(await start());
+
+        expect(await client.checkForUpdate()).toMatchObject({ check: 'ok', latest: '0.0.1', updateAvailable: false });
+    });
+
     it('reads the update status, which answers at once whatever GitHub is doing', async () => {
         const client = new ManagementClient(await start());
 

@@ -17,6 +17,12 @@ const FRESH_FOR = Duration.fromObject({ hours: 24 });
 /** Shorter than `FRESH_FOR`, so a box that was offline at its first check does not wait a day. */
 const RETRY_AFTER = Duration.fromObject({ hours: 6 });
 const TIMEOUT_MS = 10_000;
+/**
+ * How recent an answer `checkNow` returns rather than asking again. It is an open route, so this is
+ * what bounds it: twelve requests an hour however fast it is pressed, a fifth of the sixty GitHub
+ * allows an address without a token, so a box behind a shared address cannot spend its neighbours'.
+ */
+const ASKED_RECENTLY = Duration.fromObject({ minutes: 5 });
 
 type Answer = { outcome: 'ok'; latest: string; releaseUrl?: string; at: DateTime } | { outcome: 'failed'; at: DateTime };
 
@@ -57,6 +63,29 @@ export class UpdateChecker {
             ...(answer.releaseUrl === undefined ? {} : { releaseUrl: answer.releaseUrl }),
             checkedAt: answer.at.toISO()!,
         };
+    }
+
+    /**
+     * Ask GitHub now, for a person who has just been told a release is out, and answer once it has.
+     * `POST /update/check`. § 9.
+     *
+     * Waits on the check in flight rather than starting a second, returns an answer under five
+     * minutes old as it is, and asks nothing while the check is turned off. At most the check's own
+     * ten-second timeout, because a failure is an answer (`failed`) and not an error.
+     */
+    async checkNow(): Promise<UpdateStatus> {
+        if (this.settings.check) {
+            const answer = this.answer;
+            if (this.inFlight !== undefined) {
+                await this.inFlight;
+            } else if (answer === undefined || this.now() >= answer.at.plus(ASKED_RECENTLY)) {
+                this.inFlight = this.ask().finally(() => {
+                    this.inFlight = undefined;
+                });
+                await this.inFlight;
+            }
+        }
+        return this.status();
     }
 
     /** The check in flight, or a new one if the last answer has expired; undefined if neither. */

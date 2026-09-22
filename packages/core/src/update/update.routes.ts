@@ -11,4 +11,10 @@ import { UpdateChecker } from './update.checker.js';
  */
 export const updateRoutes: FastifyPluginAsync = async app => {
     app.get('/update', async request => request.container.get(UpdateChecker).status());
+
+    /**
+     * Ask now, for a person who has just read that a release is out. Open like the read, and bounded
+     * by the checker instead: one request to GitHub in five minutes however often this is called.
+     */
+    app.post('/update/check', async request => request.container.get(UpdateChecker).checkNow());
 };

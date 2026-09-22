@@ -1,9 +1,7 @@
 import { wizard, type CliContext, type CommandModule } from '@maroonedsoftware/johnny5';
 import type { UpdateStatus } from '@rhapsode/contract';
-import { DateTime } from 'luxon';
 
 import { interactiveUi, plainUi, reportFailure, type Ui } from '../lib/job.ui.js';
-import type { ManagementClient } from '../lib/management.client.js';
 import { REINSTALL_COST, reinstallAll } from '../lib/reinstall.js';
 import { serverApi } from '../lib/server.api.js';
 
@@ -15,9 +13,6 @@ interface UpdateOptions {
     exitCode?: boolean;
     yes?: boolean;
 }
-
-/** How long to wait for the core's first answer from GitHub, which it asks for on the first read. */
-const PENDING_WAIT_SECONDS = 10;
 
 /** Exit status for `--exit-code` when anything is behind, distinct from 1, which is a failure. */
 const BEHIND = 2;
@@ -56,7 +51,8 @@ const command: CommandModule<UpdateOptions> = {
 async function update(opts: UpdateOptions, ctx: CliContext, client: Client, ui: Ui): Promise<number> {
     const api = await serverApi(ctx, opts, client);
     try {
-        const status = await answered(api);
+        // Asked now rather than read, because a person running this has asked.
+        const status = await api.checkForUpdate();
         describeRelease(status, ui);
 
         const behind = (await api.engines()).filter(engine => engine.outdated === true);
@@ -77,17 +73,6 @@ async function update(opts: UpdateOptions, ctx: CliContext, client: Client, ui: 
         reportFailure(error, client, ui);
         return 1;
     }
-}
-
-/** The core's answer, waiting briefly on the first check after boot, which this read is what starts. */
-async function answered(api: ManagementClient): Promise<UpdateStatus> {
-    const giveUp = DateTime.utc().plus({ seconds: PENDING_WAIT_SECONDS });
-    let status = await api.updateStatus();
-    while (status.check === 'pending' && DateTime.utc() < giveUp) {
-        await new Promise(fulfil => setTimeout(fulfil, 500));
-        status = await api.updateStatus();
-    }
-    return status;
 }
 
 function describeRelease(status: UpdateStatus, ui: Ui): void {

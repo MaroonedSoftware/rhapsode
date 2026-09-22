@@ -1,6 +1,8 @@
-import { Alert, Anchor, Code, Stack, Text } from '@mantine/core';
+import { ActionIcon, Alert, Anchor, Button, Code, Group, Stack, Text, Tooltip } from '@mantine/core';
+import { IconRefresh } from '@tabler/icons-react';
 
-import { useUpdateStatus } from '../../api/update.queries';
+import { useCheckForUpdate, useUpdateStatus } from '../../api/update.queries';
+import { notifyFailure, notifySuccess } from '../shared/notify';
 import { severityColor } from '../shared/status';
 
 /**
@@ -46,13 +48,62 @@ export function UpdateBanner() {
     );
 }
 
-/** The running core's version, for the header. From the same document as the banner, for display only. */
+/**
+ * The running core's version, for the header, and the means to ask whether it is still the latest.
+ *
+ * The button asks the core to check now (`POST /update/check`), because the answer the core keeps
+ * stands a day, and a person who has just read that a release is out wants to know today. A newer
+ * release brings up the banner; anything else is said once and goes. Absent while the operator has
+ * turned the check off: a button that could only ever say so would be one to remove.
+ */
 export function CoreVersion() {
     const { data } = useUpdateStatus();
+    const check = useCheckForUpdate();
     if (data === undefined) return undefined;
+
+    const ask = () =>
+        check.mutate(undefined, {
+            onSuccess: status => {
+                if (status.check === 'failed') {
+                    notifyFailure('Could not check for updates', undefined, 'The server could not reach GitHub. It will try again on its own.');
+                } else if (status.check === 'ok' && status.updateAvailable !== true) {
+                    notifySuccess(`Rhapsode ${status.version} is the latest release.`);
+                }
+            },
+            onError: error => notifyFailure('Could not check for updates', error, 'The rhapsode server did not answer.'),
+        });
+
     return (
-        <Text size="xs" c="dimmed" ml="auto" title="The version of the rhapsode server this page is talking to">
-            v{data.version}
-        </Text>
+        <Group gap={4} ml="auto" wrap="nowrap">
+            {/* On a phone the version goes into the button's tooltip: with both, the button fell 23 px off a 375 px screen. */}
+            <Text
+                size="xs"
+                c="dimmed"
+                title="The version of the rhapsode server this page is talking to"
+                visibleFrom={data.check === 'off' ? undefined : 'sm'}
+            >
+                v{data.version}
+            </Text>
+            {data.check === 'off' ? undefined : (
+                <>
+                    <Button
+                        variant="subtle"
+                        size="compact-xs"
+                        leftSection={<IconRefresh size={12} />}
+                        loading={check.isPending}
+                        onClick={ask}
+                        visibleFrom="sm"
+                    >
+                        Check for updates
+                    </Button>
+                    {/* The label alone would push the page links off a phone's header, as the name did. */}
+                    <Tooltip label={`v${data.version}. Check for updates`}>
+                        <ActionIcon variant="subtle" size="sm" aria-label="Check for updates" loading={check.isPending} onClick={ask} hiddenFrom="sm">
+                            <IconRefresh size={14} />
+                        </ActionIcon>
+                    </Tooltip>
+                </>
+            )}
+        </Group>
     );
 }

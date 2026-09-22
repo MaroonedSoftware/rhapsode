@@ -32,6 +32,12 @@ export class PublicClient {
         return await parseJson<UpdateStatus>(result);
     }
 
+    /** @description Asks GitHub now rather than waiting out the day, and answers once it has, within the check's */
+    async checkForUpdate(): Promise<UpdateStatus> {
+        const result = await this.fetch(`/update/check`, { method: 'POST' });
+        return await parseJson<UpdateStatus>(result);
+    }
+
     /** @description What is on the card, for an operator asking where their memory went. Reads the core's own */
     async residency(): Promise<ResidencyDetail> {
         const result = await this.fetch(`/residency`, { method: 'GET' });
