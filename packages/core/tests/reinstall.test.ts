@@ -123,6 +123,26 @@ describe('reinstalling an engine', () => {
         expect(await catalogEntry(app, 'tone')).toMatchObject({ installed: 'yes', workerVersion: CORE_VERSION, outdated: false });
     });
 
+    it('keeps a keep-alive set through /settings, which what the install recorded does not carry', async () => {
+        // Built from the install's record alone, the new entry dropped it until the next start,
+        // while GET /settings went on saying it was set. § 10.
+        const options = { version: '0.0.1' };
+        const app = await start(fakeRunner(options).runner);
+        await installStale(app, options);
+        const patched = await app.inject({
+            method: 'PATCH',
+            url: '/settings',
+            payload: { engines: { tone: { keepAliveSeconds: 45 } } },
+            headers: { 'content-type': 'application/json' },
+        });
+        expect(patched.statusCode).toBe(200);
+
+        expect((await settled(app, (await post(app, '/engines/tone/reinstall')).json().id)).state).toBe('succeeded');
+
+        expect((await app.inject({ method: 'GET', url: '/settings' })).json().values.engines).toEqual({ tone: { keepAliveSeconds: 45 } });
+        expect(managedEntry('tone')).not.toHaveProperty('keepAliveSeconds');
+    });
+
     it('flips back to the first slot on the next reinstall, so there are never more than two', async () => {
         const options = { version: '0.0.1' };
         const app = await start(fakeRunner(options).runner);

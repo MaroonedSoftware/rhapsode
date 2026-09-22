@@ -192,10 +192,21 @@ export class EngineInstaller {
 
         context.step('register');
         const configured = { venv, ...(accepted === undefined ? {} : { accepted }) };
-        const entry = entryFrom(id, configured);
+        const entry = entryFrom(id, { ...configured, ...this.settingsFor(id) });
         await this.managed.record(id, configured);
         await this.workers.forget(id);
         this.engines.declare(entry);
+    }
+
+    /**
+     * The engine's own settings, written through `PATCH /settings` and kept apart from what an install
+     * records. Merged into the entry here because boot merges them the same way, and an entry built
+     * from the record alone dropped a keep-alive until the next start while `GET /settings` went on
+     * reporting it. § 10.
+     */
+    private settingsFor(id: string): { keepAliveSeconds?: number } {
+        const keepAliveSeconds = this.managed.store?.setting(`engines.${id}.keepAliveSeconds`);
+        return typeof keepAliveSeconds === 'number' ? { keepAliveSeconds } : {};
     }
 
     private async rebuild(id: string, record: CatalogRecord, accepted: string | undefined, context: JobContext): Promise<void> {
@@ -207,7 +218,7 @@ export class EngineInstaller {
         context.step('register');
         const { accepted: _previous, ...kept } = this.managed.entry(id) ?? {};
         const configured = { ...kept, venv: next, ...(accepted === undefined ? {} : { accepted }) };
-        const entry = entryFrom(id, configured);
+        const entry = entryFrom(id, { ...configured, ...this.settingsFor(id) });
         let swapping = false;
         try {
             await this.residency.replace(
