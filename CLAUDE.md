@@ -41,6 +41,7 @@ pnpm wizard doctor                  # what is wrong with this checkout, and --fi
 pnpm wizard install kokoro          # with the server running: install an engine through its API
 pnpm wizard ps                      # what is loaded, how big it is and when it expires
 pnpm wizard unload kokoro           # give that model's memory back now
+pnpm wizard settings                # every setting and where it came from; `settings <key> <value>` changes one
 pnpm wizard update                  # is a newer rhapsode out, is any engine behind; offers the reinstall
 pnpm wizard reinstall --all         # rebuild every engine an upgrade left behind, beside the old venv
 node scripts/docker.smoke.mjs       # build the image, install through it, and replace the container on its volumes

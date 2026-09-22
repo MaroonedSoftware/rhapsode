@@ -5,7 +5,15 @@ rather than about the contract.
 
 ## Configuration
 
-`rhapsode.config.json` beside the binary, or wherever `RHAPSODE_CONFIG` points.
+`rhapsode.config.json` beside the binary, or wherever `RHAPSODE_CONFIG` points. It is what the box
+starts with. After that, any setting below can be changed with `pnpm wizard settings <key> <value>`,
+or `PATCH /settings` (protocol.md § 10), which write `rhapsode.db` beside the file and never the
+file itself. **A value in the database wins over the file**, so a setting changed that way stays
+changed although the file still says otherwise, and `pnpm wizard settings <key> --unset` goes back to
+the file's value. Residency, each engine's keep-alive and `update.check` apply at once; the rest
+wait for a restart, and `pnpm wizard settings` lists which are waiting. Engine entries are the
+exception: the file's entry for an engine wins over the one an install recorded (protocol.md § 10,
+"The state database").
 
 ```jsonc
 {

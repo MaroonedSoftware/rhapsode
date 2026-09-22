@@ -144,7 +144,8 @@ unraid or with a GPU.
 `rhapsode.config.json` pointing the `tone` engine at that venv, and runs the conformance suite
 against it. `pnpm wizard doctor` checks the same things without changing anything, and
 `pnpm wizard doctor --fix` repairs what it can. The config is gitignored, because it describes this
-machine.
+machine. Once the server is running, `pnpm wizard settings` shows every setting and where it came
+from, and `pnpm wizard settings residency.keepAliveSeconds 900` changes one without editing the file.
 
 ```bash
 curl localhost:8080/engines
