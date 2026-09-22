@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { sdk } from './client';
 import { queryKeys } from './query.keys';
@@ -20,5 +20,22 @@ export function useUpdateStatus() {
         queryKey: queryKeys.update(),
         queryFn: () => sdk.public.updateStatus(),
         refetchInterval: query => (query.state.data?.check === 'pending' ? PENDING_POLL_MS : false),
+    });
+}
+
+/**
+ * Ask the core to check GitHub now, and put its answer where `useUpdateStatus` reads it. § 9.
+ *
+ * Written into the cache rather than invalidated, which is otherwise the rule here: the rule is
+ * against guessing what the core now says, and this is the core's own answer, returned by the
+ * request that made it. A refetch would only ask for the same document again.
+ */
+export function useCheckForUpdate() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        // No `unwrap`, as for the read: the operation declares no refusal. GitHub unreachable is an
+        // answer, `check: failed`, not an error.
+        mutationFn: () => sdk.public.checkForUpdate(),
+        onSuccess: status => queryClient.setQueryData(queryKeys.update(), status),
     });
 }
