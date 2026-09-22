@@ -674,6 +674,22 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/ErrorBody"
+    /settings:
+        get:
+            operationId: settings
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Settings"
+                "403":
+                    description: Forbidden
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ErrorBody"
     /v1/audio/speech:
         post:
             operationId: openaiSpeech
@@ -1501,6 +1517,175 @@ components:
             required:
                 - title
                 - version
+        SettingsServer:
+            type: object
+            properties:
+                port:
+                    type: integer
+                host:
+                    type: string
+                shutdownGraceMs:
+                    type: integer
+            required:
+                - port
+                - host
+                - shutdownGraceMs
+        SettingsLog:
+            type: object
+            properties:
+                level:
+                    type: string
+                    enum:
+                        - error
+                        - warn
+                        - info
+                        - debug
+                        - trace
+            required:
+                - level
+        SettingsResidency:
+            type: object
+            properties:
+                maxResidentModels:
+                    type: integer
+                evictionWaitSeconds:
+                    type: integer
+                keepAliveSeconds:
+                    type: integer
+            required:
+                - maxResidentModels
+                - evictionWaitSeconds
+                - keepAliveSeconds
+        SettingsWorkers:
+            type: object
+            properties:
+                socketDir:
+                    type: string
+                voiceDir:
+                    type: string
+                startupTimeoutSeconds:
+                    type: integer
+                drainGraceMs:
+                    type: integer
+                maxRestarts:
+                    type: integer
+                restartDecaySeconds:
+                    type: integer
+            required:
+                - socketDir
+                - voiceDir
+                - startupTimeoutSeconds
+                - drainGraceMs
+                - maxRestarts
+                - restartDecaySeconds
+        SettingsInstall:
+            type: object
+            properties:
+                venvDir:
+                    type: string
+                sourceDir:
+                    type: string
+                    description: Absent when there is neither a setting nor a checkout to find.
+                python:
+                    type: string
+            required:
+                - venvDir
+                - python
+        SettingsManagement:
+            type: object
+            properties:
+                tokenSet:
+                    type: boolean
+                    description: Never the token itself, which is a root password for the box.
+                origins:
+                    type: array
+                    items:
+                        type: string
+            required:
+                - tokenSet
+                - origins
+        SettingsUpdate:
+            type: object
+            properties:
+                check:
+                    type: boolean
+            required:
+                - check
+        SettingsEngine:
+            type: object
+            properties:
+                keepAliveSeconds:
+                    type: integer
+                    description: Absent when the engine uses residency.keepAliveSeconds.
+        SettingsValues:
+            type: object
+            properties:
+                server:
+                    $ref: "#/components/schemas/SettingsServer"
+                log:
+                    $ref: "#/components/schemas/SettingsLog"
+                residency:
+                    $ref: "#/components/schemas/SettingsResidency"
+                workers:
+                    $ref: "#/components/schemas/SettingsWorkers"
+                install:
+                    $ref: "#/components/schemas/SettingsInstall"
+                management:
+                    $ref: "#/components/schemas/SettingsManagement"
+                update:
+                    $ref: "#/components/schemas/SettingsUpdate"
+                engines:
+                    type: object
+                    additionalProperties:
+                        $ref: "#/components/schemas/SettingsEngine"
+                    description: One per engine in the registry.
+            required:
+                - server
+                - log
+                - residency
+                - workers
+                - install
+                - management
+                - update
+                - engines
+            description: What the running process is using. A setting waiting for a restart shows its old value here.
+        SettingField:
+            type: object
+            properties:
+                key:
+                    type: string
+                    description: "Dotted: residency.keepAliveSeconds, engines.kokoro.keepAliveSeconds."
+                source:
+                    type: string
+                    enum:
+                        - default
+                        - config
+                        - database
+                    description: The layer the value in use came from.
+                applies:
+                    type: string
+                    enum:
+                        - live
+                        - restart
+                    description: Whether a change takes effect when it is written.
+                saved:
+                    description: A value waiting for a restart. For management.token, `true` and never the token.
+            required:
+                - key
+                - source
+                - applies
+        Settings:
+            type: object
+            properties:
+                values:
+                    $ref: "#/components/schemas/SettingsValues"
+                fields:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/SettingField"
+            required:
+                - values
+                - fields
         OpenAISpeechRequest:
             type: object
             properties:

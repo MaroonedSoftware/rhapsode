@@ -1206,8 +1206,9 @@ the ones a page could not.
   `default`, `config` or `database`. `applies` is `live` or `restart`. `saved` is present only when
   the database holds a value the process is not using yet, which is a change waiting for a restart,
   and a client says so.
-- **The token is never in it.** `management.tokenSet` says whether one is configured. The token is a
-  root password for the box (above), and a document read to draw a form is not a place to carry one.
+- **The token is never in it.** `management.tokenSet` says whether one is configured, and a new token
+  waiting for a restart is `saved: true` on its field rather than the token. The token is a root
+  password for the box (above), and a document read to draw a form is not a place to carry one.
 - **`engines` has an entry for each engine in the registry**, holding the settings that are per
   engine. The engine's entry itself (its virtualenv, its module, its `env`) is not a setting: it is
   what the install recorded or the operator wrote, and it is changed by reinstalling or by editing
@@ -1246,7 +1247,7 @@ Everything else waits for the next start, for a reason each:
 
 **Refusals.** A value out of range is `bad_request`, naming the setting: a port outside 1 to 65535,
 a keep-alive below `-1`, a `maxResidentModels` below 1, a negative wait or grace, a `log.level`
-outside `debug`, `info`, `warn`, `error`, an origin that is not an absolute `http` or `https` origin
+outside `error`, `warn`, `info`, `debug`, `trace`, an origin that is not an absolute `http` or `https` origin
 with nothing after the host and port. A per-engine setting for an engine that is not in the registry
 is `unknown_engine`. The contract's numbers are coerced, as its booleans are (§ 10, "Installing"),
 so `"8080"` is read as 8080; `null` is not a number and always means "clear".

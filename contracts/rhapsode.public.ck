@@ -390,3 +390,89 @@ operation /installs/{job}/events: {
     }
 }
 
+
+############################################################################################
+# Settings. protocol.md § 10, "Settings". Both routes are management routes, reading included:
+# the document names directories on the box and the origins it trusts.
+#
+# Here rather than in rhapsode.types.ck because a worker has no settings of the core's to read, and
+# the types file is also the Python worker SDK's models.
+############################################################################################
+
+contract mode(loose) SettingsServer: {
+    port: int
+    host: string
+    shutdownGraceMs: int
+}
+
+contract mode(loose) SettingsLog: {
+    level: enum(error, warn, info, debug, trace)
+}
+
+contract mode(loose) SettingsResidency: {
+    maxResidentModels: int
+    evictionWaitSeconds: int
+    keepAliveSeconds: int
+}
+
+contract mode(loose) SettingsWorkers: {
+    socketDir: string
+    voiceDir: string
+    startupTimeoutSeconds: int
+    drainGraceMs: int
+    maxRestarts: int
+    restartDecaySeconds: int
+}
+
+contract mode(loose) SettingsInstall: {
+    venvDir: string
+    sourceDir?: string                          # Absent when there is neither a setting nor a checkout to find.
+    python: string
+}
+
+contract mode(loose) SettingsManagement: {
+    tokenSet: boolean                           # Never the token itself, which is a root password for the box.
+    origins: array(string)
+}
+
+contract mode(loose) SettingsUpdate: {
+    check: boolean
+}
+
+contract mode(loose) SettingsEngine: {
+    keepAliveSeconds?: int                      # Absent when the engine uses residency.keepAliveSeconds.
+}
+
+# What the running process is using. A setting waiting for a restart shows its old value here.
+contract mode(loose) SettingsValues: {
+    server: SettingsServer
+    log: SettingsLog
+    residency: SettingsResidency
+    workers: SettingsWorkers
+    install: SettingsInstall
+    management: SettingsManagement
+    update: SettingsUpdate
+    engines: record(string, SettingsEngine)     # One per engine in the registry.
+}
+
+contract mode(loose) SettingField: {
+    key: string                                 # Dotted: residency.keepAliveSeconds, engines.kokoro.keepAliveSeconds.
+    source: enum(default, config, database)     # The layer the value in use came from.
+    applies: enum(live, restart)                # Whether a change takes effect when it is written.
+    saved?: json                                # A value waiting for a restart. For management.token, `true` and never the token.
+}
+
+contract mode(loose) Settings: {
+    values: SettingsValues
+    fields: array(SettingField)
+}
+
+operation /settings: {
+    get: {
+        sdk: settings
+        response: {
+            200: { application/json: Settings }
+            403: { application/json: ErrorBody }
+        }
+    }
+}

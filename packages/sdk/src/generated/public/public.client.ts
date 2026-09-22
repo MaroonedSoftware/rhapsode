@@ -15,7 +15,7 @@ import type {
     UpdateStatus,
     Voice,
 } from '../rhapsode/types/rhapsode.types.js';
-import type { OpenApiDocument } from './types/rhapsode.public.js';
+import type { OpenApiDocument, Settings } from './types/rhapsode.public.js';
 
 export class PublicClient {
     constructor(private fetch: SdkFetch) {}
@@ -448,6 +448,21 @@ export class PublicClient {
                 return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
             default:
                 return { status: 200, contentType: 'text/event-stream', data: await result.text() };
+        }
+    }
+
+    async settings(): Promise<
+        { status: 200; contentType: 'application/json'; data: Settings } | { status: 403; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const result = await this.fetch(`/settings`, {
+            method: 'GET',
+            expectStatuses: [403],
+        });
+        switch (result.status) {
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 200, contentType: 'application/json', data: await parseJson<Settings>(result) };
         }
     }
 }

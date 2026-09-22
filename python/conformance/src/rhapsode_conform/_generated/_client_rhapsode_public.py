@@ -5,7 +5,7 @@ from urllib.parse import quote
 from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError  # noqa: F401
-from ._models_rhapsode_public import OpenApiDocument
+from ._models_rhapsode_public import OpenApiDocument, Settings
 from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice
 
 
@@ -387,6 +387,18 @@ class InstallJobEvents404Response(TypedDict):
     data: ErrorBody
 
 
+class Settings200Response(TypedDict):
+    status: Literal[200]
+    content_type: Literal["application/json"]
+    data: Settings
+
+
+class Settings403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
 _ENGINES_RESPONSE: TypeAdapter[list[EngineSummary]] = TypeAdapter(list[EngineSummary])
 _ENGINE_VOICES_RESPONSE_200: TypeAdapter[list[Voice]] = TypeAdapter(list[Voice])
 _CATALOG_RESPONSE: TypeAdapter[list[CatalogEntry]] = TypeAdapter(list[CatalogEntry])
@@ -624,3 +636,9 @@ class RhapsodePublicClient(BaseClient):
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "text/event-stream", "data": result }
+
+    async def settings(self) -> Settings200Response | Settings403Response:
+        _status, _content_type, result, _response_headers = await self._fetch_full("/settings", method="GET", response_kind="auto", expect_statuses=(403,))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 200, "content_type": "application/json", "data": Settings.model_validate(result) }

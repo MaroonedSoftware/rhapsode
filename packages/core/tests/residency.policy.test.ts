@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULTS } from '../src/config.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
-import { keepAliveFrom } from '../src/residency/residency.module.js';
+import { keepAliveFrom } from '../src/residency/residency.policy.js';
 
 const warnings = () => {
     const lines: Record<string, unknown>[] = [];
