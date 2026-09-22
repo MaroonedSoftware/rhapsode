@@ -79,3 +79,46 @@ describe('GET /update', () => {
         expect(health).not.toHaveProperty('check');
     });
 });
+
+describe('POST /update/check', () => {
+    /** A GitHub whose answer the test changes, as a release being published does. */
+    function github(tag: { value: string }) {
+        let calls = 0;
+        const fetcher = (async () => {
+            calls += 1;
+            return new Response(JSON.stringify({ tag_name: tag.value }), { status: 200 });
+        }) as typeof fetch;
+        return { fetcher, calls: () => calls };
+    }
+
+    it('asks GitHub now and answers with what it said', async () => {
+        const tag = { value: 'v999.0.0' };
+        const builder = await start({}, github(tag).fetcher);
+
+        const response = await builder.app.inject({ method: 'POST', url: '/update/check' });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({ version: CORE_VERSION, check: 'ok', latest: '999.0.0', updateAvailable: true });
+        expect((await builder.app.inject({ method: 'GET', url: '/update' })).json()).toMatchObject({ latest: '999.0.0' });
+    });
+
+    it('answers a caller from anywhere, and asks GitHub once however often it is called', async () => {
+        const tag = { value: 'v999.0.0' };
+        const counted = github(tag);
+        const builder = await start({}, counted.fetcher);
+
+        for (let i = 0; i < 5; i += 1) {
+            const response = await builder.app.inject({ method: 'POST', url: '/update/check', remoteAddress: '10.0.0.5' });
+            expect(response.statusCode).toBe(200);
+        }
+        expect(counted.calls()).toBe(1);
+    });
+
+    it('answers off without asking when the check is turned off', async () => {
+        const counted = github({ value: 'v999.0.0' });
+        const builder = await start({ update: { check: false } }, counted.fetcher);
+
+        expect((await builder.app.inject({ method: 'POST', url: '/update/check' })).json()).toMatchObject({ check: 'off' });
+        expect(counted.calls()).toBe(0);
+    });
+});

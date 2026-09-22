@@ -457,6 +457,13 @@ class RhapsodePublicClient(BaseClient):
         result = await self._fetch("/update", method="GET")
         return UpdateStatus.model_validate(result)
 
+    async def check_for_update(self) -> UpdateStatus:
+        """
+        Asks GitHub now rather than waiting out the day, and answers once it has, within the check's
+        """
+        result = await self._fetch("/update/check", method="POST")
+        return UpdateStatus.model_validate(result)
+
     async def residency(self) -> ResidencyDetail:
         """
         What is on the card, for an operator asking where their memory went. Reads the core's own

@@ -46,6 +46,24 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/update/check": {
+            "post": {
+                "operationId": "checkForUpdate",
+                "description": "Asks GitHub now rather than waiting out the day, and answers once it has, within the check's",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateStatus"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/residency": {
             "get": {
                 "operationId": "residency",

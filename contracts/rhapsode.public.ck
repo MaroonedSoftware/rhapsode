@@ -34,6 +34,18 @@ operation /update: {
     }
 }
 
+operation /update/check: {
+    post: {
+        # Asks GitHub now rather than waiting out the day, and answers once it has, within the check's
+        # ten-second timeout. Open, like the read: an answer under five minutes old is returned as it
+        # is, so it cannot make the box ask more often than that. `off` stays off. § 9.
+        sdk: checkForUpdate
+        response: {
+            200: { application/json: UpdateStatus }
+        }
+    }
+}
+
 operation /residency: {
     get: {
         # What is on the card, for an operator asking where their memory went. Reads the core's own
