@@ -22,7 +22,7 @@ const matches = (operation: Operation, needle: string) =>
 
 /**
  * Every route this server answers, drawn from the document it serves at `GET /openapi.json` rather
- * than a copy of its own (§ 12), so the page describes the core it is talking to and nothing else.
+ * than a copy of its own (§ 13), so the page describes the core it is talking to and nothing else.
  */
 export function ReferencePage() {
     const reference = useReference();

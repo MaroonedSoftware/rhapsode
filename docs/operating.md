@@ -329,7 +329,7 @@ drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
 It was two containers, and one is less to run for nothing lost: unraid needed a network and a
 second template so the page could find the server, the token crossed between them through a file in
 `/config`, and nginx had to re-ask Docker's DNS or lose the core whenever its container was
-recreated. The core still serves no page of its own (protocol.md § 12). nginx is a second process
+recreated. The core still serves no page of its own (protocol.md § 13). nginx is a second process
 beside it, reaching it over loopback like any other proxy on the same machine.
 
 Coming from the two-container compose, the old page container still holds port 8081, so replace it
@@ -607,7 +607,7 @@ and its turbo and nano builds end every piece on 120 ms of silence of their own.
 they are different engines, which is why the capability document says which you have rather than
 leaving you to hear it.
 
-`stream: false` buffers the whole answer in the core (`docs/protocol.md` § 13.2), and that buffer
+`stream: false` buffers the whole answer in the core (`docs/protocol.md` § 14.2), and that buffer
 is bounded by `maxCharacters`. An engine with a high ceiling and a long request is a proportionally
 larger buffer, so an operator raising a ceiling should know it is also raising that.
 

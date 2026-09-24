@@ -262,7 +262,7 @@ async function deliver(
  * so a worker that answered a buffered request with a click still produced an aborted connection,
  * and the Content-Length and duration the worker had sent were dropped on the way through.
  *
- * The buffer is one response, bounded by the variant's `maxCharacters`, and § 13.2 is the decision
+ * The buffer is one response, bounded by the variant's `maxCharacters`, and § 14.2 is the decision
  * that the core holds audio here and nowhere else.
  */
 async function sendBuffered(reply: FastifyReply, upstream: SpokenResponse): Promise<FastifyReply> {
