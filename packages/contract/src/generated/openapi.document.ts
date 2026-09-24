@@ -89,7 +89,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/openapi.json": {
             "get": {
                 "operationId": "openapi",
-                "summary": "OpenAPI document",
+                "summary": "Self-description",
                 "description": "This API as an OpenAPI 3.1 document, describing the core that serves it.",
                 "responses": {
                     "200": {
@@ -1275,7 +1275,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/v1/audio/speech": {
             "post": {
                 "operationId": "openaiSpeech",
-                "summary": "OpenAI speech",
+                "summary": "Audio speech",
                 "description": "OpenAI's speech route, where the model names an engine or engine:variant.",
                 "requestBody": {
                     "required": true,

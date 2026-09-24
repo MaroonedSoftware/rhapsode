@@ -65,3 +65,18 @@ only its first line, which is how every page came to end mid-sentence before the
 existed. `openapi.yaml` is copied into `static/` by the sync script rather than committed twice. The
 API page links it as `pathname:///rhapsode/openapi.yaml`, which is not given the `baseUrl`, so moving
 the site to a custom domain changes that link as well.
+
+**ContractKit lowercases an operation's `name:`** before title-casing its first letter, so an acronym
+in one does not survive onto its page: "OpenAI speech" came out "Open ai speech". Name operations
+without one ("Audio speech", "Self-description"). The groups are named after each contract's `area`
+the same way, and renaming an area would move the generated SDK and Python modules, so
+`AREA_LABELS` in `docusaurus.config.ts` relabels them in the sidebar instead.
+
+**The front page states facts the rest of the repository owns.** `src/engines.ts` restates the
+catalog's engines and licences, and `tests/engines.test.ts` fails when the two disagree; the sizes
+and cue counts come from each engine's README, which nothing checks, so change them together.
+`src/cues.ts` is § 5's stripping rule and each adapter's tags, run in the page. Every claim on the
+page should survive a reader checking it against `docs/protocol.md`.
+
+**No em dashes in anything written here.** `tests/prose.test.ts` holds the site's own pages and
+components to the repository's rule, and leaves copies and generated pages to their sources.

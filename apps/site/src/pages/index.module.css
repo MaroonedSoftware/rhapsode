@@ -1,0 +1,268 @@
+/*
+ * The front page. Left-aligned throughout, on one measure: prose never runs past about 70
+ * characters, and the page's width is the width of the engine table it has to hold.
+ */
+
+.page {
+    --measure: 40rem;
+    width: 100%;
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: 0 1.25rem 6rem;
+    overflow-x: clip;
+}
+
+.page h2 {
+    font-size: clamp(1.45rem, 1.2rem + 1vw, 1.95rem);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    margin-bottom: 0.9rem;
+    max-width: var(--measure);
+}
+
+.page h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.4rem;
+}
+
+/* The hero: what it is on the left, the thing it does on the right. */
+
+.hero > * {
+    min-width: 0;
+}
+
+.hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 3.5rem;
+    align-items: center;
+    padding: 5rem 0 4.5rem;
+}
+
+.headline {
+    font-size: clamp(2.3rem, 1.5rem + 3.2vw, 4rem);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+}
+
+.lede {
+    font-size: 1.2rem;
+    line-height: 1.55;
+    color: var(--rh-text-secondary);
+    max-width: 34rem;
+    margin-bottom: 1.75rem;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.75rem;
+}
+
+.primary,
+.secondary {
+    display: inline-block;
+    padding: 0.7rem 1.3rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease;
+}
+
+.primary {
+    background: var(--rh-accent-fill);
+    border: 1px solid var(--rh-accent-fill);
+    color: var(--rh-on-accent);
+}
+
+.primary:hover {
+    background: var(--rh-accent-fill-hover);
+    color: var(--rh-on-accent);
+    text-decoration: none;
+}
+
+.secondary {
+    border: 1px solid var(--rh-border-strong);
+    color: var(--rh-text);
+}
+
+.secondary:hover {
+    border-color: var(--ifm-color-primary);
+    color: var(--rh-text);
+    text-decoration: none;
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+    outline: 2px solid var(--ifm-color-primary);
+    outline-offset: 2px;
+}
+
+.small {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--rh-text-dimmed);
+    max-width: 32rem;
+    margin: 0;
+}
+
+/* Sections. A split is prose beside the thing it describes. */
+
+.section,
+.split {
+    padding-top: 4.5rem;
+    border-top: 1px solid var(--rh-border);
+    margin-top: 4.5rem;
+}
+
+.hero + .split {
+    margin-top: 0;
+}
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 3rem;
+    align-items: start;
+}
+
+.prose p {
+    line-height: 1.65;
+    color: var(--rh-text-secondary);
+    max-width: var(--measure);
+}
+
+.prose strong {
+    color: var(--rh-text);
+}
+
+.sectionLede {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--rh-text-secondary);
+    max-width: var(--measure);
+    margin-bottom: 2rem;
+}
+
+.code {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.stack {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.stack > div {
+    margin: 0;
+}
+
+/* The three kinds of project and this one: a comparison, so a list of terms, with this one set apart. */
+
+.kinds {
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--rh-border-strong);
+}
+
+.kind {
+    padding: 1.25rem 1.5rem 0 0;
+}
+
+.kind dt {
+    font-weight: 650;
+    margin-bottom: 0.4rem;
+}
+
+.kind dd {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--rh-text-secondary);
+}
+
+.ours {
+    padding: 1.25rem 1.25rem 1.25rem;
+    margin-top: -1px;
+    border-top: 3px solid var(--ifm-color-primary);
+    background: var(--rh-accent-soft);
+    border-radius: 0 0 10px 10px;
+}
+
+.ours dt {
+    color: var(--rh-accent);
+}
+
+.ours dd {
+    color: var(--rh-text);
+}
+
+/* Three ways in. */
+
+.routes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5rem;
+}
+
+.routes p {
+    margin: 0;
+    line-height: 1.6;
+    color: var(--rh-text-secondary);
+}
+
+@media (max-width: 996px) {
+    .hero,
+    .split {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2.5rem;
+    }
+
+    .hero {
+        padding-top: 3rem;
+    }
+
+    .kinds {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 1rem;
+    }
+
+    .routes {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.75rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .kinds {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .kind {
+        padding-right: 0;
+    }
+
+    .section,
+    .split {
+        padding-top: 3rem;
+        margin-top: 3rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .primary,
+    .secondary {
+        transition: none;
+    }
+}

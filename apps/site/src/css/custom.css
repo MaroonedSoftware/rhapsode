@@ -21,6 +21,9 @@
     --rh-accent: #443bbe;
     --rh-accent-soft: rgb(68 59 190 / 8%);
     --rh-bg-glow: #ecebfb;
+    /* Anything filled with the accent and carrying white text on it: 7.4:1. */
+    --rh-accent-fill: #443bbe;
+    --rh-accent-fill-hover: #3b34ab;
     --rh-on-accent: #ffffff;
 
     /* The `rhapsode` tuple, anchored at index 7. */
@@ -74,6 +77,9 @@ html[data-theme='dark'] {
     --rh-accent: #938de5;
     --rh-accent-soft: rgb(115 107 220 / 14%);
     --rh-bg-glow: #191833;
+    /* Index 6 rather than the dark primary shade (4), which carries white text at only 4.3:1. */
+    --rh-accent-fill: #5449d6;
+    --rh-accent-fill-hover: #5f55d7;
     --rh-on-accent: #ffffff;
 
     /* The `rhapsode` tuple, anchored at index 4: theme.ts `primaryShade.dark`. */
@@ -117,21 +123,6 @@ html[data-theme='dark'] {
     --ifm-footer-title-color: var(--rh-text);
     --ifm-footer-color: var(--rh-text-dimmed);
     border-top: 1px solid var(--rh-border);
-}
-
-/*
- * The small label over a heading: "The capability document". Global rather than in a module because
- * the front page and every component on it wear the same one, and three copies of four lines is how
- * a site ends up with three letter-spacings for one label.
- */
-.rh-eyebrow {
-    font-family: var(--ifm-font-family-monospace);
-    font-size: 0.78rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--rh-accent);
-    margin-bottom: 0.75rem;
 }
 
 /* Tabular figures for anything counted, as on the page. */

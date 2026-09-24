@@ -1,6 +1,6 @@
 ---
-title: "Open api document"
-sidebar_label: "Open api document"
+title: "Self-description"
+sidebar_label: "Self-description"
 sidebar_position: 5
 mdx:
     format: "md"

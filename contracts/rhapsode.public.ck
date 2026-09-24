@@ -84,7 +84,7 @@ contract mode(loose) ApiInfo: {
 operation /openapi.json: {
     get: { # This API as an OpenAPI 3.1 document, describing the core that serves it.
         # Open to every caller, like /health. The public API only: never a worker route.
-        name: OpenAPI document
+        name: Self-description
         sdk: openapi
         response: {
             200: { application/json: OpenApiDocument }

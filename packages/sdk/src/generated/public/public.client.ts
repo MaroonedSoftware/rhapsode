@@ -57,7 +57,7 @@ export class PublicClient {
     }
 
     /**
-     * @name OpenAPI document
+     * @name Self-description
      * @description This API as an OpenAPI 3.1 document, describing the core that serves it.
      */
     async openapi(): Promise<OpenApiDocument> {

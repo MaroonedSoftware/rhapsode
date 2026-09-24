@@ -477,7 +477,7 @@ class RhapsodePublicClient(BaseClient):
 
     async def openapi(self) -> OpenApiDocument:
         """
-        OpenAPI document
+        Self-description
         This API as an OpenAPI 3.1 document, describing the core that serves it.
         """
         result = await self._fetch("/openapi.json", method="GET")
