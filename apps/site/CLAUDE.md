@@ -1,6 +1,6 @@
 # The website
 
-`apps/site` is the public site at `https://maroonedsoftware.github.io/rhapsode/`: a Docusaurus build
+`apps/site` is the public site at `https://rhapsode.dev`: a Docusaurus build
 whose front page is a React page (`src/pages/index.tsx`) and whose docs live under `/docs`. It is not
 part of the server. Nothing here ships in the image and nothing in the core reads it. Its approach is
 deadair's `apps/site`, so somebody who knows one knows the other; its content and its look are its own.
@@ -63,8 +63,8 @@ page's title is the operation's `name:` and its description the one-line comment
 (`post: { # ...`); a comment inside the method's body is a note for maintainers, and ContractKit takes
 only its first line, which is how every page came to end mid-sentence before the names and summaries
 existed. `openapi.yaml` is copied into `static/` by the sync script rather than committed twice. The
-API page links it as `pathname:///rhapsode/openapi.yaml`, which is not given the `baseUrl`, so moving
-the site to a custom domain changes that link as well.
+API page links it as `pathname:///openapi.yaml`, which is not given the `baseUrl`, so a change to
+`baseUrl` has to change that link as well.
 
 **The front page states facts the rest of the repository owns.** `src/engines.ts` restates the
 catalog's engines and licences, and `tests/engines.test.ts` fails when the two disagree; the sizes

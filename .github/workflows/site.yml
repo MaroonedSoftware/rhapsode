@@ -1,6 +1,6 @@
 name: site
 
-# The public website, published to GitHub Pages at https://maroonedsoftware.github.io/rhapsode/.
+# The public website, published to GitHub Pages at https://rhapsode.dev.
 #
 # Only on a push to `main` that can change what the site says. The API reference is committed under
 # `apps/site`, so a contract change reaches the site through the first path below. The protocol, the

@@ -10,7 +10,7 @@ description: Where the API is, who may call which routes, and the clients that s
 Every client talks to one HTTP API on the core, `http://127.0.0.1:8080` by default. The pages in
 this section are generated from `contracts/`, the source of truth for every request and response
 shape, so they cannot describe a route the server does not have. The same contracts produce [the
-OpenAPI 3.1 document](pathname:///rhapsode/openapi.yaml), and a running core serves its own at `GET
+OpenAPI 3.1 document](pathname:///openapi.yaml), and a running core serves its own at `GET
 /openapi.json`, which describes that core rather than this site's copy of the latest release.
 
 The prose that says why each route behaves as it does is [the protocol](../protocol.md). Where a
