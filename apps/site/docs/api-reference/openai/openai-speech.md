@@ -1,6 +1,6 @@
 ---
-title: "Audio speech"
-sidebar_label: "Audio speech"
+title: "OpenAI speech"
+sidebar_label: "OpenAI speech"
 sidebar_position: 1
 mdx:
     format: "md"
