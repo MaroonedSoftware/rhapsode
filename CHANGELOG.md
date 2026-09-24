@@ -2,6 +2,12 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.13
+
+- The OpenAI route and the OpenAPI document route are named "OpenAI speech" and "OpenAPI document"
+  again, in the OpenAPI document, both clients and the site's API reference, and the API reference's
+  groups are called "Native API", "OpenAI shim" and "Shared".
+
 ## 0.1.12
 
 - Every operation in the OpenAPI document, and every method in the TypeScript SDK and the Python
