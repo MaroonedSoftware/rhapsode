@@ -40,7 +40,7 @@ contract mode(loose) OpenAIErrorBody: {
 operation /v1/audio/speech: {
     post: { # OpenAI's speech route, where the model names an engine or engine:variant.
         # Hand-written, like /speak. Every error carries `x-should-retry`, set from `retryable`.
-        name: Audio speech
+        name: OpenAI speech
         sdk: openaiSpeech
         request: {
             application/json: OpenAISpeechRequest

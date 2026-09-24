@@ -20,8 +20,8 @@ importers:
         specifier: ^0.11.5
         version: 0.11.5(prettier@3.9.7)
       '@contractkit/plugin-docs':
-        specifier: ^0.4.1
-        version: 0.4.1
+        specifier: ^0.5.0
+        version: 0.5.0
       '@contractkit/plugin-python':
         specifier: ^0.15.3
         version: 0.15.3
@@ -1191,11 +1191,14 @@ packages:
   '@contractkit/core@0.31.0':
     resolution: {integrity: sha512-GG/TOcE/AIVOfjpNByJSJvHgKRTrwhr7dFPcrkvW5A5tJdzuVxMzxTxhfwf6K+Fy2p3hqSMCJdqFX6FiGvMzFA==}
 
+  '@contractkit/core@0.31.1':
+    resolution: {integrity: sha512-63G8mLtTIiJDjvoY8j+S/ZjFhRCx2/NRW0/nDqlHStfG45TQ9XsiTkKAyMOP+a9+lc0ObDK3u/r/5a8Lt4amCg==}
+
   '@contractkit/openapi-to-ck@0.12.7':
     resolution: {integrity: sha512-NPit0nOSXptji+0Na6aHsXE1MbxK4S2U2n6xwv80e0nafgkHIYYxiMx9gN8PX/teY4s1XwsYX+GCbaUlDqLENw==}
 
-  '@contractkit/plugin-docs@0.4.1':
-    resolution: {integrity: sha512-xu12r7EEEV0K0fUg7pP13GB0lOWfAGAJ+b6zaX2Ljyj1A2a2X9FkWbZlX5quAfLXo8BdDYIQh4pdlEB7VrMVMw==}
+  '@contractkit/plugin-docs@0.5.0':
+    resolution: {integrity: sha512-rQHTohP7len2RdTdIIwIfb2Q4649IAZFjBFSnFdhjyPysv9nqwC9Fh3XHgdyzoXSb+qyENYLuQa6YxoEK2+TFQ==}
 
   '@contractkit/plugin-python@0.15.3':
     resolution: {integrity: sha512-Hs8Gzc+6inFSwJ28n602BA4bD7q2yrDmjF8JJZhyvTe2KmeRDBKP0zs7SkzvMVqSW2W9HMIZT1JtZ9O+4mOt4g==}
@@ -9992,14 +9995,18 @@ snapshots:
     dependencies:
       ohm-js: 17.5.0
 
+  '@contractkit/core@0.31.1':
+    dependencies:
+      ohm-js: 17.5.0
+
   '@contractkit/openapi-to-ck@0.12.7':
     dependencies:
       '@contractkit/core': 0.31.0
       yaml: 2.9.1
 
-  '@contractkit/plugin-docs@0.4.1':
+  '@contractkit/plugin-docs@0.5.0':
     dependencies:
-      '@contractkit/core': 0.31.0
+      '@contractkit/core': 0.31.1
 
   '@contractkit/plugin-python@0.15.3':
     dependencies:

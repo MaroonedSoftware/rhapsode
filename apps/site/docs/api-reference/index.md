@@ -48,7 +48,7 @@ A job's event stream is the one operation it cannot serve, because the stream do
 own: read `/installs/{job}/events` with an `EventSource`.
 
 **Any OpenAI client:** point its base URL at `http://127.0.0.1:8080/v1` and name an engine as the
-model. See [audio speech](openai/openai-speech.md) and [OpenAI clients](../openai.md).
+model. See [OpenAI speech](openai/openai-speech.md) and [OpenAI clients](../openai.md).
 
 **Anything else:** the OpenAPI document above, or `curl`.
 
