@@ -2,6 +2,15 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.17
+
+- A log line written with an error as one of its fields, such as `logger.error('failed', error)`,
+  now includes the error's name, message, stack and cause under `extra`. Before this fix, the error
+  was left out of the line.
+- The MCP server's read-only tools (`list_engines`, `engine_capabilities` and `list_voices`) return
+  structured results. Each one declares an `outputSchema` taken from the route's response contract,
+  and a client can check every result against it.
+
 ## 0.1.16
 
 - The site's "Why another speech server" section now starts where rhapsode did: deadair.radio, and the
