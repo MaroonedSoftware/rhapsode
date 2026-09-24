@@ -13,8 +13,8 @@ The site, with the quick start, every engine, the protocol and the API reference
 > clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,
 > against real weights on Apple Silicon, as does Kokoro, an ONNX engine that needs no GPU and no torch.
 > What Chatterbox costs on a CUDA card in a container is measured in
-> [`docs/operating.md`](docs/operating.md). OpenAI's speech route answers over the same core. What
-> is not here yet: the Wyoming shim.
+> [`docs/operating.md`](docs/operating.md). OpenAI's speech route and an MCP server answer over the
+> same core. What is not here yet: the Wyoming shim.
 > [`docs/protocol.md`](docs/protocol.md) is still the specification, and it still outranks the code.
 
 A rhapsode was a performer who recited written verse aloud. That is the job description.
@@ -113,11 +113,14 @@ failure where an engine reads the word "laugh" out loud cannot happen.
 
 ## Compatibility
 
-The native API is the contract. Two shims sit over it, because adoption runs through other people's
+The native API is the contract. Shims sit over it, because adoption runs through other people's
 clients:
 
 - **OpenAI** `/v1/audio/speech`, where `model` selects the engine, or `engine:variant`. What OpenAI
   asks for and an engine cannot do is refused rather than ignored: [`docs/protocol.md`](docs/protocol.md) § 11.
+- **MCP** `/mcp`, so an agent can list engines and voices and speak a line as tools. Each tool is a
+  request to a public route, and the audio comes back as MCP audio content:
+  [`docs/protocol.md`](docs/protocol.md) § 12.
 - **Wyoming**, for Home Assistant voice pipelines.
 
 ## Trying it

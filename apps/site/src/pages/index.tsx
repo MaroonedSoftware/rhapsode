@@ -149,7 +149,7 @@ export default function Home() {
                     <h2>The engines</h2>
                     <p className={styles.sectionLede}>
                         Each is a Python package with its own licences, installed through the API into a virtualenv of its own. Text to speech only:
-                        speech to text is a different problem, and <Link to="/docs/protocol#12-deliberately-not-in-v1">deliberately not here</Link>.
+                        speech to text is a different problem, and <Link to="/docs/protocol#13-deliberately-not-in-v1">deliberately not here</Link>.
                     </p>
                     <EngineTable />
                 </section>
