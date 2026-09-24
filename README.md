@@ -18,8 +18,12 @@ A rhapsode was a performer who recited written verse aloud. That is the job desc
 
 ## Why this exists
 
-Self-hosted TTS in 2026 is served by three kinds of project, and none of them is a server you can
-build a product on.
+Rhapsode started as the speech layer for [deadair.radio](https://deadair.radio), a radio station
+whose hosts are synthesized. A station needs more than one voice, needs to clone them, and needs
+them from a server it can build on rather than a UI it has to drive. Looking for that turned up
+three kinds of project, and none of them was it.
+
+Self-hosted TTS in 2026 is served by:
 
 - **Single-model wrappers** put a web UI on one model family. Good UIs, and you are using someone's
   UI backend as infrastructure. Their generation defaults live behind a UI bootstrap endpoint; the
