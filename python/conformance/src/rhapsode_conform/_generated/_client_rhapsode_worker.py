@@ -235,6 +235,7 @@ class RhapsodeWorkerClient(BaseClient):
     async def worker_terminate(self) -> None:
         """
         Drain and exit 0. The answer goes out before the process does, so 202 rather than 200:
+        the work is accepted, and the evidence it happened is the socket closing.
         """
         result = await self._fetch("/terminate", method="POST")
         return None
@@ -242,6 +243,7 @@ class RhapsodeWorkerClient(BaseClient):
     async def worker_fetch(self, body: FetchRequest) -> WorkerFetch204Response | WorkerFetch400Response | WorkerFetch422Response | WorkerFetch429Response | WorkerFetch500Response:
         """
         Download a variant's weights without loading them, so a first /speak does not sit through
+        the download. Optional: an adapter that does not override fetch answers 422. protocol.md § 8.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/fetch", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 422, 429, 500))
         if _status == 400:
@@ -257,6 +259,7 @@ class RhapsodeWorkerClient(BaseClient):
     async def worker_speak(self, body: SpeakRequest) -> WorkerSpeak200Response | WorkerSpeak400Response | WorkerSpeak404Response | WorkerSpeak422Response | WorkerSpeak429Response | WorkerSpeak503Response:
         """
         Loads on demand. It does not fail with \"no model loaded\" and does not require /load first.
+        Hand-written on both sides: see the note at the top of this file.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/speak", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
         if _status == 400:
@@ -282,6 +285,7 @@ class RhapsodeWorkerClient(BaseClient):
     async def worker_dialogue(self, body: DialogueRequest) -> WorkerDialogue200Response | WorkerDialogue400Response | WorkerDialogue404Response | WorkerDialogue422Response | WorkerDialogue429Response | WorkerDialogue503Response:
         """
         A conversation in one take, where the effective variant declares `dialogue`. Loads on
+        demand like /speak, and hand-written on both sides for the same reason.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/dialogue", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
         if _status == 400:
