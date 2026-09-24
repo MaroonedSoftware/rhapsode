@@ -2,6 +2,11 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.16
+
+- The site's "Why another speech server" section now starts where rhapsode did: deadair.radio, and the
+  four things a radio station needed from speech that nothing else offered together.
+
 ## 0.1.15
 
 - The website moves to https://rhapsode.dev, and the README and the TypeScript SDK's package link there.
