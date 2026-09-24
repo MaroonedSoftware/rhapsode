@@ -1739,8 +1739,9 @@ machine, which is the case this was built for, cannot spawn the core as a child 
 ### Audio arrives as audio content
 
 `speak` answers with two content items: the audio as MCP `audio` content, base64 with the
-`Content-Type` `/speak` gave it as `mimeType`, and a line of text naming the engine, variant,
-voice, format and duration. The route runs buffered because a tool result is one message, which is
+`Content-Type` `/speak` gave it as `mimeType`, and a line of text naming the engine and voice
+asked for, the type, the size and the duration when the worker reported one. `speak_dialogue`
+answers the same way. The route runs buffered because a tool result is one message, which is
 the case § 14.2 already allows for: one response, in memory, bounded by the variant's
 `maxCharacters`.
 

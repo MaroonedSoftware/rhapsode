@@ -1,3 +1,9 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { CORE_VERSION } from '../src/core.version.js';
@@ -5,9 +11,31 @@ import { buildServer } from '../src/server.js';
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import type { RhapsodeConfig } from '../src/config.js';
 
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+const canBindUnixSockets = await (async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'rh-probe-'));
+    try {
+        const server = createServer();
+        await new Promise<void>((fulfil, fail) => {
+            server.once('error', fail);
+            server.listen(join(directory, 'p.sock'), fulfil);
+        });
+        await new Promise<void>(fulfil => server.close(() => fulfil()));
+        return true;
+    } catch {
+        return false;
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+})();
+
+const describeWithSockets = canBindUnixSockets ? describe : describe.skip;
+
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
 let running: Awaited<ReturnType<typeof buildServer>> | undefined;
+let socketDir: string | undefined;
 
 async function start(settings: RhapsodeConfig = {}) {
     const builder = await buildServer(settings, silent());
@@ -19,7 +47,15 @@ async function start(settings: RhapsodeConfig = {}) {
 afterEach(async () => {
     await running?.app.close();
     running = undefined;
+    if (socketDir !== undefined) rmSync(socketDir, { recursive: true, force: true });
+    socketDir = undefined;
 });
+
+/** The tone engine, a real worker that speaks sine waves. */
+async function startTone() {
+    socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
+    return start({ workers: { socketDir, startupTimeoutSeconds: 30 }, engines: { tone: { venv: join(REPO, 'python/.venv') } } });
+}
 
 let id = 0;
 
@@ -36,7 +72,7 @@ async function rpc(method: string, params?: Record<string, unknown>, headers: Re
 async function call(name: string, args: Record<string, unknown> = {}) {
     const response = await rpc('tools/call', { name, arguments: args });
     expect(response.statusCode).toBe(200);
-    return response.json().result as { isError?: boolean; content: { type: string; text?: string }[] };
+    return response.json().result as { isError?: boolean; content: { type: string; text?: string; data?: string; mimeType?: string }[] };
 }
 
 describe('POST /mcp', () => {
@@ -69,8 +105,9 @@ describe('POST /mcp', () => {
         await start();
         const tools = (await rpc('tools/list')).json().result.tools as { name: string; annotations?: { readOnlyHint?: boolean } }[];
 
-        expect(tools.map(tool => tool.name).sort()).toEqual(['engine_capabilities', 'list_engines', 'list_voices']);
-        expect(tools.every(tool => tool.annotations?.readOnlyHint === true)).toBe(true);
+        expect(tools.map(tool => tool.name).sort()).toEqual(['engine_capabilities', 'list_engines', 'list_voices', 'speak', 'speak_dialogue']);
+        const readOnly = tools.filter(tool => tool.annotations?.readOnlyHint === true).map(tool => tool.name);
+        expect(readOnly.sort()).toEqual(['engine_capabilities', 'list_engines', 'list_voices']);
     });
 
     it('answers list_engines with what GET /engines says', async () => {
@@ -152,5 +189,82 @@ describe('who may call /mcp', () => {
             expect(response.statusCode).toBe(405);
             expect(response.headers.allow).toBe('POST');
         }
+    });
+});
+
+describe('the speak tools, before anything is spoken', () => {
+    it('offers no stream, because a tool result is one message', async () => {
+        await start({ engines: { tone: { venv: '/nowhere' } } });
+        const result = await call('speak', { engine: 'tone', text: 'x', stream: true });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0]!.text).toMatch(/^bad_request: /);
+    });
+
+    it('refuses a turn with no speaker, with the path to it', async () => {
+        await start({ engines: { tone: { venv: '/nowhere' } } });
+        const result = await call('speak_dialogue', { engine: 'tone', turns: [{ text: 'Who said this?' }] });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0]!.text).toContain('`turns.0.speaker`');
+    });
+});
+
+describeWithSockets('speaking through MCP', () => {
+    const direct = (body: Record<string, unknown>) =>
+        running!.app.inject({ method: 'POST', url: '/speak', headers: { 'content-type': 'application/json' }, payload: JSON.stringify(body) });
+
+    it('answers with the audio /speak gives, as audio content, in wav unless asked', async () => {
+        await startTone();
+        const result = await call('speak', { engine: 'tone', text: 'a line to speak', voice: 'sine' });
+
+        expect(result.isError).toBeUndefined();
+        const [audio, summary] = result.content;
+        expect(audio).toMatchObject({ type: 'audio', mimeType: 'audio/wav' });
+        const spoken = await direct({ engine: 'tone', text: 'a line to speak', voice: 'sine', format: 'wav', stream: false });
+        expect(Buffer.from(audio!.data!, 'base64').equals(spoken.rawPayload)).toBe(true);
+        expect(summary).toMatchObject({ type: 'text' });
+        expect(summary!.text).toContain('engine tone');
+    });
+
+    it('names pcm’s rate in the mime type, which is the only place it is written', async () => {
+        await startTone();
+        const result = await call('speak', { engine: 'tone', text: 'a line to speak', format: 'pcm' });
+
+        expect(result.content[0]!.mimeType).toMatch(/^audio\/L16; rate=\d+; channels=1$/);
+    });
+
+    it('reports a voice the engine lacks as a tool that failed', async () => {
+        await startTone();
+        const result = await call('speak', { engine: 'tone', text: 'a line to speak', voice: 'nobody' });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0]!.text).toMatch(/^unknown_voice: /);
+    });
+
+    it('holds an agent to the ceiling /speak holds everybody to', async () => {
+        await startTone();
+        const text = 'x'.repeat(5000);
+        const spoken = await direct({ engine: 'tone', text, stream: false });
+        const result = await call('speak', { engine: 'tone', text });
+
+        expect(spoken.statusCode).toBeGreaterThanOrEqual(400);
+        expect(result.isError).toBe(true);
+        expect(result.content[0]!.text).toContain(spoken.json().error.message);
+    });
+
+    it('speaks a dialogue in one take', async () => {
+        await startTone();
+        const result = await call('speak_dialogue', {
+            engine: 'tone',
+            turns: [
+                { speaker: 'a', text: 'Did you hear that?' },
+                { speaker: 'b', text: 'It is only the cat.' },
+            ],
+        });
+
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0]).toMatchObject({ type: 'audio', mimeType: 'audio/wav' });
+        expect(result.content[1]!.text).toContain('2 turns');
     });
 });

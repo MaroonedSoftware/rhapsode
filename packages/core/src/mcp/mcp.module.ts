@@ -13,6 +13,7 @@ import {
 import { CORE_VERSION } from '../core.version.js';
 import { EngineCapabilitiesTool, ListEnginesTool, ListVoicesTool } from './engine.tools.js';
 import { LoopbackClient } from './mcp.loopback.js';
+import { SpeakDialogueTool, SpeakTool } from './speak.tools.js';
 
 /**
  * `/mcp`'s pieces, from ServerKit's MCP package. protocol.md § 12.
@@ -44,7 +45,13 @@ export const mcpModule = (): ServerKitModule => ({
             .register(McpToolHandlerMap)
             .useFactory(container => {
                 const loopback = container.get(LoopbackClient);
-                const tools: McpToolHandler[] = [new ListEnginesTool(loopback), new EngineCapabilitiesTool(loopback), new ListVoicesTool(loopback)];
+                const tools: McpToolHandler[] = [
+                    new ListEnginesTool(loopback),
+                    new EngineCapabilitiesTool(loopback),
+                    new ListVoicesTool(loopback),
+                    new SpeakTool(loopback),
+                    new SpeakDialogueTool(loopback),
+                ];
                 return new McpToolHandlerMap(tools.map(tool => [tool.definition.name, tool]));
             })
             .asSingleton();
