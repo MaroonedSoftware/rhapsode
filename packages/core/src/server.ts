@@ -13,6 +13,8 @@ import { rhapsodeErrorPlugin } from './errors/error.plugin.js';
 import { healthRoutes } from './health/health.routes.js';
 import { catalogRoutes } from './management/catalog.routes.js';
 import { managementModule } from './management/management.module.js';
+import { mcpModule } from './mcp/mcp.module.js';
+import { mcpRoutes } from './mcp/mcp.routes.js';
 import { RhapsodeJsonLogger, type LogLevel } from './logging/rhapsode.logger.js';
 import { engineModule } from './registry/engine.module.js';
 import type { ManagedEngines } from './registry/managed.engines.js';
@@ -79,6 +81,7 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         workerModule(settings),
         residencyModule(),
         updateModule(options.fetch),
+        mcpModule(),
         // Last, so it shuts down first: a running pip is stopped before the workers it would register.
         installModule(settings, options.runner),
     ];
@@ -106,6 +109,8 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         { plugin: dialogueRoutes },
         // OpenAI's speech route, translated into the one above. § 11.
         { plugin: openaiRoutes },
+        // Tools for an agent, each a request to one of the routes above. § 12.
+        { plugin: mcpRoutes },
         { plugin: catalogRoutes },
         { plugin: updateRoutes },
         { plugin: settingsRoutes },
