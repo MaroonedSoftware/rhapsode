@@ -5,6 +5,8 @@ packages:
 allowBuilds:
     # Pulled in by ServerKit's authentication package. Builds a native addon.
     cbor-extract: true
+    # Pulled in by the site's Docusaurus. Its postinstall prints a funding banner and builds nothing.
+    core-js: false
     esbuild: true
     # The swc binary behind `pnpm wizard`, which runs the CLI from TypeScript source.
     '@swc/core': true
@@ -16,3 +18,14 @@ minimumReleaseAgeExclude:
 # pnpm's pre-run dependency check misfires in sandboxed sessions, where the store path drifts.
 # Warn rather than trying to reinstall underneath a running command.
 verifyDepsBeforeRun: warn
+
+overrides:
+    # The site's production build. Docusaurus 3.10's bundler pins these two plugins a major behind the
+    # releases that take serialize-javascript 7, which is the same CommonJS function on Node 20+.
+    # Never in the image: the site is not part of the server.
+    'copy-webpack-plugin@11>serialize-javascript': ^7.0.5
+    'css-minimizer-webpack-plugin@5>serialize-javascript': ^7.0.5
+    # The site's dev server. sockjs is unmaintained at 0.3.24 and only ever calls `v4()`, which the
+    # advisory (v3, v5 and v6 writing into a caller's buffer) does not touch, and which uuid 11 still
+    # exports to `require`. Never in the image.
+    'sockjs>uuid': ^11.1.1

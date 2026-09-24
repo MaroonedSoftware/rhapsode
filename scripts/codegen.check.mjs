@@ -15,6 +15,9 @@ const GENERATED = [
     'python/conformance/src/rhapsode_conform/_generated',
     'docs/openapi.yaml',
     'docs/openapi.worker.yaml',
+    'apps/site/docs/api-reference',
+    // The generator writes this one once and never again, so it is the site's to edit, not output.
+    ':(exclude)apps/site/docs/api-reference/index.md',
 ];
 
 const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' }).stdout.trim();

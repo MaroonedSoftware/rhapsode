@@ -5,6 +5,9 @@
 Point it at a box with a GPU, install the engines you want, and every client talks to one HTTP API
 that describes honestly what each engine can actually do.
 
+The site, with the quick start, every engine, the protocol and the API reference, is at
+**[maroonedsoftware.github.io/rhapsode](https://maroonedsoftware.github.io/rhapsode/)**.
+
 > **Status: early.** The worker protocol is implemented and conformance-tested, a core that spawns
 > a worker and streams `/speak` through it works end to end, engines install through the API, voices
 > clone through it, and the Chatterbox adapter passes the conformance suite, cloning included,

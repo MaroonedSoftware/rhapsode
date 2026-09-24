@@ -1,0 +1,139 @@
+.diagram {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5rem minmax(0, 1.1fr) 6.5rem minmax(0, 1fr);
+    align-items: center;
+    row-gap: 1.25rem;
+}
+
+.column {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.client,
+.worker {
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--rh-border-strong);
+    border-radius: 8px;
+    background: var(--rh-surface);
+    font-size: 0.95rem;
+}
+
+.worker {
+    display: grid;
+    gap: 0.1rem;
+}
+
+.worker strong {
+    font-family: var(--ifm-font-family-monospace);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.worker span,
+.core span {
+    font-size: 0.85rem;
+    color: var(--rh-text-secondary);
+}
+
+/* The one filled box: the core is the thing this project is. */
+.core {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1.4rem 1.2rem;
+    border-radius: 10px;
+    background: var(--rh-accent-soft);
+    border: 1px solid var(--ifm-color-primary);
+}
+
+.core strong {
+    font-size: 1.1rem;
+}
+
+/* A connector: a rule with its label over it, and an arrowhead at the far end. */
+.link {
+    position: relative;
+    height: 2rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.link::before {
+    content: '';
+    position: absolute;
+    left: 0.4rem;
+    right: 0.6rem;
+    top: 50%;
+    border-top: 1.5px solid var(--rh-text-dimmed);
+}
+
+.link::after {
+    content: '';
+    position: absolute;
+    right: 0.4rem;
+    top: calc(50% - 4px);
+    border: 4.5px solid transparent;
+    border-left: 7px solid var(--rh-text-dimmed);
+    border-right: 0;
+}
+
+.link span {
+    position: relative;
+    top: -0.9rem;
+    font-size: 0.75rem;
+    color: var(--rh-text-dimmed);
+    white-space: nowrap;
+}
+
+.caption {
+    grid-column: 1 / -1;
+    font-size: 0.9rem;
+    color: var(--rh-text-secondary);
+    max-width: 44rem;
+}
+
+@media (max-width: 800px) {
+    .diagram {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0;
+    }
+
+    .link {
+        height: 3rem;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .link::before {
+        left: 50%;
+        right: auto;
+        top: 0.3rem;
+        bottom: 0.7rem;
+        border-top: 0;
+        border-left: 1.5px solid var(--rh-text-dimmed);
+    }
+
+    .link::after {
+        left: calc(50% - 4px);
+        right: auto;
+        top: auto;
+        bottom: 0.3rem;
+        border: 4.5px solid transparent;
+        border-top: 7px solid var(--rh-text-dimmed);
+        border-bottom: 0;
+    }
+
+    .link span {
+        top: 0;
+        margin-left: calc(50% + 0.75rem);
+    }
+
+    .caption {
+        margin-top: 1.25rem;
+    }
+}

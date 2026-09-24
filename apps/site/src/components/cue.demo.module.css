@@ -1,0 +1,123 @@
+.demo {
+    margin: 0;
+    padding: 1.5rem;
+    background: var(--rh-surface);
+    border: 1px solid var(--rh-border);
+    border-radius: 12px;
+    display: grid;
+    gap: 1.25rem;
+}
+
+.step {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.label {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--rh-text-dimmed);
+}
+
+.line {
+    margin: 0;
+    font-family: var(--ifm-font-family-monospace);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--rh-text);
+    overflow-wrap: anywhere;
+}
+
+/* A cue as the client wrote it: the vocabulary word, in the accent. */
+.cue {
+    color: var(--rh-accent);
+    font-weight: 600;
+}
+
+/* A cue as the engine takes it: the tag its adapter wrote, set on the accent's tint. */
+.tag {
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    background: var(--rh-accent-soft);
+    color: var(--rh-accent);
+    font-weight: 600;
+}
+
+.note {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--rh-text-secondary);
+}
+
+.targets {
+    /* A fieldset's min-width is min-content by default, which held the whole page wider than a phone. */
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.targets legend {
+    width: 100%;
+    padding: 0;
+    margin-bottom: 0.4rem;
+}
+
+.target {
+    position: relative;
+    cursor: pointer;
+}
+
+/* The radio stays in the page for the keyboard and screen readers; the pill is what is drawn. */
+.target input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.target span {
+    display: inline-block;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--rh-border-strong);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: var(--rh-text-secondary);
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
+}
+
+.target:hover span {
+    border-color: var(--ifm-color-primary);
+    color: var(--rh-text);
+}
+
+.target input:checked + span {
+    background: var(--rh-accent-fill);
+    border-color: var(--rh-accent-fill);
+    color: var(--rh-on-accent);
+}
+
+.target input:focus-visible + span {
+    outline: 2px solid var(--ifm-color-primary);
+    outline-offset: 2px;
+}
+
+.caption {
+    font-size: 0.85rem;
+    color: var(--rh-text-dimmed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .target span {
+        transition: none;
+    }
+}

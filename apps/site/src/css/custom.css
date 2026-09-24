@@ -1,0 +1,131 @@
+/*
+ * The site in the page's colours: the same ink indigo as `apps/web/src/theme.ts` and the same
+ * surfaces as `apps/web/src/tokens.css`, so the site someone reads before installing looks like the
+ * page they get after. Copied rather than imported, because the page publishes them through Mantine
+ * and this site does not load it. If theme.ts or tokens.css move, move these with them.
+ *
+ * Both schemes, following the operating system as the page does. Infima states its dark palette on
+ * `[data-theme='dark']`, so the dark block has to name that selector to win.
+ */
+
+:root {
+    --rh-bg: #f7f7f9;
+    --rh-surface: #ffffff;
+    --rh-raised: #efeff4;
+    --rh-border: #e3e3ea;
+    --rh-border-strong: #cfcfda;
+    --rh-text: #1b1b24;
+    --rh-text-secondary: #4a4a5a;
+    --rh-text-dimmed: #6e6e80;
+    /* The accent as text: the primary shade in light (theme.ts `primaryShade.light`, index 7). */
+    --rh-accent: #443bbe;
+    --rh-accent-soft: rgb(68 59 190 / 8%);
+    --rh-bg-glow: #ecebfb;
+    /* Anything filled with the accent and carrying white text on it: 7.4:1. */
+    --rh-accent-fill: #443bbe;
+    --rh-accent-fill-hover: #3b34ab;
+    --rh-on-accent: #ffffff;
+
+    /* The `rhapsode` tuple, anchored at index 7. */
+    --ifm-color-primary: #443bbe;
+    --ifm-color-primary-dark: #3b34ab;
+    --ifm-color-primary-darker: #2f2c98;
+    --ifm-color-primary-darkest: #26237c;
+    --ifm-color-primary-light: #5449d6;
+    --ifm-color-primary-lighter: #5f55d7;
+    --ifm-color-primary-lightest: #736bdc;
+
+    --ifm-background-color: var(--rh-bg);
+    --ifm-background-surface-color: var(--rh-surface);
+    --ifm-font-color-base: var(--rh-text);
+    --ifm-font-color-secondary: var(--rh-text-secondary);
+    --ifm-heading-color: var(--rh-text);
+    --ifm-link-color: var(--rh-accent);
+    --ifm-hr-background-color: var(--rh-border);
+    --ifm-toc-border-color: var(--rh-border);
+    --ifm-table-border-color: var(--rh-border-strong);
+    --ifm-table-stripe-background: var(--rh-raised);
+    --ifm-code-background: var(--rh-raised);
+    --ifm-menu-color-background-active: var(--rh-accent-soft);
+    --ifm-menu-color-background-hover: var(--rh-raised);
+    --ifm-navbar-background-color: var(--rh-surface);
+
+    --ifm-font-family-base: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --ifm-font-family-monospace: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    /* theme.ts `headings.fontWeight`. */
+    --ifm-heading-font-weight: 650;
+    --ifm-code-font-size: 88%;
+
+    --ifm-global-radius: 8px;
+    --ifm-navbar-shadow: none;
+    --docusaurus-highlighted-code-line-bg: rgb(68 59 190 / 12%);
+}
+
+html[data-theme='dark'] {
+    --rh-bg: #111216;
+    --rh-surface: #17181d;
+    --rh-raised: #1e1f26;
+    --rh-border: #2a2b33;
+    --rh-border-strong: #3a3b46;
+    --rh-text: #e9e9f0;
+    --rh-text-secondary: #b0b0c0;
+    --rh-text-dimmed: #858596;
+    /*
+     * Index 3 of the tuple rather than the dark primary shade (4) for text: #736bdc on #111216 is
+     * 4.3:1, under the 4.5 body text needs, and #938de5 is 6.3:1.
+     */
+    --rh-accent: #938de5;
+    --rh-accent-soft: rgb(115 107 220 / 14%);
+    --rh-bg-glow: #191833;
+    /* Index 6 rather than the dark primary shade (4), which carries white text at only 4.3:1. */
+    --rh-accent-fill: #5449d6;
+    --rh-accent-fill-hover: #5f55d7;
+    --rh-on-accent: #ffffff;
+
+    /* The `rhapsode` tuple, anchored at index 4: theme.ts `primaryShade.dark`. */
+    --ifm-color-primary: #736bdc;
+    --ifm-color-primary-dark: #5f55d7;
+    --ifm-color-primary-darker: #5449d6;
+    --ifm-color-primary-darkest: #443bbe;
+    --ifm-color-primary-light: #938de5;
+    --ifm-color-primary-lighter: #bab6ef;
+    --ifm-color-primary-lightest: #dedcfa;
+
+    --ifm-background-color: var(--rh-bg);
+    --ifm-background-surface-color: var(--rh-surface);
+    --ifm-font-color-base: var(--rh-text);
+    --ifm-font-color-secondary: var(--rh-text-secondary);
+    --ifm-heading-color: var(--rh-text);
+    --ifm-link-color: var(--rh-accent);
+    --ifm-hr-background-color: var(--rh-border);
+    --ifm-toc-border-color: var(--rh-border);
+    --ifm-table-border-color: var(--rh-border-strong);
+    --ifm-table-stripe-background: var(--rh-raised);
+    --ifm-code-background: var(--rh-raised);
+    --ifm-menu-color-background-active: var(--rh-accent-soft);
+    --ifm-menu-color-background-hover: var(--rh-raised);
+    --ifm-navbar-background-color: var(--rh-surface);
+    --docusaurus-highlighted-code-line-bg: rgb(115 107 220 / 18%);
+}
+
+.navbar {
+    border-bottom: 1px solid var(--rh-border);
+}
+
+.navbar__title {
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.footer {
+    --ifm-footer-background-color: var(--rh-surface);
+    --ifm-footer-link-color: var(--rh-text-secondary);
+    --ifm-footer-title-color: var(--rh-text);
+    --ifm-footer-color: var(--rh-text-dimmed);
+    border-top: 1px solid var(--rh-border);
+}
+
+/* Tabular figures for anything counted, as on the page. */
+.rh-num {
+    font-variant-numeric: tabular-nums;
+}

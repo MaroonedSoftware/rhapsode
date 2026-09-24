@@ -31,5 +31,10 @@ rhapsode.engines.json
 **/*.sock
 **/.DS_Store
 
+# The site is not part of the server. Its manifest stays because the frozen lockfile names it as a
+# workspace member, and nothing else does, so editing a page does not invalidate the source layer.
+apps/site/*
+!apps/site/package.json
+
 .git
 .claude

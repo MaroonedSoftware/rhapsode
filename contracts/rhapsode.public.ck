@@ -12,10 +12,11 @@ options {
 # because ContractKit has no prefix mechanism; the shapes do not, and the shapes are the contract.
 
 operation /health: {
-    get: {
+    get: { # The core's own health, which answers even while every worker is down.
         # The core's own. It answers while every worker is down and never blocks on one, because a
         # health endpoint that waits on the thing it is reporting about is a health endpoint that
         # times out exactly when you need it.
+        name: Health
         sdk: health
         response: {
             200: { application/json: CoreHealth }
@@ -24,9 +25,10 @@ operation /health: {
 }
 
 operation /update: {
-    get: {
+    get: { # Whether a newer rhapsode has been released, from a check made at most once a day.
         # Open to every caller, like /health. It never waits on the network: a first call after boot
         # answers `pending` and starts the check, which runs at most once a day. § 9.
+        name: Update status
         sdk: updateStatus
         response: {
             200: { application/json: UpdateStatus }
@@ -35,10 +37,11 @@ operation /update: {
 }
 
 operation /update/check: {
-    post: {
+    post: { # Asks GitHub for the latest release now, and answers once it has.
         # Asks GitHub now rather than waiting out the day, and answers once it has, within the check's
         # ten-second timeout. Open, like the read: an answer under five minutes old is returned as it
         # is, so it cannot make the box ask more often than that. `off` stays off. § 9.
+        name: Check for an update
         sdk: checkForUpdate
         response: {
             200: { application/json: UpdateStatus }
@@ -47,7 +50,7 @@ operation /update/check: {
 }
 
 operation /residency: {
-    get: {
+    get: { # What each engine holds in memory, how big it is and when it expires.
         # What is on the card, for an operator asking where their memory went. Reads the core's own
         # state: it spawns nothing, loads nothing and never blocks on a worker, exactly as /health
         # and /engines do not. Separate from /health because that one is polled by monitors and
@@ -55,6 +58,7 @@ operation /residency: {
         #
         # Not a thing to consult before speaking: /speak loads on demand (§ 3), and a client that
         # reads this first has rebuilt the round trip per utterance that rule exists to remove.
+        name: Residency
         sdk: residency
         response: {
             200: { application/json: ResidencyDetail }
@@ -78,8 +82,9 @@ contract mode(loose) ApiInfo: {
 }
 
 operation /openapi.json: {
-    get: {
+    get: { # This API as an OpenAPI 3.1 document, describing the core that serves it.
         # Open to every caller, like /health. The public API only: never a worker route.
+        name: Self-description
         sdk: openapi
         response: {
             200: { application/json: OpenApiDocument }
@@ -88,10 +93,11 @@ operation /openapi.json: {
 }
 
 operation /engines: {
-    get: {
+    get: { # Every declared engine, running or not, with its code and weights licences.
         # Every declared engine, whether or not it is running. Never spawns one: this is the list an
         # operator reads to find out what is installed, and it carries both licences so the weights
         # licence is visible before install rather than after.
+        name: Engines
         sdk: engines
         response: {
             200: { application/json: array(EngineSummary) }
@@ -103,7 +109,8 @@ operation /engines/{engine}/capabilities: {
     params: {
         engine: string
     }
-    get: {
+    get: { # What the engine can do with the variant it has loaded, and what its other variants could.
+        name: Engine capabilities
         sdk: engineCapabilities
         response: {
             200: { application/json: Capabilities }
@@ -117,15 +124,17 @@ operation /engines/{engine}/voices: {
     params: {
         engine: string
     }
-    get: {
+    get: { # The engine's voices, built in and cloned.
+        name: Voices
         sdk: engineVoices
         response: {
             200: { application/json: array(Voice) }
             404: { application/json: ErrorBody }
         }
     }
-    post: {
+    post: { # Creates a voice from a reference, such as a clip to clone, or from a blend of voices the engine has.
         # Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB.
+        name: Create a voice
         sdk: createVoice
         request: {
             multipart/form-data: CreateVoiceForm
@@ -145,7 +154,8 @@ operation /engines/{engine}/voices/{voice}: {
         engine: string
         voice: string
     }
-    delete: {
+    delete: { # Deletes a voice.
+        name: Delete a voice
         sdk: deleteVoice
         response: {
             204:
@@ -162,7 +172,8 @@ operation /engines/{engine}/voices/{voice}/preview: {
         engine: string
         voice: string
     }
-    get: {
+    get: { # A short sample of the voice.
+        name: Voice preview
         sdk: voicePreview
         response: {
             200: {
@@ -174,10 +185,11 @@ operation /engines/{engine}/voices/{voice}/preview: {
 }
 
 operation /speak: {
-    post: {
+    post: { # Speaks a line with one engine, streamed or as a finished file.
         # The one endpoint that matters. Cues the effective variant does not claim are stripped
         # before dispatch, a delivery it did not claim is dropped, and an unknown dial is a 400
         # naming the key. Hand-written: ContractKit cannot express a streamed body.
+        name: Speak
         sdk: speak
         request: {
             application/json: EngineSpeakRequest
@@ -203,10 +215,11 @@ operation /engines/{engine}/dialogue: {
     params: {
         engine: string
     }
-    post: {
+    post: { # A conversation between speakers in one take, on a variant that declares dialogue.
         # A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per
         # turn, the ceiling is the sum of every turn's text, and one that does not declare it is
         # unsupported. Hand-written: ContractKit cannot express a streamed body.
+        name: Dialogue
         sdk: dialogue
         request: {
             application/json: EngineDialogueRequest
@@ -234,8 +247,9 @@ operation /engines/{engine}/dialogue: {
 ############################################################################################
 
 operation /catalog: {
-    get: {
+    get: { # Every engine this core knows how to install, with both licences, before anything is installed.
         # Open to every caller: it only reads, and its licences are what § 4 promises before install.
+        name: Catalog
         sdk: catalog
         response: {
             200: { application/json: array(CatalogEntry) }
@@ -247,8 +261,9 @@ operation /engines/{engine}: {
     params: {
         engine: string
     }
-    delete: {
+    delete: { # Removes an engine this API installed.
         # Only an engine this API installed. One the operator configured is theirs to remove.
+        name: Uninstall an engine
         sdk: uninstallEngine
         response: {
             204:
@@ -263,11 +278,12 @@ operation /engines/{engine}/unload: {
     params: {
         engine: string
     }
-    post: {
+    post: { # Frees the engine's model now, rather than waiting out its keep-alive.
         # Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an
         # engine holding nothing is already in the state this asks for, and answers 200.
         #
         # A query rather than a body, as the install route explains. protocol.md § 3 and § 10.
+        name: Unload an engine
         sdk: unloadEngine
         query: {
             # `terminate` (the default) ends the worker process, which is the only way to get back
@@ -287,7 +303,8 @@ operation /engines/{engine}/install: {
     params: {
         engine: string
     }
-    post: {
+    post: { # Installs an engine from the catalog, as a job to follow.
+        name: Install an engine
         sdk: installEngine
         # A query rather than a body: ServerKit refuses a missing body on a route that declares
         # one, and an install with nothing else to say has always been a bare POST. protocol.md § 10.
@@ -311,7 +328,8 @@ operation /engines/{engine}/reinstall: {
     params: {
         engine: string
     }
-    post: {
+    post: { # Rebuilds an installed engine beside the old one and swaps it in once it works.
+        name: Reinstall an engine
         sdk: reinstallEngine
         # Rebuilds an installed engine in its other slot and swaps it in once it imports, so the
         # engine keeps working until then and a failure changes nothing. The remedy for `outdated`.
@@ -335,7 +353,8 @@ operation /engines/{engine}/pull: {
     params: {
         engine: string
     }
-    post: {
+    post: { # Downloads a variant's weights ahead of its first load, as a job to follow.
+        name: Pull weights
         sdk: pullEngine
         request: {
             application/json: PullRequest
@@ -350,7 +369,8 @@ operation /engines/{engine}/pull: {
 }
 
 operation /installs: {
-    get: {
+    get: { # Every install job, running and finished.
+        name: Install jobs
         sdk: installJobs
         response: {
             200: { application/json: array(InstallJob) }
@@ -360,7 +380,8 @@ operation /installs: {
 }
 
 operation /installs/outdated: {
-    post: {
+    post: { # Reinstalls every engine an upgrade left behind.
+        name: Reinstall outdated engines
         sdk: reinstallOutdated
         # A reinstall for every `outdated` engine this API installed. Never refused as a whole: what
         # it cannot reinstall without asking is `skipped`, and nothing behind is `jobs: []`, so it can
@@ -376,7 +397,8 @@ operation /installs/{job}: {
     params: {
         job: string
     }
-    get: {
+    get: { # One install job and where it has got to.
+        name: Install job
         sdk: installJob
         response: {
             200: { application/json: InstallJob }
@@ -390,9 +412,10 @@ operation /installs/{job}/events: {
     params: {
         job: string
     }
-    get: {
+    get: { # An install job's progress and output as server-sent events.
         # Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit
         # cannot express a stream, so this declares the route and the shapes and nothing more.
+        name: Install job events
         sdk: installJobEvents
         response: {
             200: { text/event-stream: string }
@@ -538,16 +561,18 @@ contract SettingsPatch: {
 }
 
 operation /settings: {
-    get: {
+    get: { # Every setting, its value, where the value came from and whether a change applies now.
+        name: Settings
         sdk: settings
         response: {
             200: { application/json: Settings }
             403: { application/json: ErrorBody }
         }
     }
-    patch: {
+    patch: { # Changes settings in one transaction, and answers the whole document after the write.
         # One transaction: a patch that is refused changes nothing. Answers the whole document after
         # the write. A change that would lock its caller out is a 409. § 10.
+        name: Update settings
         sdk: updateSettings
         request: {
             application/json: SettingsPatch
