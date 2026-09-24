@@ -23,6 +23,9 @@ Two languages, one protocol.
   committed. It depends on nothing, for the same reason `packages/contract` depends only on zod.
 - `apps/web` is a web page for installing engines, a client of the management API and nothing the
   wizard lacks. Its rules are in [`apps/web/CLAUDE.md`](apps/web/CLAUDE.md).
+- `apps/site` is the public website, a Docusaurus build published to GitHub Pages. It is not part of
+  the server and nothing in the image reads it. Its rules are in
+  [`apps/site/CLAUDE.md`](apps/site/CLAUDE.md).
 
 Dependency direction is one-way: `apps/server` → `packages/core` → `packages/contract`. The SDK
 depends on the core only to test against it.
@@ -46,6 +49,7 @@ pnpm wizard update                  # is a newer rhapsode out, is any engine beh
 pnpm wizard reinstall --all         # rebuild every engine an upgrade left behind, beside the old venv
 node scripts/docker.smoke.mjs       # build the image, install through it, and replace the container on its volumes
 pnpm release version 0.2.0          # every published package to one version, changesets into CHANGELOG.md
+pnpm --filter @rhapsode/site start  # the website on :8082, which `pnpm dev` does not start
 ```
 
 Build from the root before building one package. `pnpm build` is turbo, which builds a package's

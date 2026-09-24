@@ -33,6 +33,9 @@ rhapsode.engines.json
 # Turbo
 .turbo/
 
+# The site's generated route and config modules, rewritten on every start and build.
+.docusaurus/
+
 # Python virtualenv for the worker SDK and its engines
 python/.venv/
 .pytest_cache/
