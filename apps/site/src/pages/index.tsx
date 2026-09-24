@@ -44,6 +44,29 @@ const SPEAK = `curl -X POST localhost:8080/speak \\
   -d '{"engine":"kokoro","text":"Right, that was The Verve Pipe.","format":"wav"}' \\
   --output line.wav`;
 
+/**
+ * What deadair.radio asks of speech, which is why rhapsode exists, and the part of rhapsode that
+ * answers each. The needs are deadair's own, from its "Models and voices" page.
+ */
+const NEEDS = [
+    {
+        need: 'Many voices, on more than one engine',
+        answer: 'A host, a newsreader and every character, each on whichever engine suits it. One API speaks them all, and each voice names its engine.',
+    },
+    {
+        need: 'A presenter who laughs, and a caller who clears their throat',
+        answer: 'Cues ride in the text. The station offers only the cues the loaded engine reports, and the core strips the rest, so nobody reads “laugh” out loud on air.',
+    },
+    {
+        need: 'One graphics card, shared with a language model',
+        answer: 'The core decides what is on the card, gives the memory back when a keep-alive runs out, and unloads an engine now when asked.',
+    },
+    {
+        need: 'Never silence',
+        answer: 'Every engine runs in its own process, so a crash takes down that worker and not the server, and a failure is reported instead of arriving as a short, silent file.',
+    },
+];
+
 /** The three kinds of project the README says exist, and the one this is. */
 const KINDS = [
     {
@@ -117,7 +140,19 @@ export default function Home() {
                 <section className={styles.section}>
                     <h2>Why another speech server</h2>
                     <p className={styles.sectionLede}>
-                        Self-hosted speech is served by three kinds of project, and none is a server to build a product on.
+                        rhapsode started as the speech layer for <a href="https://deadair.radio">deadair.radio</a>, a radio station whose hosts are
+                        synthesized. A station asks of speech what any product built on it does, only all at once.
+                    </p>
+                    <dl className={styles.needs}>
+                        {NEEDS.map(item => (
+                            <div key={item.need} className={styles.need}>
+                                <dt>{item.need}</dt>
+                                <dd>{item.answer}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <p className={styles.sectionLede}>
+                        Looking for a server that did all four turned up three kinds of project, and none of them was it.
                     </p>
                     <dl className={styles.kinds}>
                         {KINDS.map(kind => (

@@ -7,7 +7,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
     "openapi": "3.1.0",
     "info": {
         "title": "Rhapsode",
-        "version": "0.1.11"
+        "version": "0.1.16"
     },
     "paths": {
         "/health": {
@@ -89,7 +89,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/openapi.json": {
             "get": {
                 "operationId": "openapi",
-                "summary": "Self-description",
+                "summary": "OpenAPI document",
                 "description": "This API as an OpenAPI 3.1 document, describing the core that serves it.",
                 "responses": {
                     "200": {

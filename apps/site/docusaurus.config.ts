@@ -30,9 +30,10 @@ const config: Config = {
     tagline: 'A multi-engine speech server: one contract, many TTS models.',
     favicon: 'favicon.svg',
 
-    // The repository's Pages address. A custom domain is a Pages setting plus these two lines.
-    url: 'https://maroonedsoftware.github.io',
-    baseUrl: '/rhapsode/',
+    // A custom domain on the repository's Pages site, set in its Pages settings rather than in a
+    // `CNAME` file, which a site deployed from Actions ignores.
+    url: 'https://rhapsode.dev',
+    baseUrl: '/',
     // GitHub Pages serves `quick-start.html` at `/docs/quick-start` without a redirect, and a
     // trailing slash would give every page two addresses.
     trailingSlash: false,
@@ -59,10 +60,7 @@ const config: Config = {
         [
             'classic',
             {
-                docs: {
-                    editUrl,
-                    sidebarPath: './sidebars.ts',
-                },
+                docs: { editUrl, sidebarPath: './sidebars.ts' },
                 blog: false,
                 theme: { customCss: './src/css/custom.css' },
             } satisfies Preset.Options,

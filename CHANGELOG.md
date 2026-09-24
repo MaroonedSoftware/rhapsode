@@ -2,6 +2,40 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.16
+
+- The site's "Why another speech server" section now starts where rhapsode did: deadair.radio, and the
+  four things a radio station needed from speech that nothing else offered together.
+
+## 0.1.15
+
+- The website moves to https://rhapsode.dev, and the README and the TypeScript SDK's package link there.
+
+## 0.1.14
+
+- The server speaks MCP at `POST /mcp`, so an agent such as Claude Code can use rhapsode's engines as
+  tools. `list_engines`, `engine_capabilities` and `list_voices` answer what the public routes answer.
+  The endpoint is open to the same callers as `/speak`, and it refuses browser pages from origins
+  that are not this machine's or listed in `management.origins`.
+  
+  `speak` and `speak_dialogue` return the audio as MCP audio content. They use wav unless another
+  format is asked for, because wav needs no ffmpeg on the server.
+
+## 0.1.13
+
+- The OpenAI route and the OpenAPI document route are named "OpenAI speech" and "OpenAPI document"
+  again, in the OpenAPI document, both clients and the site's API reference, and the API reference's
+  groups are called "Native API", "OpenAI shim" and "Shared".
+
+## 0.1.12
+
+- Every operation in the OpenAPI document, and every method in the TypeScript SDK and the Python
+  client, now carries a name and a one-sentence summary. The descriptions they replace were the first
+  line of a longer comment and ended mid-sentence.
+- rhapsode has a website, at https://maroonedsoftware.github.io/rhapsode/: a quick start, a page for
+  every engine, the protocol, the operator guide, and an API reference generated from the same
+  contracts as the server. The TypeScript SDK's package links to its API reference.
+
 ## 0.1.11
 
 - The server keeps the engines it installed in `rhapsode.db`, a SQLite database beside the config
