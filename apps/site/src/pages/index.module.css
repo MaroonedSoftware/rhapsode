@@ -163,6 +163,27 @@
     margin: 0;
 }
 
+/* What a station needs, beside what answers it: pairs, so a list of terms, two to a row. */
+
+.needs {
+    margin: 0 0 3rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.75rem 3rem;
+    max-width: 60rem;
+}
+
+.need dt {
+    font-weight: 650;
+    margin-bottom: 0.35rem;
+}
+
+.need dd {
+    margin: 0;
+    line-height: 1.6;
+    color: var(--rh-text-secondary);
+}
+
 /* The three kinds of project and this one: a comparison, so a list of terms, with this one set apart. */
 
 .kinds {
@@ -245,7 +266,8 @@
 }
 
 @media (max-width: 600px) {
-    .kinds {
+    .kinds,
+    .needs {
         grid-template-columns: minmax(0, 1fr);
     }
 
