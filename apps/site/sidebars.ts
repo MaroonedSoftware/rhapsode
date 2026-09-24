@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
             items: ['engines/kokoro', 'engines/chatterbox', 'engines/orpheus', 'engines/dia', 'engines/tone'],
         },
         'openai',
+        'mcp',
         'help',
     ],
     build: ['develop/index', 'protocol', 'develop/worker-sdk', 'develop/conformance', 'develop/contributing'],

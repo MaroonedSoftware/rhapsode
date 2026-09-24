@@ -329,7 +329,7 @@ drained. `RHAPSODE_API_PORT` and `RHAPSODE_WEB_PORT` move the published ports.
 It was two containers, and one is less to run for nothing lost: unraid needed a network and a
 second template so the page could find the server, the token crossed between them through a file in
 `/config`, and nginx had to re-ask Docker's DNS or lose the core whenever its container was
-recreated. The core still serves no page of its own (protocol.md § 12). nginx is a second process
+recreated. The core still serves no page of its own (protocol.md § 13). nginx is a second process
 beside it, reaching it over loopback like any other proxy on the same machine.
 
 Coming from the two-container compose, the old page container still holds port 8081, so replace it
@@ -497,6 +497,41 @@ on. Leaving `response_format` out asks for `mp3`, as OpenAI does, and that needs
 engine with no dial to carry it, instead of being quietly ignored. `docs/protocol.md` § 11 has the
 rules and the reasons.
 
+## MCP clients
+
+`POST /mcp` is an MCP server, so an agent can list engines and voices and speak a line as tools.
+It is stateless Streamable HTTP. Point a client at `http://<host>:8080/mcp`. For Claude Code:
+
+```bash
+claude mcp add --transport http rhapsode http://localhost:8080/mcp
+```
+
+A client that only launches stdio servers needs a bridge to the URL. Claude Desktop's config file
+is one such client, and `mcp-remote` is one such bridge. It wants `--allow-http` for a plain-HTTP
+address that is not `localhost`:
+
+```json
+{
+  "mcpServers": {
+    "rhapsode": { "command": "npx", "args": ["-y", "mcp-remote", "http://tower:8080/mcp", "--allow-http"] }
+  }
+}
+```
+
+The tools are `list_engines`, `engine_capabilities`, `list_voices`, `speak` and `speak_dialogue`.
+Each one is a request to the matching public route, so it answers what that route answers and
+refuses what it refuses. Nothing from the management API is a tool, so an agent cannot install,
+unload or change a setting.
+
+`speak` returns the audio as MCP audio content, in `wav` unless asked for another format, because
+`wav` needs no ffmpeg on the engine's box. A line of text comes with it. What happens to the audio
+depends on the client: it might play it, save it, pass it to the model, or show only the text.
+
+Access works as it does for `/speak`: anybody who can reach :8080 can use it, and no token is
+asked for. The one refusal is a browser page from an origin that is not this machine's or listed
+in `management.origins`, which gets `403`. That rule stops a web page the operator visits from
+driving the server through their browser. `docs/protocol.md` § 12 has the rules and the reasons.
+
 ## What to watch
 
 `GET /health` answers while every worker is down and never blocks on one.
@@ -607,7 +642,7 @@ and its turbo and nano builds end every piece on 120 ms of silence of their own.
 they are different engines, which is why the capability document says which you have rather than
 leaving you to hear it.
 
-`stream: false` buffers the whole answer in the core (`docs/protocol.md` § 13.2), and that buffer
+`stream: false` buffers the whole answer in the core (`docs/protocol.md` § 14.2), and that buffer
 is bounded by `maxCharacters`. An engine with a high ceiling and a long request is a proportionally
 larger buffer, so an operator raising a ceiling should know it is also raising that.
 

@@ -16,6 +16,24 @@ export interface ManagementAccessContext extends PolicyContext {
 }
 
 /**
+ * Which web pages this core answers: this machine's own, and the origins the operator named in
+ * `management.origins`. protocol.md § 10, and § 12, which applies it to `/mcp`.
+ *
+ * One rule rather than one per route, because the reason is the same wherever it is applied: any
+ * page the operator visits can make their browser send a request, and `Origin` is the only thing
+ * that says whose page it was. A second list for a second route would be an operator adding their
+ * page to one of them and finding it refused by the other.
+ */
+export class OriginRule {
+    constructor(private readonly allowedOrigins: readonly string[] = []) {}
+
+    /** An absent `Origin` is curl, the wizard or an agent, not a page, and is left to the route to judge. */
+    admits(origin: string | undefined): boolean {
+        return origin === undefined || isLoopbackOrigin(origin) || this.allowedOrigins.includes(origin);
+    }
+}
+
+/**
  * A local caller, or one holding the management token, and never a web page that did not come from
  * this machine or from an origin the operator named.
  *
@@ -30,12 +48,12 @@ export interface ManagementAccessContext extends PolicyContext {
  * cannot forge it, so refusing a foreign `Origin` closes that and DNS rebinding with it.
  */
 export class ManagementAccessPolicy extends Policy<ManagementAccessContext> {
-    constructor(private readonly allowedOrigins: readonly string[] = []) {
+    constructor(private readonly origins: OriginRule = new OriginRule()) {
         super();
     }
 
     async evaluate(context: ManagementAccessContext): Promise<PolicyResult> {
-        if (context.origin !== undefined && !this.originAllowed(context.origin)) {
+        if (!this.origins.admits(context.origin)) {
             const reason = `management routes do not answer pages from ${context.origin}; add it to management.origins if it is yours`;
             return this.deny(reason, { message: reason }, { ip: context.ip, origin: context.origin });
         }
@@ -44,10 +62,6 @@ export class ManagementAccessPolicy extends Policy<ManagementAccessContext> {
 
         const reason = 'management routes answer loopback callers, or a caller presenting management.token as a bearer token';
         return this.deny(reason, { message: reason }, { ip: context.ip, forwardedFor: context.forwardedFor });
-    }
-
-    private originAllowed(origin: string): boolean {
-        return isLoopbackOrigin(origin) || this.allowedOrigins.includes(origin);
     }
 }
 

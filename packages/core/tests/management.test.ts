@@ -4,7 +4,7 @@ import { CatalogEntry } from '@rhapsode/contract';
 
 import { RhapsodeJsonLogger } from '../src/logging/rhapsode.logger.js';
 import { sameToken } from '../src/management/management.auth.js';
-import { isLoopback, isLoopbackOrigin } from '../src/management/management.access.policy.js';
+import { isLoopback, isLoopbackOrigin, OriginRule } from '../src/management/management.access.policy.js';
 import { managementGuard } from '../src/management/management.module.js';
 import { ManagedEngines } from '../src/registry/managed.engines.js';
 import { buildServer } from '../src/server.js';
@@ -179,6 +179,21 @@ describe('isLoopbackOrigin', () => {
         ['chrome-extension://abc', false],
     ])('%s is %s', (origin, expected) => {
         expect(isLoopbackOrigin(origin)).toBe(expected);
+    });
+});
+
+describe('OriginRule', () => {
+    const rule = new OriginRule(['http://tower:8081']);
+
+    it.each([
+        [undefined, true],
+        ['http://localhost:8081', true],
+        ['http://tower:8081', true],
+        ['http://tower:8082', false],
+        ['https://evil.example', false],
+    ])('%s is %s', (origin, expected) => {
+        // Absent is not a page, so the rule has nothing to say about it and leaves it to the route.
+        expect(rule.admits(origin)).toBe(expected);
     });
 });
 

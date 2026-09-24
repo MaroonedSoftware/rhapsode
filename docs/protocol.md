@@ -894,7 +894,7 @@ the web page shows a conversation editor only where a variant declares one.
 
 Piper, Kokoro and Supertonic ship ONNX weights, and `onnxruntime-node` could run them inside the
 core with no Python at all. **They run as workers instead**, through `onnxruntime` in their own
-virtualenv, and the core has one kind of engine. This was open until v1 (§ 13) and was decided on
+virtualenv, and the core has one kind of engine. This was open until v1 (§ 14) and was decided on
 what running them in-process would actually have cost:
 
 - **The model is the easy half.** These models take phonemes, not text, and every maintained route
@@ -968,7 +968,7 @@ whether an engine is behind it (`outdated`, below) and whether a newer release e
 below). A client that compared version strings itself would need its own ordering of them, and two
 clients would disagree about a prerelease.
 
-One version rather than one per package because § 13.5 keeps the protocol and both of its
+One version rather than one per package because § 14.5 keeps the protocol and both of its
 implementations in one repository so that they move in one commit, and that holds for a user only
 if they also move in one release. Separate versions would need a hand-kept table of which core goes
 with which engine, and the catalog would have to consult it on every install.
@@ -1130,7 +1130,7 @@ the web that describes some other version.
 Installing an engine is part of the API rather than a set of instructions, so that a terminal
 client and a web page can both drive it and neither holds logic the other lacks. By hand it was five
 steps: a virtualenv, a pip install, an edit to the config, a restart, and a first `/speak` that
-silently downloaded 3.8 GB. The core still ships no interface of its own (§ 12). These routes are
+silently downloaded 3.8 GB. The core still ships no interface of its own (§ 13). These routes are
 what one is built on.
 
 | Route | Does |
@@ -1292,7 +1292,7 @@ allowed, and the file and the database are theirs to edit by hand.
 names directories on the box, the origins it trusts and whether it has a token, which is a map for
 somebody deciding where to push next, and a page that cannot change settings has no use for it
 either. The web page and `pnpm wizard settings` are the two clients, and the page has nothing the
-wizard does not (§ 12).
+wizard does not (§ 13).
 
 ### The catalog
 
@@ -1690,7 +1690,90 @@ needs them.
 
 ---
 
-## 12. Deliberately not in v1
+## 12. The MCP server
+
+An agent that can call tools should be able to find an engine, pick a voice and speak a line
+without anybody writing glue for it. The Model Context Protocol is how those agents are told what
+a server can do, so the core serves it.
+
+```http
+POST /mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+```
+
+**MCP is a translation into the public routes, as the OpenAI shim is (§ 11).** Every tool builds
+a request to a route of § 6 or § 7 and runs it through the core's own router, in process, and
+reads the answer. The ceiling, the cue stripping, the dial check, the residency lease, the floor
+and the error taxonomy are that route's, so an agent is held to exactly what `curl` is held to, and
+a rule added to a route reaches its tool without anybody remembering that the tool exists.
+
+| Tool | Runs | Takes |
+| --- | --- | --- |
+| `list_engines` | `GET /engines` | nothing |
+| `engine_capabilities` | `GET /engines/{engine}/capabilities` | `engine` |
+| `list_voices` | `GET /engines/{engine}/voices` | `engine` |
+| `speak` | `POST /speak` with `stream: false` | `/speak`'s body without `stream` |
+| `speak_dialogue` | `POST /engines/{engine}/dialogue` with `stream: false` | the dialogue body with `engine` and without `stream` |
+
+A tool's input schema is the request contract's, from `contracts/`, so the two cannot describe
+different requests. The read-only tools say so in their annotations.
+
+**The tools are the public API and nothing more.** Nothing in § 10 is a tool. The management
+routes run pip and change settings, and they answer loopback callers and a token (§ 10); an agent
+that can reach `/mcp` is not thereby somebody who may install an engine. A client that wants
+those routes calls them.
+
+### Stateless, over Streamable HTTP
+
+Each `POST` carries one JSON-RPC message and is answered with one JSON response, or with `202` and
+no body for a notification. The server keeps no session and sends no `Mcp-Session-Id`, so any
+request may be the first one, a restart loses nothing, and a load balancer needs no affinity. Every
+tool is a request and its answer; nothing here has progress to report or anything to push, so a
+session would be state kept for no reader. `GET /mcp` and `DELETE /mcp` answer `405`, which is
+how the transport says a server offers no stream.
+
+stdio is not served. A client that only speaks stdio runs a bridge to the URL; an agent on another
+machine, which is the case this was built for, cannot spawn the core as a child anyway.
+
+### Audio arrives as audio content
+
+`speak` answers with two content items: the audio as MCP `audio` content, base64 with the
+`Content-Type` `/speak` gave it as `mimeType`, and a line of text naming the engine and voice
+asked for, the type, the size and the duration when the worker reported one. `speak_dialogue`
+answers the same way. The route runs buffered because a tool result is one message, which is
+the case § 14.2 already allows for: one response, in memory, bounded by the variant's
+`maxCharacters`.
+
+**`format` defaults to `wav`**, not to what `/speak` would choose. `mp3` and `opus` need ffmpeg on
+the worker's box and `wav` needs nothing, so a box without ffmpeg can still answer the call an
+agent makes when it says nothing. `pcm` keeps its `audio/L16; rate=…; channels=1` type verbatim,
+for the reason § 11 gives: the rate is the engine's.
+
+### Errors are tool results
+
+A route's refusal becomes a tool result with `isError: true` whose text carries the envelope's
+`code`, `message` and `retryable`. That is how MCP reports a tool that ran and failed, as opposed
+to a call that was malformed, and it is the form an agent reads: `unknown_voice` naming the voices
+there are is something it can act on, where a JSON-RPC error is something its client reports and
+stops at. A call to a tool that does not exist, or a body that is not JSON-RPC, is a protocol error
+as the transport defines one.
+
+### Who may call it
+
+Anybody who may call `/speak`, which is anybody, with one refusal. The transport requires a server
+to check `Origin`, because a page the operator visits can make their browser `POST` to a
+server on the LAN as easily as to `localhost`. `/mcp` applies the rule the management routes do
+(§ 10): a request carrying an `Origin` is refused as `forbidden` unless the origin is this machine's
+own or is listed in `management.origins`. An agent is not a browser and sends no `Origin`, and is
+admitted. A bearer token is ignored and, as everywhere, stripped before any handler runs.
+
+`/mcp` is not in `GET /openapi.json` (§ 9). It is one JSON-RPC endpoint whose operations are the
+tools, and `tools/list` is where they are described, to the only readers that can use them.
+
+---
+
+## 13. Deliberately not in v1
 
 Named so that nobody has to guess whether they were forgotten.
 
@@ -1706,7 +1789,7 @@ Named so that nobody has to guess whether they were forgotten.
   no route the terminal client does not. Its API reference renders `GET /openapi.json` (§ 9), the
   document every other client can read, rather than a copy of its own.
 
-## 13. Open questions
+## 14. Open questions
 
 1. **Dialogue.** Decided: a second endpoint, declared per variant (§ 4, § 6). A structured `text`
    would have put a shape into every engine's request that most of them must refuse half of; a second
