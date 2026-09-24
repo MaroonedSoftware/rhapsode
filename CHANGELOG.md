@@ -2,6 +2,10 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.15
+
+- The website moves to https://rhapsode.dev, and the README and the TypeScript SDK's package link there.
+
 ## 0.1.14
 
 - The server speaks MCP at `POST /mcp`, so an agent such as Claude Code can use rhapsode's engines as
