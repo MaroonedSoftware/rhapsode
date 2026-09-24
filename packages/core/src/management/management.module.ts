@@ -7,7 +7,7 @@ import { Container } from 'injectkit';
 
 import type { RhapsodeConfig } from '../config.js';
 import { ManagementTokenHandler } from './management.auth.js';
-import { MANAGEMENT_ACCESS_POLICY, ManagementAccessPolicy, RhapsodePolicyService } from './management.access.policy.js';
+import { MANAGEMENT_ACCESS_POLICY, ManagementAccessPolicy, OriginRule, RhapsodePolicyService } from './management.access.policy.js';
 
 /**
  * The pieces ServerKit's `authenticationPlugin` and `PolicyService` resolve from the container.
@@ -36,8 +36,12 @@ export const managementModule = (settings: RhapsodeConfig): ServerKitModule => (
             .asSingleton();
 
         registry
+            .register(OriginRule)
+            .useFactory(() => new OriginRule(settings.management?.origins ?? []))
+            .asSingleton();
+        registry
             .register(ManagementAccessPolicy)
-            .useFactory(() => new ManagementAccessPolicy(settings.management?.origins ?? []))
+            .useFactory(container => new ManagementAccessPolicy(container.get(OriginRule)))
             .asSingleton();
         registry
             .register(PolicyRegistryMap)
