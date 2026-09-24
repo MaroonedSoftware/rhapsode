@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { CORE_VERSION } from '../src/core.version.js';
@@ -44,7 +47,11 @@ async function start(settings: RhapsodeConfig = {}) {
     return builder;
 }
 
+let client: Client | undefined;
+
 afterEach(async () => {
+    await client?.close();
+    client = undefined;
     await running?.app.close();
     running = undefined;
     if (socketDir !== undefined) rmSync(socketDir, { recursive: true, force: true });
@@ -55,6 +62,32 @@ afterEach(async () => {
 async function startTone() {
     socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
     return start({ workers: { socketDir, startupTimeoutSeconds: 30 }, engines: { tone: { venv: join(REPO, 'python/.venv') } } });
+}
+
+/**
+ * The SDK's own client, over its own Streamable HTTP transport, with `fetch` routed into the core.
+ * It is the one reader that checks structured content against `outputSchema` and fails the call
+ * when they disagree, which is the promise `outputSchema` makes and nothing else here would test.
+ */
+async function connect() {
+    const viaInject: FetchLike = async (url, init) => {
+        const target = new URL(url);
+        const response = await running!.app.inject({
+            method: (init?.method ?? 'GET') as 'GET' | 'POST' | 'DELETE',
+            url: target.pathname + target.search,
+            headers: Object.fromEntries(new Headers(init?.headers).entries()),
+            ...(typeof init?.body === 'string' ? { payload: init.body } : {}),
+        });
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(response.headers)) {
+            if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(', ') : String(value));
+        }
+        const empty = response.statusCode === 202 || response.statusCode === 204 || response.rawPayload.length === 0;
+        return new Response(empty ? null : new Uint8Array(response.rawPayload), { status: response.statusCode, headers });
+    };
+    client = new Client({ name: 'test', version: '0' });
+    await client.connect(new StreamableHTTPClientTransport(new URL('http://rhapsode.test/mcp'), { fetch: viaInject }));
+    return client;
 }
 
 let id = 0;
@@ -266,5 +299,51 @@ describeWithSockets('speaking through MCP', () => {
         expect(result.isError).toBeUndefined();
         expect(result.content[0]).toMatchObject({ type: 'audio', mimeType: 'audio/wav' });
         expect(result.content[1]!.text).toContain('2 turns');
+    });
+});
+
+describe('an MCP client', () => {
+    it('connects, lists the tools and reads engines checked against their outputSchema', async () => {
+        await start({ engines: { tone: { venv: '/nowhere' } } });
+        const mcp = await connect();
+
+        expect(mcp.getServerVersion()).toMatchObject({ name: 'rhapsode', version: CORE_VERSION });
+        const { tools } = await mcp.listTools();
+        expect(tools.find(tool => tool.name === 'list_engines')?.outputSchema).toMatchObject({ required: ['items'] });
+
+        // callTool validates structuredContent against outputSchema and throws when it does not fit.
+        const result = await mcp.callTool({ name: 'list_engines', arguments: {} });
+        expect(result.structuredContent).toMatchObject({ items: [{ id: 'tone' }] });
+    });
+
+    it('sees a refusal as a failed tool, not a failed call', async () => {
+        await start();
+        const mcp = await connect();
+
+        const result = await mcp.callTool({ name: 'list_voices', arguments: { engine: 'nope' } });
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toBeUndefined();
+    });
+});
+
+describeWithSockets('an MCP client against a real worker', () => {
+    it('reads capabilities and voices that fit their outputSchema', async () => {
+        await startTone();
+        const mcp = await connect();
+
+        const capabilities = await mcp.callTool({ name: 'engine_capabilities', arguments: { engine: 'tone' } });
+        expect(capabilities.isError).toBeUndefined();
+        expect(capabilities.structuredContent).toMatchObject({ engine: { id: 'tone' } });
+
+        const voices = await mcp.callTool({ name: 'list_voices', arguments: { engine: 'tone' } });
+        expect((voices.structuredContent as { items: { id: string }[] }).items.map(voice => voice.id)).toContain('sine');
+    });
+
+    it('speaks, and the audio arrives as audio content', async () => {
+        await startTone();
+        const mcp = await connect();
+
+        const result = await mcp.callTool({ name: 'speak', arguments: { engine: 'tone', text: 'a line to speak' } });
+        expect((result.content as { type: string; mimeType?: string }[])[0]).toMatchObject({ type: 'audio', mimeType: 'audio/wav' });
     });
 });

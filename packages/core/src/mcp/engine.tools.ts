@@ -1,5 +1,6 @@
 import type { McpToolHandler } from '@maroonedsoftware/mcp';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import { Capabilities, EngineSummary, Voice } from '@rhapsode/contract';
 import { z } from 'zod';
 
 import type { LoopbackClient } from './mcp.loopback.js';
@@ -19,13 +20,14 @@ export class ListEnginesTool implements McpToolHandler {
         description:
             'Every speech engine installed on this rhapsode server, with its variants and licences. Start here: every other tool takes an engine id from this list.',
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        outputSchema: outputSchema(EngineSummary, 'list'),
         annotations: READ_ONLY,
     };
 
     constructor(private readonly loopback: LoopbackClient) {}
 
     async handle(): Promise<CallToolResult> {
-        return jsonResult(await this.loopback.request({ method: 'GET', url: '/engines' }));
+        return jsonResult(await this.loopback.request({ method: 'GET', url: '/engines' }), 'list');
     }
 }
 
@@ -37,6 +39,7 @@ export class EngineCapabilitiesTool implements McpToolHandler {
         description:
             "What one engine can do, per variant: output formats, languages, the most characters a request may carry, the cues and deliveries it performs, and the dials `speak` may set in `params`. Read it before speak to learn what the engine's params and cues are.",
         inputSchema: inputSchema(EngineArguments),
+        outputSchema: outputSchema(Capabilities, 'object'),
         annotations: READ_ONLY,
     };
 
@@ -45,7 +48,10 @@ export class EngineCapabilitiesTool implements McpToolHandler {
     async handle(args: Record<string, unknown>): Promise<CallToolResult> {
         const parsed = EngineArguments.safeParse(args);
         if (!parsed.success) return badArguments(parsed.error.issues[0]!.message);
-        return jsonResult(await this.loopback.request({ method: 'GET', url: `/engines/${encodeURIComponent(parsed.data.engine)}/capabilities` }));
+        return jsonResult(
+            await this.loopback.request({ method: 'GET', url: `/engines/${encodeURIComponent(parsed.data.engine)}/capabilities` }),
+            'object',
+        );
     }
 }
 
@@ -56,6 +62,7 @@ export class ListVoicesTool implements McpToolHandler {
         title: 'List voices',
         description: "The voices one engine can speak in. A voice's id is what `speak` takes as `voice`; leaving it out uses the engine's default.",
         inputSchema: inputSchema(EngineArguments),
+        outputSchema: outputSchema(Voice, 'list'),
         annotations: READ_ONLY,
     };
 
@@ -64,12 +71,28 @@ export class ListVoicesTool implements McpToolHandler {
     async handle(args: Record<string, unknown>): Promise<CallToolResult> {
         const parsed = EngineArguments.safeParse(args);
         if (!parsed.success) return badArguments(parsed.error.issues[0]!.message);
-        return jsonResult(await this.loopback.request({ method: 'GET', url: `/engines/${encodeURIComponent(parsed.data.engine)}/voices` }));
+        return jsonResult(await this.loopback.request({ method: 'GET', url: `/engines/${encodeURIComponent(parsed.data.engine)}/voices` }), 'list');
     }
 }
 
 /** A zod object as the JSON Schema a tool advertises, without the dialect line MCP already assumes. */
 export function inputSchema(schema: z.ZodObject): Tool['inputSchema'] {
-    const { $schema: _dialect, ...rest } = z.toJSONSchema(schema, { io: 'input' }) as Record<string, unknown>;
-    return rest as Tool['inputSchema'];
+    return jsonSchema(schema, 'input') as Tool['inputSchema'];
+}
+
+/**
+ * The route's response contract as the tool's `outputSchema`, so a client can check a result against
+ * the contract the route answers with rather than against a description of it. A list is wrapped as
+ * `{ items }`, because MCP requires structured content to be an object and a schema for anything
+ * else is one a client parsing `tools/list` may reject.
+ */
+export function outputSchema(schema: z.ZodType, shape: 'object' | 'list'): Tool['outputSchema'] {
+    const item = jsonSchema(schema, 'output');
+    if (shape === 'object') return item as Tool['outputSchema'];
+    return { type: 'object', properties: { items: { type: 'array', items: item } }, required: ['items'] };
+}
+
+function jsonSchema(schema: z.ZodType, io: 'input' | 'output'): Record<string, unknown> {
+    const { $schema: _dialect, ...rest } = z.toJSONSchema(schema, { io }) as Record<string, unknown>;
+    return rest;
 }

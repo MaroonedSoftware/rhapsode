@@ -1717,7 +1717,11 @@ a rule added to a route reaches its tool without anybody remembering that the to
 | `speak_dialogue` | `POST /engines/{engine}/dialogue` with `stream: false` | the dialogue body with `engine` and without `stream` |
 
 A tool's input schema is the request contract's, from `contracts/`, so the two cannot describe
-different requests. The read-only tools say so in their annotations.
+different requests. The read-only tools say so in their annotations, and answer with structured
+content whose `outputSchema` is the route's response contract, so a client checks a result against
+what the route promises rather than against prose. MCP requires structured content to be an
+object, so a list goes out as `{ "items": [...] }`. The same JSON goes out as text too, for a client
+that predates structured results.
 
 **The tools are the public API and nothing more.** Nothing in § 10 is a tool. The management
 routes run pip and change settings, and they answer loopback callers and a token (§ 10); an agent

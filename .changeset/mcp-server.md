@@ -8,3 +8,6 @@ that are not this machine's or listed in `management.origins`.
 
 `speak` and `speak_dialogue` return the audio as MCP audio content. They use wav unless another
 format is asked for, because wav needs no ffmpeg on the server.
+
+The read-only tools return structured results. Each one declares an `outputSchema` taken from the
+route's response contract, and a client can check every result against it.
