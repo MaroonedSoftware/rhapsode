@@ -48,3 +48,15 @@ python/.venv/
 # ContractKit's build cache.
 .contractkit/
 .scratch/
+# The site's copies of pages written elsewhere. apps/site/scripts/docs.sync.mjs writes them on every
+# start and build, from the sources its list names.
+apps/site/docs/operating.md
+apps/site/docs/protocol.md
+apps/site/docs/develop/contributing.md
+apps/site/docs/develop/worker-sdk.md
+apps/site/docs/develop/conformance.md
+apps/site/docs/engines/chatterbox.md
+apps/site/docs/engines/dia.md
+apps/site/docs/engines/kokoro.md
+apps/site/docs/engines/orpheus.md
+apps/site/docs/engines/tone.md

@@ -4,8 +4,8 @@
     "license": "MIT",
     "description": "The public website: what rhapsode is, how to run it, and the protocol and API it serves.",
     "scripts": {
-        "start": "docusaurus start --port 8082",
-        "build": "tsc --noEmit && docusaurus build --out-dir dist",
+        "start": "node scripts/docs.sync.mjs && docusaurus start --port 8082",
+        "build": "tsc --noEmit && node scripts/docs.sync.mjs && docusaurus build --out-dir dist",
         "serve": "docusaurus serve --dir dist --port 8082",
         "clear": "docusaurus clear",
         "lint": "eslint --fix",

@@ -2,8 +2,12 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         // Type-check only: covers tests/ as well as src/, which the build tsconfig leaves out.
-        "noEmit": true
+        "noEmit": true,
+        // The scripts are plain `.mjs` that node runs as they are, typed with JSDoc, and the tests
+        // import them.
+        "allowJs": true,
+        "checkJs": true
     },
-    "include": ["./src/**/*", "./tests/**/*", "./docusaurus.config.ts", "./sidebars.ts", "./vitest.config.ts"],
+    "include": ["./src/**/*", "./tests/**/*", "./scripts/**/*.mjs", "./docusaurus.config.ts", "./sidebars.ts", "./vitest.config.ts"],
     "exclude": ["node_modules", "dist", ".docusaurus"]
 }

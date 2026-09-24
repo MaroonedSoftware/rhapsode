@@ -4,7 +4,10 @@ import { themes as prismThemes } from 'prism-react-renderer';
 
 const repository = 'https://github.com/MaroonedSoftware/rhapsode';
 
-/** Where "Edit this page" goes: the page's own file, since every doc here is written here. */
+/**
+ * Where "Edit this page" goes for a page written here. A page copied in by `scripts/docs.sync.mjs`
+ * sets `custom_edit_url` to its source instead, which wins over this.
+ */
 function editUrl({ docPath }: { docPath: string }): string {
     return `${repository}/blob/main/apps/site/docs/${docPath}`;
 }
@@ -57,6 +60,7 @@ const config: Config = {
             logo: { alt: '', src: 'favicon.svg' },
             items: [
                 { type: 'docSidebar', sidebarId: 'run', label: 'Run it', position: 'left' },
+                { type: 'docSidebar', sidebarId: 'build', label: 'Build on it', position: 'left' },
                 { href: repository, label: 'GitHub', position: 'right' },
             ],
         },
@@ -64,7 +68,20 @@ const config: Config = {
             links: [
                 {
                     title: 'Run it',
-                    items: [{ label: 'Quick start', to: '/docs/quick-start' }],
+                    items: [
+                        { label: 'Quick start', to: '/docs/quick-start' },
+                        { label: 'Running one', to: '/docs/operating' },
+                        { label: 'Engines', to: '/docs/engines/kokoro' },
+                    ],
+                },
+                {
+                    title: 'Build on it',
+                    items: [
+                        { label: 'The protocol', to: '/docs/protocol' },
+                        { label: 'The worker SDK', to: '/docs/develop/worker-sdk' },
+                        { label: 'Conformance', to: '/docs/develop/conformance' },
+                        { label: 'Contributing', to: '/docs/develop/contributing' },
+                    ],
                 },
                 {
                     title: 'Project',

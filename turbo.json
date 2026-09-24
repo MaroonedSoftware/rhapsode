@@ -7,6 +7,18 @@
             "dependsOn": ["^build"],
             "outputs": ["dist/**"]
         },
+        "@rhapsode/site#build": {
+            "dependsOn": ["^build"],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/docs/operating.md",
+                "$TURBO_ROOT$/docs/protocol.md",
+                "$TURBO_ROOT$/CONTRIBUTING.md",
+                "$TURBO_ROOT$/python/*/README.md",
+                "$TURBO_ROOT$/apps/web/public/**"
+            ],
+            "outputs": ["dist/**"]
+        },
         "codegen": {
             "cache": false
         },

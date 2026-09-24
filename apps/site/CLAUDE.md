@@ -31,9 +31,25 @@ default blue. The block is the one Docusaurus's own template ships.
 **The colours are the page's, copied.** `src/css/custom.css` restates `apps/web/src/theme.ts`'s
 `rhapsode` tuple as Infima's primary scale and `apps/web/src/tokens.css`'s surfaces, in both schemes,
 because the page publishes them through Mantine and this site does not load it. If either moves, move
-these with it. Links in the dark scheme use index 5 rather than the dark primary shade, which is
+these with it. Links in the dark scheme use index 3 rather than the dark primary shade, which is
 4.3:1 on the dark background. The favicon comes from `apps/web/public` through `staticDirectories`,
 so the mark has one drawing.
 
 **The Docusaurus-only advisories are overridden in `pnpm-workspace.yaml`,** with the reasons beside
 them. They are the dev server and the bundler, never the image.
+
+**Most pages are copied in, never edited here.** `scripts/docs.sync.mjs` copies `docs/operating.md`,
+`docs/protocol.md`, `CONTRIBUTING.md` and the README of every package under `python/` into `docs/`
+on every `start` and `build`. The copies are gitignored; edit the source files. The repository's own
+rule that `docs/protocol.md` outranks the code holds for its copy too: the site shows the spec, it
+does not restate it. A link in a source is written for the repository, so the script rewrites it:
+to the copied page when it names a file the script copies (relatively, or by its GitHub URL, which is
+how the engine READMEs cite the protocol so the link works off GitHub), and to the file on GitHub
+otherwise. A new source is four edits: the list in the script, `sidebars.ts`, `.gitignore`, and the
+`inputs` of `@rhapsode/site#build` in `turbo.json`, since turbo does not otherwise know the site reads
+outside its package. A new engine's README is caught by the `python/*/README.md` glob there, but not
+by the other three.
+
+**There is one sidebar per audience, listed by hand.** `sidebars.ts` holds `run` (operators) and
+`build` (engine and client authors), and the navbar has one item per sidebar. Renaming a page fails
+the build instead of quietly moving it; a new page has no sidebar until it is added to the list.

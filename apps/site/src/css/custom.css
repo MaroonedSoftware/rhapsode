@@ -68,7 +68,7 @@ html[data-theme='dark'] {
     --rh-text-secondary: #b0b0c0;
     --rh-text-dimmed: #858596;
     /*
-     * Index 5 of the tuple rather than the dark primary shade (4) for text: #736bdc on #111216 is
+     * Index 3 of the tuple rather than the dark primary shade (4) for text: #736bdc on #111216 is
      * 4.3:1, under the 4.5 body text needs, and #938de5 is 6.3:1.
      */
     --rh-accent: #938de5;
