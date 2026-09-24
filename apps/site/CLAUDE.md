@@ -80,3 +80,10 @@ page should survive a reader checking it against `docs/protocol.md`.
 
 **No em dashes in anything written here.** `tests/prose.test.ts` holds the site's own pages and
 components to the repository's rule, and leaves copies and generated pages to their sources.
+
+**A push to `main` is the deploy.** `.github/workflows/site.yml` builds `dist/` and publishes it to
+GitHub Pages whenever a push touches the site or a file it reads from outside the package; its
+`paths` list those files, as `turbo.json`'s inputs do, and a new source goes in both. It needs the
+repository's Pages source set to "GitHub Actions" once, and fails at `configure-pages` saying so
+until it is. A custom domain is set in the Pages settings, not in a `CNAME` file, which a Pages site
+deployed from Actions ignores; `url` and `baseUrl` in `docusaurus.config.ts` then change with it.
