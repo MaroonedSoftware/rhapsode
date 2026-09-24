@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-engine-chatterbox"
-version = "0.1.16"
+version = "0.1.17"
 description = "Chatterbox for rhapsode: the engine the capability document was designed around."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rhapsode-worker==0.1.16",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "rhapsode-worker==0.1.17",  # Its own version, exactly, and bumped with it. protocol.md § 9.
     # Used directly, to turn a finished waveform into PCM. torch brings it too, but depending on it
     # through torch would make the adapter's own conversion untestable without several gigabytes.
     "numpy>=1.26",
