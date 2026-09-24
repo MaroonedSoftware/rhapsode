@@ -2,6 +2,15 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.12
+
+- Every operation in the OpenAPI document, and every method in the TypeScript SDK and the Python
+  client, now carries a name and a one-sentence summary. The descriptions they replace were the first
+  line of a longer comment and ended mid-sentence.
+- rhapsode has a website, at https://maroonedsoftware.github.io/rhapsode/: a quick start, a page for
+  every engine, the protocol, the operator guide, and an API reference generated from the same
+  contracts as the server. The TypeScript SDK's package links to its API reference.
+
 ## 0.1.11
 
 - The server keeps the engines it installed in `rhapsode.db`, a SQLite database beside the config
