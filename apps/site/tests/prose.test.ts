@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { NOTICE } from '../scripts/docs.sync.mjs';
 
 // The repository's house style (CLAUDE.md, "Conventions"): no em dashes in prose. A site is the one
 // place a reader meets the prose first, so the rule is checked here rather than trusted.
@@ -26,9 +27,13 @@ describe('the site prose', () => {
         const offenders: string[] = [];
         for (const file of files) {
             const text = await readFile(file, 'utf8');
-            // A page copied in from elsewhere is held to the rule where it is written, not here.
-            if (text.includes('Edit that file, not this one.')) continue;
-            if (text.includes('—')) offenders.push(relative(site, file));
+            // A page copied in from elsewhere is held to the rule where it is written, not here, and a
+            // generated one is ContractKit's to write. `index.md` in the API section is the one page
+            // there written by hand.
+            if (text.includes(NOTICE)) continue;
+            const path = relative(site, file);
+            if (path.startsWith(join('docs', 'api-reference')) && path !== join('docs', 'api-reference', 'index.md')) continue;
+            if (text.includes('\u2014')) offenders.push(path);
         }
         expect(offenders).toEqual([]);
     });

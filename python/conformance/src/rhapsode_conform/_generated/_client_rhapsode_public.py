@@ -445,47 +445,57 @@ class RhapsodePublicClient(BaseClient):
 
     async def health(self) -> CoreHealth:
         """
-        The core's own. It answers while every worker is down and never blocks on one, because a
+        Health
+        The core's own health, which answers even while every worker is down.
         """
         result = await self._fetch("/health", method="GET")
         return CoreHealth.model_validate(result)
 
     async def update_status(self) -> UpdateStatus:
         """
-        Open to every caller, like /health. It never waits on the network: a first call after boot
+        Update status
+        Whether a newer rhapsode has been released, from a check made at most once a day.
         """
         result = await self._fetch("/update", method="GET")
         return UpdateStatus.model_validate(result)
 
     async def check_for_update(self) -> UpdateStatus:
         """
-        Asks GitHub now rather than waiting out the day, and answers once it has, within the check's
+        Check for an update
+        Asks GitHub for the latest release now, and answers once it has.
         """
         result = await self._fetch("/update/check", method="POST")
         return UpdateStatus.model_validate(result)
 
     async def residency(self) -> ResidencyDetail:
         """
-        What is on the card, for an operator asking where their memory went. Reads the core's own
+        Residency
+        What each engine holds in memory, how big it is and when it expires.
         """
         result = await self._fetch("/residency", method="GET")
         return ResidencyDetail.model_validate(result)
 
     async def openapi(self) -> OpenApiDocument:
         """
-        Open to every caller, like /health. The public API only: never a worker route.
+        OpenAPI document
+        This API as an OpenAPI 3.1 document, describing the core that serves it.
         """
         result = await self._fetch("/openapi.json", method="GET")
         return OpenApiDocument.model_validate(result)
 
     async def engines(self) -> list[EngineSummary]:
         """
-        Every declared engine, whether or not it is running. Never spawns one: this is the list an
+        Engines
+        Every declared engine, running or not, with its code and weights licences.
         """
         result = await self._fetch("/engines", method="GET")
         return _ENGINES_RESPONSE.validate_python(result)
 
     async def engine_capabilities(self, engine: str) -> EngineCapabilities200Response | EngineCapabilities404Response | EngineCapabilities503Response:
+        """
+        Engine capabilities
+        What the engine can do with the variant it has loaded, and what its other variants could.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/capabilities", method="GET", response_kind="auto", expect_statuses=(404, 503))
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -494,6 +504,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 200, "content_type": "application/json", "data": Capabilities.model_validate(result) }
 
     async def engine_voices(self, engine: str) -> EngineVoices200Response | EngineVoices404Response:
+        """
+        Voices
+        The engine's voices, built in and cloned.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices", method="GET", response_kind="auto", expect_statuses=(404,))
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -501,7 +515,8 @@ class RhapsodePublicClient(BaseClient):
 
     async def create_voice(self, engine: str, body: dict[str, Any]) -> CreateVoice201Response | CreateVoice400Response | CreateVoice403Response | CreateVoice404Response | CreateVoice422Response:
         """
-        Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB.
+        Create a voice
+        Creates a voice from a reference, such as a clip to clone, or from a blend of voices the engine has.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices", method="POST", body=body, content_type="multipart/form-data", body_kind="multipart", response_kind="auto", expect_statuses=(400, 403, 404, 422))
         if _status == 400:
@@ -515,6 +530,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 201, "content_type": "application/json", "data": Voice.model_validate(result) }
 
     async def delete_voice(self, engine: str, voice: str) -> DeleteVoice204Response | DeleteVoice400Response | DeleteVoice403Response | DeleteVoice404Response | DeleteVoice422Response:
+        """
+        Delete a voice
+        Deletes a voice.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices/{quote(str(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(400, 403, 404, 422))
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -527,6 +546,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 204 }
 
     async def voice_preview(self, engine: str, voice: str) -> VoicePreview200Response | VoicePreview404Response:
+        """
+        Voice preview
+        A short sample of the voice.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/voices/{quote(str(voice), safe='')}/preview", method="GET", response_kind="auto", expect_statuses=(404,))
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -534,7 +557,8 @@ class RhapsodePublicClient(BaseClient):
 
     async def speak(self, body: EngineSpeakRequest) -> Speak200Response | Speak400Response | Speak404Response | Speak422Response | Speak429Response | Speak503Response:
         """
-        The one endpoint that matters. Cues the effective variant does not claim are stripped
+        Speak
+        Speaks a line with one engine, streamed or as a finished file.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/speak", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
         if _status == 400:
@@ -559,7 +583,8 @@ class RhapsodePublicClient(BaseClient):
 
     async def dialogue(self, engine: str, body: EngineDialogueRequest) -> Dialogue200Response | Dialogue400Response | Dialogue404Response | Dialogue422Response | Dialogue429Response | Dialogue503Response:
         """
-        A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per
+        Dialogue
+        A conversation between speakers in one take, on a variant that declares dialogue.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/dialogue", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 404, 422, 429, 503))
         if _status == 400:
@@ -584,14 +609,16 @@ class RhapsodePublicClient(BaseClient):
 
     async def catalog(self) -> list[CatalogEntry]:
         """
-        Open to every caller: it only reads, and its licences are what § 4 promises before install.
+        Catalog
+        Every engine this core knows how to install, with both licences, before anything is installed.
         """
         result = await self._fetch("/catalog", method="GET")
         return _CATALOG_RESPONSE.validate_python(result)
 
     async def uninstall_engine(self, engine: str) -> UninstallEngine204Response | UninstallEngine403Response | UninstallEngine404Response | UninstallEngine409Response:
         """
-        Only an engine this API installed. One the operator configured is theirs to remove.
+        Uninstall an engine
+        Removes an engine this API installed.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(403, 404, 409))
         if _status == 403:
@@ -604,7 +631,8 @@ class RhapsodePublicClient(BaseClient):
 
     async def unload_engine(self, engine: str, query: UnloadEngineQuery | None = None) -> UnloadEngine200Response | UnloadEngine403Response | UnloadEngine404Response | UnloadEngine409Response:
         """
-        Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an
+        Unload an engine
+        Frees the engine's model now, rather than waiting out its keep-alive.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/unload", method="POST", response_kind="auto", expect_statuses=(403, 404, 409), params=query)
         if _status == 403:
@@ -616,6 +644,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 200, "content_type": "application/json", "data": EngineSummary.model_validate(result) }
 
     async def install_engine(self, engine: str, query: InstallEngineQuery | None = None) -> InstallEngine202Response | InstallEngine400Response | InstallEngine403Response | InstallEngine404Response | InstallEngine409Response:
+        """
+        Install an engine
+        Installs an engine from the catalog, as a job to follow.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/install", method="POST", response_kind="auto", expect_statuses=(400, 403, 404, 409), params=query)
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -628,6 +660,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
 
     async def reinstall_engine(self, engine: str, query: ReinstallEngineQuery | None = None) -> ReinstallEngine202Response | ReinstallEngine400Response | ReinstallEngine403Response | ReinstallEngine404Response | ReinstallEngine409Response:
+        """
+        Reinstall an engine
+        Rebuilds an installed engine beside the old one and swaps it in once it works.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/reinstall", method="POST", response_kind="auto", expect_statuses=(400, 403, 404, 409), params=query)
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -640,6 +676,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
 
     async def pull_engine(self, engine: str, body: PullRequest) -> PullEngine202Response | PullEngine403Response | PullEngine404Response | PullEngine409Response:
+        """
+        Pull weights
+        Downloads a variant's weights ahead of its first load, as a job to follow.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(str(engine), safe='')}/pull", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(403, 404, 409))
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -650,18 +690,30 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
 
     async def install_jobs(self) -> InstallJobs200Response | InstallJobs403Response:
+        """
+        Install jobs
+        Every install job, running and finished.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full("/installs", method="GET", response_kind="auto", expect_statuses=(403,))
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "application/json", "data": _INSTALL_JOBS_RESPONSE_200.validate_python(result) }
 
     async def reinstall_outdated(self) -> ReinstallOutdated202Response | ReinstallOutdated403Response:
+        """
+        Reinstall outdated engines
+        Reinstalls every engine an upgrade left behind.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full("/installs/outdated", method="POST", response_kind="auto", expect_statuses=(403,))
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 202, "content_type": "application/json", "data": ReinstallOutdated.model_validate(result) }
 
     async def install_job(self, job: str) -> InstallJob200Response | InstallJob403Response | InstallJob404Response:
+        """
+        Install job
+        One install job and where it has got to.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(str(job), safe='')}", method="GET", response_kind="auto", expect_statuses=(403, 404))
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -671,7 +723,8 @@ class RhapsodePublicClient(BaseClient):
 
     async def install_job_events(self, job: str) -> InstallJobEvents200Response | InstallJobEvents403Response | InstallJobEvents404Response:
         """
-        Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit
+        Install job events
+        An install job's progress and output as server-sent events.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(str(job), safe='')}/events", method="GET", response_kind="auto", expect_statuses=(403, 404))
         if _status == 403:
@@ -681,6 +734,10 @@ class RhapsodePublicClient(BaseClient):
         return { "status": 200, "content_type": "text/event-stream", "data": result }
 
     async def settings(self) -> Settings200Response | Settings403Response:
+        """
+        Settings
+        Every setting, its value, where the value came from and whether a change applies now.
+        """
         _status, _content_type, result, _response_headers = await self._fetch_full("/settings", method="GET", response_kind="auto", expect_statuses=(403,))
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
@@ -688,7 +745,8 @@ class RhapsodePublicClient(BaseClient):
 
     async def update_settings(self, body: SettingsPatch) -> UpdateSettings200Response | UpdateSettings400Response | UpdateSettings403Response | UpdateSettings404Response | UpdateSettings409Response | UpdateSettings422Response:
         """
-        One transaction: a patch that is refused changes nothing. Answers the whole document after
+        Update settings
+        Changes settings in one transaction, and answers the whole document after the write.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full("/settings", method="PATCH", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(400, 403, 404, 409, 422))
         if _status == 400:

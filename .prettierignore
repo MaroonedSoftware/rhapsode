@@ -16,6 +16,7 @@
 **/_contract/
 docs/openapi.yaml
 docs/openapi.worker.yaml
+apps/site/docs/api-reference/
 # TanStack Router's route tree, which the Vite plugin rewrites in its own style on every dev and
 # build run. Formatting it is a diff the next build takes back.
 **/routeTree.gen.ts

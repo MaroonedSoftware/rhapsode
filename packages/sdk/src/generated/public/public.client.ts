@@ -20,42 +20,64 @@ import type { OpenApiDocument, Settings, SettingsPatch } from './types/rhapsode.
 export class PublicClient {
     constructor(private fetch: SdkFetch) {}
 
-    /** @description The core's own. It answers while every worker is down and never blocks on one, because a */
+    /**
+     * @name Health
+     * @description The core's own health, which answers even while every worker is down.
+     */
     async health(): Promise<CoreHealth> {
         const result = await this.fetch(`/health`, { method: 'GET' });
         return await parseJson<CoreHealth>(result);
     }
 
-    /** @description Open to every caller, like /health. It never waits on the network: a first call after boot */
+    /**
+     * @name Update status
+     * @description Whether a newer rhapsode has been released, from a check made at most once a day.
+     */
     async updateStatus(): Promise<UpdateStatus> {
         const result = await this.fetch(`/update`, { method: 'GET' });
         return await parseJson<UpdateStatus>(result);
     }
 
-    /** @description Asks GitHub now rather than waiting out the day, and answers once it has, within the check's */
+    /**
+     * @name Check for an update
+     * @description Asks GitHub for the latest release now, and answers once it has.
+     */
     async checkForUpdate(): Promise<UpdateStatus> {
         const result = await this.fetch(`/update/check`, { method: 'POST' });
         return await parseJson<UpdateStatus>(result);
     }
 
-    /** @description What is on the card, for an operator asking where their memory went. Reads the core's own */
+    /**
+     * @name Residency
+     * @description What each engine holds in memory, how big it is and when it expires.
+     */
     async residency(): Promise<ResidencyDetail> {
         const result = await this.fetch(`/residency`, { method: 'GET' });
         return await parseJson<ResidencyDetail>(result);
     }
 
-    /** @description Open to every caller, like /health. The public API only: never a worker route. */
+    /**
+     * @name OpenAPI document
+     * @description This API as an OpenAPI 3.1 document, describing the core that serves it.
+     */
     async openapi(): Promise<OpenApiDocument> {
         const result = await this.fetch(`/openapi.json`, { method: 'GET' });
         return await parseJson<OpenApiDocument>(result);
     }
 
-    /** @description Every declared engine, whether or not it is running. Never spawns one: this is the list an */
+    /**
+     * @name Engines
+     * @description Every declared engine, running or not, with its code and weights licences.
+     */
     async engines(): Promise<EngineSummary[]> {
         const result = await this.fetch(`/engines`, { method: 'GET' });
         return await parseJson<EngineSummary[]>(result);
     }
 
+    /**
+     * @name Engine capabilities
+     * @description What the engine can do with the variant it has loaded, and what its other variants could.
+     */
     async engineCapabilities(
         engine: string,
     ): Promise<
@@ -77,6 +99,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Voices
+     * @description The engine's voices, built in and cloned.
+     */
     async engineVoices(
         engine: string,
     ): Promise<{ status: 200; contentType: 'application/json'; data: Voice[] } | { status: 404; contentType: 'application/json'; data: ErrorBody }> {
@@ -92,7 +118,10 @@ export class PublicClient {
         }
     }
 
-    /** @description Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB. */
+    /**
+     * @name Create a voice
+     * @description Creates a voice from a reference, such as a clip to clone, or from a blend of voices the engine has.
+     */
     async createVoice(
         engine: string,
         body: FormData,
@@ -122,6 +151,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Delete a voice
+     * @description Deletes a voice.
+     */
     async deleteVoice(
         engine: string,
         voice: string,
@@ -150,6 +183,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Voice preview
+     * @description A short sample of the voice.
+     */
     async voicePreview(
         engine: string,
         voice: string,
@@ -166,7 +203,10 @@ export class PublicClient {
         }
     }
 
-    /** @description The one endpoint that matters. Cues the effective variant does not claim are stripped */
+    /**
+     * @name Speak
+     * @description Speaks a line with one engine, streamed or as a finished file.
+     */
     async speak(
         body: EngineSpeakRequest,
     ): Promise<
@@ -203,7 +243,10 @@ export class PublicClient {
         }
     }
 
-    /** @description A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per */
+    /**
+     * @name Dialogue
+     * @description A conversation between speakers in one take, on a variant that declares dialogue.
+     */
     async dialogue(
         engine: string,
         body: EngineDialogueRequest,
@@ -241,13 +284,19 @@ export class PublicClient {
         }
     }
 
-    /** @description Open to every caller: it only reads, and its licences are what § 4 promises before install. */
+    /**
+     * @name Catalog
+     * @description Every engine this core knows how to install, with both licences, before anything is installed.
+     */
     async catalog(): Promise<CatalogEntry[]> {
         const result = await this.fetch(`/catalog`, { method: 'GET' });
         return await parseJson<CatalogEntry[]>(result);
     }
 
-    /** @description Only an engine this API installed. One the operator configured is theirs to remove. */
+    /**
+     * @name Uninstall an engine
+     * @description Removes an engine this API installed.
+     */
     async uninstallEngine(
         engine: string,
     ): Promise<
@@ -272,7 +321,10 @@ export class PublicClient {
         }
     }
 
-    /** @description Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an */
+    /**
+     * @name Unload an engine
+     * @description Frees the engine's model now, rather than waiting out its keep-alive.
+     */
     async unloadEngine(
         engine: string,
         query?: { mode?: 'terminate' | 'unload' },
@@ -299,6 +351,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Install an engine
+     * @description Installs an engine from the catalog, as a job to follow.
+     */
     async installEngine(
         engine: string,
         query?: { pull?: string; accept?: string },
@@ -328,6 +384,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Reinstall an engine
+     * @description Rebuilds an installed engine beside the old one and swaps it in once it works.
+     */
     async reinstallEngine(
         engine: string,
         query?: { accept?: string },
@@ -357,6 +417,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Pull weights
+     * @description Downloads a variant's weights ahead of its first load, as a job to follow.
+     */
     async pullEngine(
         engine: string,
         body: PullRequest,
@@ -384,6 +448,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Install jobs
+     * @description Every install job, running and finished.
+     */
     async installJobs(): Promise<
         { status: 200; contentType: 'application/json'; data: InstallJob[] } | { status: 403; contentType: 'application/json'; data: ErrorBody }
     > {
@@ -399,6 +467,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Reinstall outdated engines
+     * @description Reinstalls every engine an upgrade left behind.
+     */
     async reinstallOutdated(): Promise<
         { status: 202; contentType: 'application/json'; data: ReinstallOutdated } | { status: 403; contentType: 'application/json'; data: ErrorBody }
     > {
@@ -414,6 +486,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Install job
+     * @description One install job and where it has got to.
+     */
     async installJob(
         job: string,
     ): Promise<
@@ -435,7 +511,10 @@ export class PublicClient {
         }
     }
 
-    /** @description Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit */
+    /**
+     * @name Install job events
+     * @description An install job's progress and output as server-sent events.
+     */
     async installJobEvents(
         job: string,
     ): Promise<
@@ -457,6 +536,10 @@ export class PublicClient {
         }
     }
 
+    /**
+     * @name Settings
+     * @description Every setting, its value, where the value came from and whether a change applies now.
+     */
     async settings(): Promise<
         { status: 200; contentType: 'application/json'; data: Settings } | { status: 403; contentType: 'application/json'; data: ErrorBody }
     > {
@@ -472,7 +555,10 @@ export class PublicClient {
         }
     }
 
-    /** @description One transaction: a patch that is refused changes nothing. Answers the whole document after */
+    /**
+     * @name Update settings
+     * @description Changes settings in one transaction, and answers the whole document after the write.
+     */
     async updateSettings(
         body: SettingsPatch,
     ): Promise<

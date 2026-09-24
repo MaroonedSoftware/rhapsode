@@ -15,6 +15,8 @@ build/
 # Models and generated audio, which are never committed
 models/
 weights/
+# Except the site's API reference, whose model pages are generated from contracts/ and committed.
+!apps/site/docs/api-reference/models/
 # A worker's voice store, which defaults to ./voices/<engine> under wherever it was started.
 **/voices/
 outputs/
@@ -60,3 +62,4 @@ apps/site/docs/engines/dia.md
 apps/site/docs/engines/kokoro.md
 apps/site/docs/engines/orpheus.md
 apps/site/docs/engines/tone.md
+apps/site/static/openapi.yaml

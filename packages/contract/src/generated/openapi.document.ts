@@ -13,7 +13,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/health": {
             "get": {
                 "operationId": "health",
-                "description": "The core's own. It answers while every worker is down and never blocks on one, because a",
+                "summary": "Health",
+                "description": "The core's own health, which answers even while every worker is down.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -31,7 +32,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/update": {
             "get": {
                 "operationId": "updateStatus",
-                "description": "Open to every caller, like /health. It never waits on the network: a first call after boot",
+                "summary": "Update status",
+                "description": "Whether a newer rhapsode has been released, from a check made at most once a day.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -49,7 +51,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/update/check": {
             "post": {
                 "operationId": "checkForUpdate",
-                "description": "Asks GitHub now rather than waiting out the day, and answers once it has, within the check's",
+                "summary": "Check for an update",
+                "description": "Asks GitHub for the latest release now, and answers once it has.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -67,7 +70,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/residency": {
             "get": {
                 "operationId": "residency",
-                "description": "What is on the card, for an operator asking where their memory went. Reads the core's own",
+                "summary": "Residency",
+                "description": "What each engine holds in memory, how big it is and when it expires.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -85,7 +89,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/openapi.json": {
             "get": {
                 "operationId": "openapi",
-                "description": "Open to every caller, like /health. The public API only: never a worker route.",
+                "summary": "OpenAPI document",
+                "description": "This API as an OpenAPI 3.1 document, describing the core that serves it.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -103,7 +108,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines": {
             "get": {
                 "operationId": "engines",
-                "description": "Every declared engine, whether or not it is running. Never spawns one: this is the list an",
+                "summary": "Engines",
+                "description": "Every declared engine, running or not, with its code and weights licences.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -124,6 +130,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/capabilities": {
             "get": {
                 "operationId": "engineCapabilities",
+                "summary": "Engine capabilities",
+                "description": "What the engine can do with the variant it has loaded, and what its other variants could.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -171,6 +179,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/voices": {
             "get": {
                 "operationId": "engineVoices",
+                "summary": "Voices",
+                "description": "The engine's voices, built in and cloned.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -209,7 +219,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
             },
             "post": {
                 "operationId": "createVoice",
-                "description": "Management, like § 10: it writes a file on the box. Streamed to the worker, capped at 25 MB.",
+                "summary": "Create a voice",
+                "description": "Creates a voice from a reference, such as a clip to clone, or from a blend of voices the engine has.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -287,6 +298,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/voices/{voice}": {
             "delete": {
                 "operationId": "deleteVoice",
+                "summary": "Delete a voice",
+                "description": "Deletes a voice.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -355,6 +368,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/voices/{voice}/preview": {
             "get": {
                 "operationId": "voicePreview",
+                "summary": "Voice preview",
+                "description": "A short sample of the voice.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -401,7 +416,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/speak": {
             "post": {
                 "operationId": "speak",
-                "description": "The one endpoint that matters. Cues the effective variant does not claim are stripped",
+                "summary": "Speak",
+                "description": "Speaks a line with one engine, streamed or as a finished file.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -504,7 +520,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/dialogue": {
             "post": {
                 "operationId": "dialogue",
-                "description": "A conversation in one take, on a variant that declares `dialogue`. Cues are stripped per",
+                "summary": "Dialogue",
+                "description": "A conversation between speakers in one take, on a variant that declares dialogue.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -617,7 +634,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/catalog": {
             "get": {
                 "operationId": "catalog",
-                "description": "Open to every caller: it only reads, and its licences are what § 4 promises before install.",
+                "summary": "Catalog",
+                "description": "Every engine this core knows how to install, with both licences, before anything is installed.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -638,7 +656,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}": {
             "delete": {
                 "operationId": "uninstallEngine",
-                "description": "Only an engine this API installed. One the operator configured is theirs to remove.",
+                "summary": "Uninstall an engine",
+                "description": "Removes an engine this API installed.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -689,7 +708,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/unload": {
             "post": {
                 "operationId": "unloadEngine",
-                "description": "Free this engine's model now, rather than waiting out its keep-alive. Idempotent: an",
+                "summary": "Unload an engine",
+                "description": "Frees the engine's model now, rather than waiting out its keep-alive.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -759,6 +779,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/install": {
             "post": {
                 "operationId": "installEngine",
+                "summary": "Install an engine",
+                "description": "Installs an engine from the catalog, as a job to follow.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -842,6 +864,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/reinstall": {
             "post": {
                 "operationId": "reinstallEngine",
+                "summary": "Reinstall an engine",
+                "description": "Rebuilds an installed engine beside the old one and swaps it in once it works.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -917,6 +941,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/engines/{engine}/pull": {
             "post": {
                 "operationId": "pullEngine",
+                "summary": "Pull weights",
+                "description": "Downloads a variant's weights ahead of its first load, as a job to follow.",
                 "parameters": [
                     {
                         "name": "engine",
@@ -984,6 +1010,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/installs": {
             "get": {
                 "operationId": "installJobs",
+                "summary": "Install jobs",
+                "description": "Every install job, running and finished.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1014,6 +1042,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/installs/outdated": {
             "post": {
                 "operationId": "reinstallOutdated",
+                "summary": "Reinstall outdated engines",
+                "description": "Reinstalls every engine an upgrade left behind.",
                 "responses": {
                     "202": {
                         "description": "Response 202",
@@ -1041,6 +1071,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/installs/{job}": {
             "get": {
                 "operationId": "installJob",
+                "summary": "Install job",
+                "description": "One install job and where it has got to.",
                 "parameters": [
                     {
                         "name": "job",
@@ -1088,7 +1120,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/installs/{job}/events": {
             "get": {
                 "operationId": "installJobEvents",
-                "description": "Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit",
+                "summary": "Install job events",
+                "description": "An install job's progress and output as server-sent events.",
                 "parameters": [
                     {
                         "name": "job",
@@ -1136,6 +1169,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/settings": {
             "get": {
                 "operationId": "settings",
+                "summary": "Settings",
+                "description": "Every setting, its value, where the value came from and whether a change applies now.",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1161,7 +1196,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
             },
             "patch": {
                 "operationId": "updateSettings",
-                "description": "One transaction: a patch that is refused changes nothing. Answers the whole document after",
+                "summary": "Update settings",
+                "description": "Changes settings in one transaction, and answers the whole document after the write.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1239,7 +1275,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/v1/audio/speech": {
             "post": {
                 "operationId": "openaiSpeech",
-                "description": "Hand-written, like /speak. Every error carries `x-should-retry`, set from `retryable`.",
+                "summary": "OpenAI speech",
+                "description": "OpenAI's speech route, where the model names an engine or engine:variant.",
                 "requestBody": {
                     "required": true,
                     "content": {

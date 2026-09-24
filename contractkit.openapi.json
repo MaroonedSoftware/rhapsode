@@ -3,6 +3,11 @@
     "patterns": ["contracts/rhapsode.types.ck", "contracts/rhapsode.public.ck", "contracts/rhapsode.openai.ck"],
     "plugins": {
         "@contractkit/plugin-docs": {
+            "docusaurus": {
+                "baseDir": "apps/site/docs/",
+                "label": "API",
+                "position": 3
+            },
             "openapi": {
                 "baseDir": "docs/",
                 "output": "openapi.yaml",

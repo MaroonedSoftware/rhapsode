@@ -15,7 +15,7 @@
 //
 // A link to an anchor on the same page is left alone.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +40,14 @@ export const pages = [
     { source: 'python/rhapsode-engine-orpheus/README.md', doc: 'engines/orpheus.md', label: 'Orpheus' },
     { source: 'python/rhapsode-engine-tone/README.md', doc: 'engines/tone.md', label: 'Tone' },
 ];
+
+/**
+ * Files served as they are, from `static/`: the OpenAPI document the API section links to, so the
+ * site offers the same one the repository commits rather than a copy of its own.
+ *
+ * @type {{ source: string, file: string }[]}
+ */
+export const files = [{ source: 'docs/openapi.yaml', file: 'openapi.yaml' }];
 
 /** The marker every copy carries, which the prose test uses to leave copies to their sources. */
 export const NOTICE = 'Edit that file, not this one.';
@@ -124,6 +132,10 @@ async function sync() {
         const target = resolve(site, 'docs', page.doc);
         await mkdir(dirname(target), { recursive: true });
         await writeFile(target, render(await readFile(resolve(root, page.source), 'utf8'), page));
+    }
+    for (const file of files) {
+        await mkdir(resolve(site, 'static'), { recursive: true });
+        await copyFile(resolve(root, file.source), resolve(site, 'static', file.file));
     }
 }
 

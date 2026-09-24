@@ -53,3 +53,15 @@ by the other three.
 **There is one sidebar per audience, listed by hand.** `sidebars.ts` holds `run` (operators) and
 `build` (engine and client authors), and the navbar has one item per sidebar. Renaming a page fails
 the build instead of quietly moving it; a new page has no sidebar until it is added to the list.
+
+**The API reference is generated, and committed.** Everything under `docs/api-reference/` but its
+`index.md` is written by `pnpm codegen` (the `docusaurus` block in `contractkit.openapi.json`) and is
+covered by the generated-output rule: never edit it, and `codegen:check` fails if it disagrees with
+the contracts. `index.md` is written once and never again, so it is ours, and the drift check leaves
+it out. `editUrl` sends a generated page's "Edit this page" to the contract its area comes from. A
+page's title is the operation's `name:` and its description the one-line comment on its method line
+(`post: { # ...`); a comment inside the method's body is a note for maintainers, and ContractKit takes
+only its first line, which is how every page came to end mid-sentence before the names and summaries
+existed. `openapi.yaml` is copied into `static/` by the sync script rather than committed twice. The
+API page links it as `pathname:///rhapsode/openapi.yaml`, which is not given the `baseUrl`, so moving
+the site to a custom domain changes that link as well.
