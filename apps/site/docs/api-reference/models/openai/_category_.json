@@ -1,8 +1,8 @@
 {
-    "label": "Openai",
+    "label": "OpenAI shim",
     "position": 3,
     "link": {
         "type": "generated-index",
-        "title": "Openai"
+        "title": "OpenAI shim"
     }
 }

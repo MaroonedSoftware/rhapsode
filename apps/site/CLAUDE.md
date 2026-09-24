@@ -66,11 +66,13 @@ existed. `openapi.yaml` is copied into `static/` by the sync script rather than 
 API page links it as `pathname:///rhapsode/openapi.yaml`, which is not given the `baseUrl`, so moving
 the site to a custom domain changes that link as well.
 
-**ContractKit lowercases an operation's `name:`** before title-casing its first letter, so an acronym
-in one does not survive onto its page: "OpenAI speech" came out "Open ai speech". Name operations
-without one ("Audio speech", "Self-description"). The groups are named after each contract's `area`
-the same way, and renaming an area would move the generated SDK and Python modules, so
-`AREA_LABELS` in `docusaurus.config.ts` relabels them in the sidebar instead.
+**The API groups are named in `contractkit.openapi.json`,** under the docusaurus target's
+`areaLabels`. ContractKit names a group after its contract file's `area` and title-cases it, which
+made `openai` "Openai" and the shared types "Rhapsode", and renaming an area would move the generated
+SDK and Python modules with it. Before ContractKit 0.5 had the option, a `sidebarItemsGenerator` in
+`docusaurus.config.ts` relabelled the sidebar instead; the generated `_category_.json` files now carry
+the words themselves. An operation's `name:` is kept as written, so an acronym in one survives onto
+its page ("OpenAI speech"). Before plugin-docs 0.5 it was lowercased into "Open ai speech".
 
 **The front page states facts the rest of the repository owns.** `src/engines.ts` restates the
 catalog's engines and licences, and `tests/engines.test.ts` fails when the two disagree; the sizes

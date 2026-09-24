@@ -1275,7 +1275,7 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
         "/v1/audio/speech": {
             "post": {
                 "operationId": "openaiSpeech",
-                "summary": "Audio speech",
+                "summary": "OpenAI speech",
                 "description": "OpenAI's speech route, where the model names an engine or engine:variant.",
                 "requestBody": {
                     "required": true,

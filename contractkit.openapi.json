@@ -6,7 +6,12 @@
             "docusaurus": {
                 "baseDir": "apps/site/docs/",
                 "label": "API",
-                "position": 3
+                "position": 3,
+                "areaLabels": {
+                    "public": "Native API",
+                    "openai": "OpenAI shim",
+                    "rhapsode": "Shared"
+                }
             },
             "openapi": {
                 "baseDir": "docs/",
