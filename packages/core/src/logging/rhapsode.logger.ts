@@ -51,7 +51,8 @@ export class RhapsodeJsonLogger extends Logger {
                     record[RESERVED.has(key) ? `${key}_` : key] = serialise(value);
                 }
             } else if (field !== undefined) {
-                (record.extra ??= []) && (record.extra as unknown[]).push(serialise(field));
+                const extra = (record.extra ??= []) as unknown[];
+                extra.push(serialise(field));
             }
         }
 
