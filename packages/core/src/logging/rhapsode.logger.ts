@@ -42,7 +42,9 @@ export class RhapsodeJsonLogger extends Logger {
 
         const record: Record<string, unknown> = {};
         for (const field of fields) {
-            if (field !== null && typeof field === 'object' && !Array.isArray(field)) {
+            // Not an Error, although it is an object: its name, message and stack are not enumerable,
+            // so spreading one wrote nothing and `logger.error('failed', error)` lost the error.
+            if (field !== null && typeof field === 'object' && !Array.isArray(field) && !(field instanceof Error)) {
                 for (const [key, value] of Object.entries(field)) {
                     // The record's own keys are authoritative, and a collision is kept under a
                     // suffixed name rather than dropped: a caller passing `message` meant something
@@ -51,7 +53,8 @@ export class RhapsodeJsonLogger extends Logger {
                     record[RESERVED.has(key) ? `${key}_` : key] = serialise(value);
                 }
             } else if (field !== undefined) {
-                (record.extra ??= []) && (record.extra as unknown[]).push(serialise(field));
+                const extra = (record.extra ??= []) as unknown[];
+                extra.push(serialise(field));
             }
         }
 

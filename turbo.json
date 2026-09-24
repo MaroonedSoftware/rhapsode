@@ -1,7 +1,7 @@
 {
     "$schema": "https://turborepo.com/schema.json",
     "globalEnv": ["NODE_ENV"],
-    "globalPassThroughEnv": ["TMPDIR", "RHAPSODE_FFMPEG"],
+    "globalPassThroughEnv": ["TMPDIR", "RHAPSODE_FFMPEG", "PATH", "HOME", "LANG"],
     "tasks": {
         "build": {
             "dependsOn": ["^build"],

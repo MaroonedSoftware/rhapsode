@@ -153,14 +153,18 @@ paths:
     /terminate:
         post:
             operationId: workerTerminate
-            description: "Drain and exit 0. The answer goes out before the process does, so 202 rather than 200:"
+            description: |-
+                Drain and exit 0. The answer goes out before the process does, so 202 rather than 200:
+                the work is accepted, and the evidence it happened is the socket closing.
             responses:
                 "202":
                     description: Response 202
     /fetch:
         post:
             operationId: workerFetch
-            description: Download a variant's weights without loading them, so a first /speak does not sit through
+            description: |-
+                Download a variant's weights without loading them, so a first /speak does not sit through
+                the download. Optional: an adapter that does not override fetch answers 422. protocol.md § 8.
             requestBody:
                 required: true
                 content:
@@ -197,7 +201,9 @@ paths:
     /speak:
         post:
             operationId: workerSpeak
-            description: Loads on demand. It does not fail with "no model loaded" and does not require /load first.
+            description: |-
+                Loads on demand. It does not fail with "no model loaded" and does not require /load first.
+                Hand-written on both sides: see the note at the top of this file.
             requestBody:
                 required: true
                 content:
@@ -261,7 +267,9 @@ paths:
     /dialogue:
         post:
             operationId: workerDialogue
-            description: A conversation in one take, where the effective variant declares `dialogue`. Loads on
+            description: |-
+                A conversation in one take, where the effective variant declares `dialogue`. Loads on
+                demand like /speak, and hand-written on both sides for the same reason.
             requestBody:
                 required: true
                 content:

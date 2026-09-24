@@ -3,10 +3,19 @@ import { ErrorBody } from '@rhapsode/contract';
 
 import type { LoopbackResponse } from './mcp.loopback.js';
 
-/** A route's JSON answer as a tool result, or its refusal as one with `isError`. */
-export function jsonResult(response: LoopbackResponse): CallToolResult {
+/**
+ * A route's JSON answer as a tool result, or its refusal as one with `isError`.
+ *
+ * Both structured and as text: `structuredContent` is what a client checks against the tool's
+ * `outputSchema`, and the text is the same JSON for a client that predates structured results. MCP
+ * requires structured content to be an object, so a list goes out as `{ items }`, the shape
+ * `outputSchema` declares for it.
+ */
+export function jsonResult(response: LoopbackResponse, shape: 'object' | 'list'): CallToolResult {
     if (response.status >= 400) return refusal(response);
-    return { content: [{ type: 'text', text: JSON.stringify(response.json(), undefined, 2) }] };
+    const body = response.json();
+    const structured = shape === 'list' ? { items: body } : (body as Record<string, unknown>);
+    return { content: [{ type: 'text', text: JSON.stringify(body, undefined, 2) }], structuredContent: structured };
 }
 
 /**

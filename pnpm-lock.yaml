@@ -17,20 +17,20 @@ importers:
         specifier: ^3.0.2
         version: 3.0.3
       '@contractkit/cli':
-        specifier: ^0.11.5
-        version: 0.11.5(prettier@3.9.7)
+        specifier: ^0.11.7
+        version: 0.11.7(prettier@3.9.7)
       '@contractkit/plugin-docs':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.5.1
+        version: 0.5.1
       '@contractkit/plugin-python':
-        specifier: ^0.15.3
-        version: 0.15.3
+        specifier: ^0.15.5
+        version: 0.15.5
       '@contractkit/plugin-typescript':
-        specifier: ^0.38.12
-        version: 0.38.13
+        specifier: ^0.39.0
+        version: 0.39.0
       '@contractkit/prettier-plugin':
-        specifier: ^0.14.10
-        version: 0.14.10(prettier@3.9.7)
+        specifier: ^0.14.12
+        version: 0.14.12(prettier@3.9.7)
       '@types/node':
         specifier: ^26.1.2
         version: 26.6.1
@@ -317,20 +317,20 @@ importers:
         specifier: ^2.6.1
         version: 2.6.1(yaml@2.9.1)
       '@maroonedsoftware/authentication':
-        specifier: ^6.0.0
-        version: 6.0.0
+        specifier: ^6.1.0
+        version: 6.1.0
       '@maroonedsoftware/errors':
         specifier: ^1.9.1
         version: 1.9.1
       '@maroonedsoftware/fastify':
-        specifier: ^0.4.1
-        version: 0.4.1(@fastify/cors@11.3.0)(@maroonedsoftware/serverfeed@0.1.6(@maroonedsoftware/logger@1.1.9))(@maroonedsoftware/zod@0.8.0(fast-json-stringify@7.0.1))(fast-json-stringify@7.0.1)(fastify@5.12.5)(yaml@2.9.1)(zod@4.6.5)
+        specifier: ^0.4.2
+        version: 0.4.2(@fastify/cors@11.3.0)(@maroonedsoftware/serverfeed@0.1.6(@maroonedsoftware/logger@1.1.9))(@maroonedsoftware/zod@0.8.0(fast-json-stringify@7.0.1))(fast-json-stringify@7.0.1)(fastify@5.12.5)(yaml@2.9.1)(zod@4.6.5)
       '@maroonedsoftware/logger':
         specifier: ^1.1.9
         version: 1.1.9
       '@maroonedsoftware/mcp':
-        specifier: ^0.3.6
-        version: 0.3.6(@maroonedsoftware/cache@0.5.0)(supports-color@8.1.1)(zod@4.6.5)
+        specifier: ^0.5.0
+        version: 0.5.0(@maroonedsoftware/cache@0.5.0)(supports-color@8.1.1)(zod@4.6.5)
       '@maroonedsoftware/policies':
         specifier: ^0.6.9
         version: 0.6.9
@@ -1185,8 +1185,8 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@contractkit/cli@0.11.5':
-    resolution: {integrity: sha512-MaFWEOSC+zlOX9ujHkEYn49Vf+V9wkhsaF5YbRnnxVHHRF8WrS8LqdAwmwxMdGS9HaqenQb2vPsbj9UY8R0KUg==}
+  '@contractkit/cli@0.11.7':
+    resolution: {integrity: sha512-LGRulgNWuHlc+tP+ZaaEwcxw/Pe3Bwtb/YxOxYRzO5RuVuZZ+dF/UDh3Q3khc5Pz18WXjB96XauVw13AtAuOag==}
     hasBin: true
     peerDependencies:
       prettier: '>=3.0.0'
@@ -1194,26 +1194,23 @@ packages:
       prettier:
         optional: true
 
-  '@contractkit/core@0.31.0':
-    resolution: {integrity: sha512-GG/TOcE/AIVOfjpNByJSJvHgKRTrwhr7dFPcrkvW5A5tJdzuVxMzxTxhfwf6K+Fy2p3hqSMCJdqFX6FiGvMzFA==}
+  '@contractkit/core@0.32.0':
+    resolution: {integrity: sha512-QtWR9OXW4OmtwvW66pyrp/xQ6E5JwtHuIy6ObwVM9QVKo8i7bt6NqXDZQbQDIH/sfPkcPkwdk5eNXuFCZX7KMQ==}
 
-  '@contractkit/core@0.31.1':
-    resolution: {integrity: sha512-63G8mLtTIiJDjvoY8j+S/ZjFhRCx2/NRW0/nDqlHStfG45TQ9XsiTkKAyMOP+a9+lc0ObDK3u/r/5a8Lt4amCg==}
+  '@contractkit/openapi-to-ck@0.12.9':
+    resolution: {integrity: sha512-jaXunfn2JmZI+lLfk99P4n+dXeETq9WaSpI+O+dWp8qJ9hSp5+k5IzJnAoip0ILemIQG1aaAcpo7ZWVc9wC4hQ==}
 
-  '@contractkit/openapi-to-ck@0.12.7':
-    resolution: {integrity: sha512-NPit0nOSXptji+0Na6aHsXE1MbxK4S2U2n6xwv80e0nafgkHIYYxiMx9gN8PX/teY4s1XwsYX+GCbaUlDqLENw==}
+  '@contractkit/plugin-docs@0.5.1':
+    resolution: {integrity: sha512-/CXi3XL6bHOaOLdA6K4MpNolL73Y7FR1G14IOy79fhLzpAxx45L8qXxhtmMPmcXt6ZOw5awO9d/CyrrED9PFwg==}
 
-  '@contractkit/plugin-docs@0.5.0':
-    resolution: {integrity: sha512-rQHTohP7len2RdTdIIwIfb2Q4649IAZFjBFSnFdhjyPysv9nqwC9Fh3XHgdyzoXSb+qyENYLuQa6YxoEK2+TFQ==}
+  '@contractkit/plugin-python@0.15.5':
+    resolution: {integrity: sha512-C90ojwuEK3EWS5CXsmce2hO1AgDyWLxM7d77b4pvii+oUGLlf+CvyQDsSchiSjjsxkCo1D1NzfoV12x8LZIeUg==}
 
-  '@contractkit/plugin-python@0.15.3':
-    resolution: {integrity: sha512-Hs8Gzc+6inFSwJ28n602BA4bD7q2yrDmjF8JJZhyvTe2KmeRDBKP0zs7SkzvMVqSW2W9HMIZT1JtZ9O+4mOt4g==}
+  '@contractkit/plugin-typescript@0.39.0':
+    resolution: {integrity: sha512-O8MfmLqoiTZO/OiOp7fI0q9vSwcLrAT4UfxQDefIYvB1RB75n7n7Shmh9IZaB9BS1U6haGwlDgYymQtGb3TKHg==}
 
-  '@contractkit/plugin-typescript@0.38.13':
-    resolution: {integrity: sha512-PbCNxe6Krv6v4gCQWhuDXz3+hQV+IyrInmxn1tA4iNjRcwfBUbClnLJcYuGKTAvYC+lYt4yhYTIN8wp28ngLdA==}
-
-  '@contractkit/prettier-plugin@0.14.10':
-    resolution: {integrity: sha512-up8lMIZG364w1w0a/V6DSxyvLOC8cU88unKnryPvoG91usq401wqp3iNfq+R0+/NQPGofBT1DCDEqpfiGrEcWA==}
+  '@contractkit/prettier-plugin@0.14.12':
+    resolution: {integrity: sha512-3y9GOFftk5P5Dzdz1NZifDj5R+qcjVKFUWoGlWmTI6frGgUvkVJKD1Et/GBx/Ey0Rjwx1AzwdnWj0BmvHHWhKQ==}
     peerDependencies:
       prettier: ^3.0.0
 
@@ -2282,8 +2279,8 @@ packages:
       yaml:
         optional: true
 
-  '@maroonedsoftware/authentication@6.0.0':
-    resolution: {integrity: sha512-z84c6/j3DDr7+Fy7+qOkfJgHfAIepWUoCeuB41q6/MaZLAcwIn1DOkbAQXXnPVKhPhNR0Zj5ULveW+n5v6JUiQ==}
+  '@maroonedsoftware/authentication@6.1.0':
+    resolution: {integrity: sha512-tV0tP0rT9OOEyaHJoGgYDARHffDjfeT4PzH1WpyY4NA2kEFV6t2nNQAY0nV5S3U4M+y2vLF5U0a46qSfZtVpcg==}
     engines: {node: '>=22'}
 
   '@maroonedsoftware/cache@0.5.0':
@@ -2303,8 +2300,8 @@ packages:
     resolution: {integrity: sha512-V2P8iHoxfuFJZ8XrhWzo9SDyEA8tDUv6DzuNntxTWVohHy8NWoZrcjYw4/LFG2NxmQTPeUt0nNLBKRPEV/9R8g==}
     engines: {node: '>=22'}
 
-  '@maroonedsoftware/fastify@0.4.1':
-    resolution: {integrity: sha512-ZJXCEinWxObBaPqJl9pVHCOaQiVTqBLggQN4yEnEDhuCYRcxHEFOumXhYwWyT5E8eY2f9OGEBpPKsmdtTAP3Bg==}
+  '@maroonedsoftware/fastify@0.4.2':
+    resolution: {integrity: sha512-Pp8SkyQDhlBqJCbOHcOh/UOCQLk3BYmUIEtUnApVAcCgXpncB96csFuXQOk0hl1xV88lNtvCNbP3cO80kfhCBw==}
     engines: {node: '>=22'}
     peerDependencies:
       '@fastify/cors': ^11.0.0
@@ -2357,8 +2354,8 @@ packages:
     resolution: {integrity: sha512-eEksDYu/PAWC/mIwLzxFqcF9tOnYURqyP9BDUlSgconUZ/I6MJrXvZ/cYOjCtQ6YEr/8k4GRMvwxIaOwSVaQ4w==}
     engines: {node: '>=22'}
 
-  '@maroonedsoftware/mcp@0.3.6':
-    resolution: {integrity: sha512-n/5HDFIg1UdLWS5LKVKX8MaKzUjWXua7fzNofXjDC6QvV4alCC44RTPWoF147YAKrbd05lpsv21/3WflBMHkOw==}
+  '@maroonedsoftware/mcp@0.5.0':
+    resolution: {integrity: sha512-MP2qQQjGUVIB6YDzKFl1hORg2cavQKTSlQam5bIuShaNa6cgkwuawhCcaCxkSkmr/afgWyY2hI1ab5E/EXQeHA==}
     engines: {node: '>=22'}
     peerDependencies:
       '@maroonedsoftware/cache': 0.5.0
@@ -10116,42 +10113,38 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@contractkit/cli@0.11.5(prettier@3.9.7)':
+  '@contractkit/cli@0.11.7(prettier@3.9.7)':
     dependencies:
-      '@contractkit/core': 0.31.0
-      '@contractkit/openapi-to-ck': 0.12.7
+      '@contractkit/core': 0.32.0
+      '@contractkit/openapi-to-ck': 0.12.9
       glob: 13.0.6
     optionalDependencies:
       prettier: 3.9.7
 
-  '@contractkit/core@0.31.0':
+  '@contractkit/core@0.32.0':
     dependencies:
       ohm-js: 17.5.0
 
-  '@contractkit/core@0.31.1':
+  '@contractkit/openapi-to-ck@0.12.9':
     dependencies:
-      ohm-js: 17.5.0
-
-  '@contractkit/openapi-to-ck@0.12.7':
-    dependencies:
-      '@contractkit/core': 0.31.0
+      '@contractkit/core': 0.32.0
       yaml: 2.9.1
 
-  '@contractkit/plugin-docs@0.5.0':
+  '@contractkit/plugin-docs@0.5.1':
     dependencies:
-      '@contractkit/core': 0.31.1
+      '@contractkit/core': 0.32.0
 
-  '@contractkit/plugin-python@0.15.3':
+  '@contractkit/plugin-python@0.15.5':
     dependencies:
-      '@contractkit/core': 0.31.0
+      '@contractkit/core': 0.32.0
 
-  '@contractkit/plugin-typescript@0.38.13':
+  '@contractkit/plugin-typescript@0.39.0':
     dependencies:
-      '@contractkit/core': 0.31.0
+      '@contractkit/core': 0.32.0
 
-  '@contractkit/prettier-plugin@0.14.10(prettier@3.9.7)':
+  '@contractkit/prettier-plugin@0.14.12(prettier@3.9.7)':
     dependencies:
-      '@contractkit/core': 0.31.0
+      '@contractkit/core': 0.32.0
       prettier: 3.9.7
 
   '@csstools/cascade-layer-name-parser@2.0.5(@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4))(@csstools/css-tokenizer@3.0.4)':
@@ -11989,7 +11982,7 @@ snapshots:
     optionalDependencies:
       yaml: 2.9.1
 
-  '@maroonedsoftware/authentication@6.0.0':
+  '@maroonedsoftware/authentication@6.1.0':
     dependencies:
       '@maroonedsoftware/cache': 0.5.0
       '@maroonedsoftware/encryption': 0.5.13
@@ -12029,11 +12022,11 @@ snapshots:
 
   '@maroonedsoftware/errors@1.9.1': {}
 
-  '@maroonedsoftware/fastify@0.4.1(@fastify/cors@11.3.0)(@maroonedsoftware/serverfeed@0.1.6(@maroonedsoftware/logger@1.1.9))(@maroonedsoftware/zod@0.8.0(fast-json-stringify@7.0.1))(fast-json-stringify@7.0.1)(fastify@5.12.5)(yaml@2.9.1)(zod@4.6.5)':
+  '@maroonedsoftware/fastify@0.4.2(@fastify/cors@11.3.0)(@maroonedsoftware/serverfeed@0.1.6(@maroonedsoftware/logger@1.1.9))(@maroonedsoftware/zod@0.8.0(fast-json-stringify@7.0.1))(fast-json-stringify@7.0.1)(fastify@5.12.5)(yaml@2.9.1)(zod@4.6.5)':
     dependencies:
       '@fastify/cors': 11.3.0
       '@maroonedsoftware/appconfig': 2.6.1(yaml@2.9.1)
-      '@maroonedsoftware/authentication': 6.0.0
+      '@maroonedsoftware/authentication': 6.1.0
       '@maroonedsoftware/errors': 1.9.1
       '@maroonedsoftware/logger': 1.1.9
       '@maroonedsoftware/policies': 0.6.9
@@ -12075,9 +12068,9 @@ snapshots:
     dependencies:
       injectkit: 1.7.1
 
-  '@maroonedsoftware/mcp@0.3.6(@maroonedsoftware/cache@0.5.0)(supports-color@8.1.1)(zod@4.6.5)':
+  '@maroonedsoftware/mcp@0.5.0(@maroonedsoftware/cache@0.5.0)(supports-color@8.1.1)(zod@4.6.5)':
     dependencies:
-      '@maroonedsoftware/authentication': 6.0.0
+      '@maroonedsoftware/authentication': 6.1.0
       '@maroonedsoftware/errors': 1.9.1
       '@maroonedsoftware/logger': 1.1.9
       '@maroonedsoftware/policies': 0.6.9
