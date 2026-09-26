@@ -24,7 +24,7 @@
         "@mdx-js/react": "^3.1.0",
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
-        "@types/node": "^26.1.2",
+        "@types/node": "^26.6.2",
         "@types/react": "^19.2.18",
         "prism-react-renderer": "^2.4.1",
         "react": "^19.2.8",
