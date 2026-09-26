@@ -20,7 +20,7 @@
         "@mantine/hooks": "^9.5.1",
         "@mantine/notifications": "^9.5.1",
         "@maroonedsoftware/rhapsode-sdk": "workspace:*",
-        "@tabler/icons-react": "^3.46.0",
+        "@tabler/icons-react": "^3.47.0",
         "@tanstack/react-query": "^5.101.4",
         "@tanstack/react-router": "^1.170.18",
         "luxon": "^3.7.2",
