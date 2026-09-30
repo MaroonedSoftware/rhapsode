@@ -50,7 +50,7 @@
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "@types/luxon": "^3.7.1",
-        "openai": "^7.17.0",
+        "openai": "^7.19.0",
         "vitest": "^5.0.0"
     }
 }
