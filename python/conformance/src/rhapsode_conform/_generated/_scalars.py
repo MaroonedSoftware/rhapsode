@@ -2,6 +2,8 @@
 """Contract scalars whose JSON form differs from their Python type."""
 from __future__ import annotations
 
+import re
+from decimal import Decimal
 from typing import Annotated, Any
 
 from pydantic import BeforeValidator, PlainSerializer
@@ -19,3 +21,30 @@ def _parse_bigint(value: Any) -> Any:
 # A contract bigint: an int in Python, and a digit string in JSON, which keeps its precision past
 # 2**53 and is what a ContractKit server accepts.
 BigInt = Annotated[int, BeforeValidator(_parse_bigint), PlainSerializer(str, return_type=str, when_used="json")]
+
+
+_DECIMAL_PATTERN = re.compile(r"^-?[0-9]+(\.[0-9]+)?$")
+
+
+def _parse_decimal(value: Any) -> Any:
+    # Only the plain wire form the spec publishes: Decimal() alone would also read "1e5", "NaN" and
+    # "Infinity". A float is refused because it has already lost the precision the type exists to
+    # keep; an int is exact, so building a model with one still works.
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError("a decimal must be finite")
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return Decimal(value)
+    if isinstance(value, str) and _DECIMAL_PATTERN.fullmatch(value):
+        return Decimal(value)
+    raise ValueError('a decimal must be a string of plain digits, such as "1250.00"')
+
+
+def _format_decimal(value: Decimal) -> str:
+    # Plain digits: str() writes 0.00000001 as "1E-8", which the server rejects.
+    return format(value, "f")
+
+
+# A contract decimal: a Decimal in Python, and a plain digit string in JSON.
+ExactDecimal = Annotated[Decimal, BeforeValidator(_parse_decimal), PlainSerializer(_format_decimal, return_type=str, when_used="json")]

@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Strict, like every request here: OpenAI's own API refuses a field it does not recognise with a 400,
  * so a refusal holds a client to nothing it was not already held to.
- * generated from [OpenAISpeechRequest](../../../../contracts/rhapsode.openai.ck#L16)
+ * generated from [OpenAISpeechRequest](../../../../contracts/rhapsode.openai.ck)
  */
 export const OpenAISpeechRequest = z.strictObject({
     model: z.string().min(1).describe('An engine id, or `engine:variant`.'),
@@ -20,7 +20,7 @@ export const OpenAISpeechRequest = z.strictObject({
 export type OpenAISpeechRequest = z.infer<typeof OpenAISpeechRequest>;
 
 /**
- * generated from [OpenAIErrorDetail](../../../../contracts/rhapsode.openai.ck#L26)
+ * generated from [OpenAIErrorDetail](../../../../contracts/rhapsode.openai.ck)
  */
 export const OpenAIErrorDetail = z.looseObject({
     message: z.string(),
@@ -36,7 +36,7 @@ export const OpenAIErrorDetail = z.looseObject({
 export type OpenAIErrorDetail = z.infer<typeof OpenAIErrorDetail>;
 
 /**
- * generated from [OpenAIErrorBody](../../../../contracts/rhapsode.openai.ck#L36)
+ * generated from [OpenAIErrorBody](../../../../contracts/rhapsode.openai.ck)
  */
 export const OpenAIErrorBody = z.looseObject({
     error: OpenAIErrorDetail,
