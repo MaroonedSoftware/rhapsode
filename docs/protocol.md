@@ -886,6 +886,17 @@ that does not override it answers `unsupported`. It exists because the alternati
 load, and a caller waiting on one utterance cannot tell that from a hang. An engine whose weights
 ship inside its package, or that has none, leaves it alone.
 
+**`fetch` may bring upstream's code as well as its weights**, where that code cannot ship in a
+package. Fish Audio S2 Pro's inference code is `fish-speech`, which cannot be installed as a
+package: its pyproject depends on `pyaudio`, which needs PortAudio's headers and a compiler that the
+server image does not have, though nothing that runs inference imports it. And its code is under
+the same research licence as its weights, so a copy in a rhapsode package would be rhapsode
+distributing it. So the adapter fetches upstream's archive at one pinned commit, keeps only the
+package and its licence, and checks the unpacked files against a pinned digest of them rather than
+the archive's bytes, which GitHub does not promise to keep the same. The operator's box downloads
+it from upstream, after an install that accepted that licence by name (§ 10). The adapter's own
+dependencies are the ones inference imports, found by importing it.
+
 ### `dialogue`, which is declared rather than discovered
 
 `dialogue(request)` speaks a conversation (§ 6) and yields PCM as `speak` does. An adapter that
