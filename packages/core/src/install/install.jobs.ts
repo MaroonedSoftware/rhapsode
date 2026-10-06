@@ -24,6 +24,7 @@ const INSTALL_STEPS: InstallStep[] = ['venv', 'packages', 'verify', 'register'];
  */
 function stepsOf(job: InstallJob): InstallStep[] {
     if (job.kind === 'pull') return ['weights'];
+    if (job.kind === 'warm') return ['warm'];
     return job.variant === undefined ? INSTALL_STEPS : [...INSTALL_STEPS, 'weights'];
 }
 

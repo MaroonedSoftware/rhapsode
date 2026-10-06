@@ -14,6 +14,7 @@ import type {
     ResidencyDetail,
     UpdateStatus,
     Voice,
+    WarmRequest,
 } from '../rhapsode/types/rhapsode.types.js';
 import type { OpenApiDocument, Settings, SettingsPatch } from './types/rhapsode.public.js';
 
@@ -431,6 +432,37 @@ export class PublicClient {
         | { status: 409; contentType: 'application/json'; data: ErrorBody }
     > {
         const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/pull`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body, bigIntReplacer),
+            expectStatuses: [403, 404, 409],
+        });
+        switch (result.status) {
+            case 403:
+                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 404:
+                return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            case 409:
+                return { status: 409, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
+            default:
+                return { status: 202, contentType: 'application/json', data: await parseJson<InstallJob>(result) };
+        }
+    }
+
+    /**
+     * @name Warm a variant
+     * @description Loads a variant that compiles and unloads it, so its first request does not compile.
+     */
+    async warmEngine(
+        engine: string,
+        body: WarmRequest,
+    ): Promise<
+        | { status: 202; contentType: 'application/json'; data: InstallJob }
+        | { status: 403; contentType: 'application/json'; data: ErrorBody }
+        | { status: 404; contentType: 'application/json'; data: ErrorBody }
+        | { status: 409; contentType: 'application/json'; data: ErrorBody }
+    > {
+        const result = await this.fetch(`/engines/${encodeURIComponent(engine)}/warm`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body, bigIntReplacer),

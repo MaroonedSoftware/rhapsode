@@ -42,6 +42,7 @@ from ._models_rhapsode_types import (
     UpdateStatus,
     Variant,
     Voice,
+    WarmRequest,
     WorkerHealth,
 )
 
@@ -83,5 +84,6 @@ __all__ = [
     "UpdateStatus",
     "Variant",
     "Voice",
+    "WarmRequest",
     "WorkerHealth",
 ]

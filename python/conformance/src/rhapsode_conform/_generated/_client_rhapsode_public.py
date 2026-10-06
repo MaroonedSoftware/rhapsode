@@ -6,7 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError, _path_text  # noqa: F401
 from ._models_rhapsode_public import OpenApiDocument, Settings, SettingsPatch
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice, WarmRequest
 
 
 UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
@@ -322,6 +322,30 @@ class PullEngine404Response(TypedDict):
 
 
 class PullEngine409Response(TypedDict):
+    status: Literal[409]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WarmEngine202Response(TypedDict):
+    status: Literal[202]
+    content_type: Literal["application/json"]
+    data: InstallJob
+
+
+class WarmEngine403Response(TypedDict):
+    status: Literal[403]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WarmEngine404Response(TypedDict):
+    status: Literal[404]
+    content_type: Literal["application/json"]
+    data: ErrorBody
+
+
+class WarmEngine409Response(TypedDict):
     status: Literal[409]
     content_type: Literal["application/json"]
     data: ErrorBody
@@ -681,6 +705,20 @@ class RhapsodePublicClient(BaseClient):
         Downloads a variant's weights ahead of its first load, as a job to follow.
         """
         _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(_path_text(engine), safe='')}/pull", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(403, 404, 409))
+        if _status == 403:
+            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 404:
+            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        if _status == 409:
+            return { "status": 409, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
+        return { "status": 202, "content_type": "application/json", "data": InstallJob.model_validate(result) }
+
+    async def warm_engine(self, engine: str, body: WarmRequest) -> WarmEngine202Response | WarmEngine403Response | WarmEngine404Response | WarmEngine409Response:
+        """
+        Warm a variant
+        Loads a variant that compiles and unloads it, so its first request does not compile.
+        """
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/engines/{quote(_path_text(engine), safe='')}/warm", method="POST", body=body.model_dump(mode="json", by_alias=True, exclude_unset=True), response_kind="auto", expect_statuses=(403, 404, 409))
         if _status == 403:
             return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:

@@ -1,4 +1,4 @@
-import { PullRequest } from '@rhapsode/contract';
+import { PullRequest, WarmRequest } from '@rhapsode/contract';
 import type { FastifyPluginAsync } from 'fastify';
 
 import { RhapsodeError } from '../errors/rhapsode.error.js';
@@ -41,6 +41,17 @@ export const installRoutes: FastifyPluginAsync = async app => {
             const parsed = PullRequest.safeParse(request.body ?? {});
             if (!parsed.success) throw new RhapsodeError('bad_request', `the body is not a pull request: ${parsed.error.message}`);
             const job = request.container.get(EngineInstaller).pull(request.params.engine, parsed.data.variant);
+            return reply.status(202).send(job);
+        },
+    );
+
+    app.post<{ Params: { engine: string } }>(
+        '/engines/:engine/warm',
+        { onRequest: managementGuard, config: { body: ['application/json'] } },
+        async (request, reply) => {
+            const parsed = WarmRequest.safeParse(request.body ?? {});
+            if (!parsed.success) throw new RhapsodeError('bad_request', `the body is not a warm request: ${parsed.error.message}`);
+            const job = request.container.get(EngineInstaller).warmOne(request.params.engine, parsed.data.variant);
             return reply.status(202).send(job);
         },
     );

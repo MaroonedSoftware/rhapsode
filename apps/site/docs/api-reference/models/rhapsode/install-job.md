@@ -12,8 +12,8 @@ mdx:
 | --- | --- | --- | --- |
 | `id` | `string` | Yes |  |
 | `engine` | `string` | Yes |  |
-| `kind` | `'install' \| 'pull' \| 'reinstall'` | Yes |  |
-| `variant` | `string` | No | What a pull fetches, or an install fetches in step 5. |
+| `kind` | `'install' \| 'pull' \| 'reinstall' \| 'warm'` | Yes |  |
+| `variant` | `string` | No | What a pull fetches or a warm loads, or an install fetches in step 5. |
 | `state` | `'queued' \| 'running' \| 'succeeded' \| 'failed'` | Yes |  |
 | `step` | `'venv' \| 'packages' \| 'verify' \| 'register' \| 'weights' \| 'warm'` | No |  |
 | `createdAt` | `string` | Yes | ISO 8601, UTC. |

@@ -212,6 +212,10 @@ class PullRequest(BaseModel):
     # Absent means the engine's default variant.
     variant: str | None = None
 
+class WarmRequest(BaseModel):
+    # Absent means the engine's default variant.
+    variant: str | None = None
+
 # One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
 # declared here so a client can parse it without depending on ServerKit.
 class FeedProgress(BaseModel):
@@ -316,8 +320,8 @@ class InstallJob(BaseModel):
 
     id: str
     engine: str
-    kind: Literal["install", "pull", "reinstall"]
-    # What a pull fetches, or an install fetches in step 5.
+    kind: Literal["install", "pull", "reinstall", "warm"]
+    # What a pull fetches or a warm loads, or an install fetches in step 5.
     variant: str | None = None
     state: Literal["queued", "running", "succeeded", "failed"]
     step: Literal["venv", "packages", "verify", "register", "weights", "warm"] | None = None

@@ -471,6 +471,58 @@ describe('the install routes', () => {
             const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
             expect(engines.map((engine: { id: string }) => engine.id)).toEqual(['tone']);
         });
+
+        const warm = (app: Awaited<ReturnType<typeof start>>, engine: string, payload: Record<string, unknown> = {}) =>
+            app.inject({ method: 'POST', url: `/engines/${engine}/warm`, payload, headers: { 'content-type': 'application/json' } });
+
+        it.skipIf(!canBindUnixSockets)('is warmed by name for an engine its install did not warm, and recorded', { timeout: 60_000 }, async () => {
+            const app = await start(fakeRunner({ python: compilingPython() }).runner);
+            expect((await settled(app, (await install(app, 'tone')).json().id)).state).toBe('succeeded');
+
+            const accepted = await warm(app, 'tone', { variant: 'compiled' });
+            expect(accepted.statusCode).toBe(202);
+            const job = await settled(app, accepted.json().id);
+
+            expect(job.error).toBeUndefined();
+            expect(job).toMatchObject({ kind: 'warm', state: 'succeeded', step: 'warm', variant: 'compiled' });
+            expect(progress()).toBe('loaded compiled\nunloaded\n');
+            expect(recordedIn(dir).engines.tone).toMatchObject({ warmed: ['compiled'] });
+        });
+
+        it.skipIf(!canBindUnixSockets)(
+            'fails a warm of a variant that does not compile as unsupported, and loads nothing',
+            { timeout: 60_000 },
+            async () => {
+                const app = await start(fakeRunner({ python: compilingPython() }).runner);
+                await settled(app, (await install(app, 'tone')).json().id);
+
+                const job = await settled(app, (await warm(app, 'tone', { variant: 'plain' })).json().id);
+
+                expect(job).toMatchObject({ kind: 'warm', state: 'failed', step: 'warm' });
+                expect(job.error).toMatchObject({ code: 'unsupported' });
+                expect(existsSync(join(dir, 'progress'))).toBe(false);
+                expect(recordedIn(dir).engines.tone).not.toHaveProperty('warmed');
+            },
+        );
+
+        it.skipIf(!canBindUnixSockets)('warms an engine the operator configured and records nothing of it', { timeout: 60_000 }, async () => {
+            const app = await start(fakeRunner().runner, {
+                engines: { tone: { command: compilingPython(), args: [], defaultVariant: 'compiled' } },
+            });
+
+            const job = await settled(app, (await warm(app, 'tone')).json().id);
+
+            expect(job.error).toBeUndefined();
+            expect(job).toMatchObject({ kind: 'warm', state: 'succeeded', variant: 'compiled' });
+            expect(progress()).toBe('loaded compiled\nunloaded\n');
+            expect(recordedIn(dir).engines).toEqual({});
+        });
+
+        it('refuses a warm of an engine that is not installed, or a body that names no variant, before a job exists', async () => {
+            const app = await start(fakeRunner().runner);
+            expect((await warm(app, 'chatterbox')).json().error.code).toBe('unknown_engine');
+            expect((await warm(app, 'tone', { variant: 3 })).statusCode).toBe(400);
+        });
     });
 
     describe('a weights licence that may not be used commercially', () => {

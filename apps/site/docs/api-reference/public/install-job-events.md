@@ -1,7 +1,7 @@
 ---
 title: "Install job events"
 sidebar_label: "Install job events"
-sidebar_position: 23
+sidebar_position: 24
 mdx:
     format: "md"
 ---

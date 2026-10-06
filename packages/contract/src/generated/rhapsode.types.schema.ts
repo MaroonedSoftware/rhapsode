@@ -314,6 +314,14 @@ export const PullRequest = z.strictObject({
 export type PullRequest = z.infer<typeof PullRequest>;
 
 /**
+ * generated from [WarmRequest](../../../../contracts/rhapsode.types.ck)
+ */
+export const WarmRequest = z.strictObject({
+    variant: z.string().optional().describe("Absent means the engine's default variant."),
+});
+export type WarmRequest = z.infer<typeof WarmRequest>;
+
+/**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
  * generated from [FeedProgress](../../../../contracts/rhapsode.types.ck)
@@ -452,8 +460,8 @@ export type ErrorBody = z.infer<typeof ErrorBody>;
 export const InstallJob = z.looseObject({
     id: z.string(),
     engine: z.string(),
-    kind: z.enum(['install', 'pull', 'reinstall']),
-    variant: z.string().optional().describe('What a pull fetches, or an install fetches in step 5.'),
+    kind: z.enum(['install', 'pull', 'reinstall', 'warm']),
+    variant: z.string().optional().describe('What a pull fetches or a warm loads, or an install fetches in step 5.'),
     state: z.enum(['queued', 'running', 'succeeded', 'failed']),
     step: z.enum(['venv', 'packages', 'verify', 'register', 'weights', 'warm']).optional(),
     createdAt: z.string().describe('ISO 8601, UTC.'),
