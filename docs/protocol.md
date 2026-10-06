@@ -806,6 +806,10 @@ serve(ChatterboxEngine())
   through ffmpeg. Without this, every adapter reimplements format conversion and they all do it
   differently. This is the single largest reduction in adapter burden in the design.
 - **Applies the unload-then-load-once retry** around `load()`, so the OOM lesson is free.
+- **Collects after every unload**, then empties torch's cache if an adapter imported torch. A model
+  held in a reference cycle is freed by the collector, not when the adapter drops it, so an adapter's
+  own `empty_cache` finds nothing to return: Fish Audio S2 Pro left 3.93 GiB of the 11.97 GiB a load
+  took on the card after its unload, and every reload ran out of memory, until a collection ran.
 - **Measures what a load cost**, as a device-wide delta across `load()`, and reports it as
   `modelBytes` (§ 3). An adapter that knows better overrides `memory_bytes()`; one that does not
   gets a figure for free, and one on a device nothing can measure reports nothing rather than zero.

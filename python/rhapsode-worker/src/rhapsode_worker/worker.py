@@ -27,7 +27,7 @@ from .engine import (
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
-from .memory import held_bytes
+from .memory import held_bytes, release
 
 
 class Worker:
@@ -230,11 +230,14 @@ class Worker:
             # concerned, and refusing to move on would strand the worker in `unloading` forever.
             self.log.warn("unload raised; treating the model as gone anyway", error=error)
         finally:
+            # After the adapter's own unload, and whether or not it raised: a model in a reference
+            # cycle is only freed by the collector. memory.release says what that cost.
+            collected = await asyncio.to_thread(release)
             self.engine.variant = None
             self.model = "unloaded"
             self.model_bytes = None
         if not quiet:
-            self.log.info("unloaded")
+            self.log.info("unloaded", collected=collected)
 
     async def unload(self) -> None:
         """Idempotent, and never fatal. Unloading nothing is a success.
