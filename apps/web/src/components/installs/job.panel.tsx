@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react';
 import { Alert, Badge, Card, Code, Group, Loader, ScrollArea, Stack, Stepper, Text, Title } from '@mantine/core';
 import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
+import { useCatalog } from '../../api/catalog.queries';
 import { useInstallJob } from '../../api/installs.queries';
 import { useJobFeed } from '../../api/job.feed';
 import { ErrorAlert } from '../shared/error.alert';
 import { severityColor } from '../shared/status';
 import { isNothingToFetch, jobBadge } from './job.state';
+import { WarmOffer } from './warm.offer';
 
 // Labels only: with a description each, four steps wrap onto two lines in the panel's width and
 // read as a grid. The descriptions went into the tooltip of each step instead.
@@ -46,8 +48,9 @@ export function jobTitle(job: InstallJob): string {
 const SUCCEEDED: Record<InstallJob['kind'], string> = { install: 'Installed', reinstall: 'Reinstalled', pull: 'Downloaded', warm: 'Warmed' };
 
 /** One job, followed as it happens: which step, what it printed, and how it ended. */
-export function JobPanel({ jobId }: { jobId: string }) {
+export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: string, variant: string) => void }) {
     const job = useInstallJob(jobId);
+    const catalog = useCatalog();
     const feed = useJobFeed(jobId);
     const viewport = useRef<HTMLDivElement>(null);
 
@@ -68,6 +71,7 @@ export function JobPanel({ jobId }: { jobId: string }) {
     const active = data.state === 'succeeded' ? steps.length : Math.max(0, index);
     const badge = jobBadge(data);
     const noFetch = isNothingToFetch(data);
+    const reinstalled = data.state === 'succeeded' ? catalog.data?.find(entry => entry.id === data.engine) : undefined;
 
     return (
         <Card>
@@ -105,6 +109,12 @@ export function JobPanel({ jobId }: { jobId: string }) {
                                   : warmed
                                     ? `${data.engine} is ready, with the ${data.variant} weights on this machine and compiled, so its first request loads them from the cache.`
                                     : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
+                        {/* A reinstall warms only what was recorded, and its old worker is gone, so the card cannot see this. § 10. */}
+                        {data.kind === 'reinstall' && onWarm !== undefined && reinstalled !== undefined ? (
+                            <Group mt="xs">
+                                <WarmOffer entry={reinstalled} ask onWarm={variant => onWarm(data.engine, variant)} />
+                            </Group>
+                        ) : undefined}
                     </Alert>
                 ) : noFetch ? (
                     <Alert color={severityColor.info} title="Nothing to download ahead of time">

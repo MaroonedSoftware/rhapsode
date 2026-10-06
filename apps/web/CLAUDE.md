@@ -6,7 +6,7 @@ rules, so that somebody who knows one knows the other.
 
 ## What it is for
 
-Four pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull and
+Four pages over the public API. **Engines** (`/`) is § 10: the catalog, and install, pull, warm and
 uninstall with each job followed as it happens, and § 3's "On the card": what is loaded, how big it
 is, when it expires, and the means to unload it now. **Try it** (`/try`) is § 6 and § 7: say a line with
 an installed engine, offering only what the chosen variant's capability document claims, and list,
@@ -70,6 +70,13 @@ poll a row sits on screen minutes after its model has gone. Anything else that w
 probably wants an invalidation instead. `useUpdateStatus` refetches only while the core's first check
 is `pending` and stops at its answer, which is the core waiting on GitHub rather than a document
 changing on its own.
+
+**The catalog never starts a worker to decide what to offer.** Reading an engine's capability
+document starts its worker if it is not running, tens of megabytes and seconds where it imports
+torch, which is why § 10 keeps what is left to warm out of `GET /catalog`. So a card asks only of a
+worker `GET /engines` says is `up`, and a reinstall's job panel asks of the one engine it just
+rebuilt, whose new worker the card cannot see. Anything else that wants a capability document on
+the Engines page asks the same way.
 
 **`unwrap` is for an operation that declares refusals.** `GET /residency` declares none, so the SDK
 hands back the document itself and the query uses it directly, as `useEngines` does. Passing a bare
