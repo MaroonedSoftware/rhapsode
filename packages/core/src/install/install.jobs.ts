@@ -17,7 +17,11 @@ const KEPT = 50;
 
 const INSTALL_STEPS: InstallStep[] = ['venv', 'packages', 'verify', 'register'];
 
-/** An install asked for weights has a fifth step, and a job's variant is how it was asked. § 10. */
+/**
+ * An install asked for weights has a fifth step, and a job's variant is how it was asked. § 10.
+ * `warm` is not here: whether a job warms is the worker's to say once it is asked, so the step is
+ * added to the count when a job reaches it.
+ */
 function stepsOf(job: InstallJob): InstallStep[] {
     if (job.kind === 'pull') return ['weights'];
     return job.variant === undefined ? INSTALL_STEPS : [...INSTALL_STEPS, 'weights'];
@@ -89,7 +93,7 @@ export class InstallJobs {
     }
 
     private async execute(job: InstallJob, work: (context: JobContext) => Promise<void>): Promise<void> {
-        const steps = stepsOf(job);
+        const steps = [...stepsOf(job)];
         job.state = 'running';
         job.startedAt = DateTime.utc().toISO();
         this.logger.info('install job started', { job: job.id, kind: job.kind, engine: job.engine });
@@ -99,6 +103,7 @@ export class InstallJobs {
             signal: this.stopping.signal,
             step: step => {
                 job.step = step;
+                if (!steps.includes(step)) steps.push(step);
                 this.feed.progress(INSTALL_SOURCE, job.id, { phase: step, index: steps.indexOf(step) + 1, total: steps.length, status: 'running' });
             },
             line: line => {
