@@ -10,7 +10,7 @@ from rhapsode_engine_breeze.prompt import SEGMENT_CHARACTERS, segments, translat
 
 class TestCues:
     def test_each_claimed_cue_becomes_its_english_tag(self) -> None:
-        assert translate_cues("Right. [laugh] Anyway.") == "Right. (laugh) Anyway."
+        assert translate_cues("Right. [sigh] Anyway.") == "Right. (sigh) Anyway."
         assert translate_cues("[sigh] [cough]") == "(sigh) (cough)"
 
     def test_clear_throat_keeps_its_space(self) -> None:
@@ -43,9 +43,9 @@ class TestCues:
             assert translate_cues(f"a [{tag}] b", "zh") == "a b"
 
     def test_a_translated_cue_survives_the_stripping(self) -> None:
-        # The stripping runs first, so `[laugh]` becoming `(laugh)` is not then removed as native.
-        assert translate_cues("[laugh]") == "(laugh)"
-        assert translate_cues("[laugh]", "zh") == "[笑]"
+        # The stripping runs first, so `[sigh]` becoming `(sigh)` is not then removed as native.
+        assert translate_cues("[sigh]") == "(sigh)"
+        assert translate_cues("[sigh]", "zh") == "[叹气]"
 
     def test_a_parenthesis_that_is_prose_is_left_as_text(self) -> None:
         assert translate_cues("He left (finally) at noon.") == "He left (finally) at noon."

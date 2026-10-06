@@ -18,24 +18,24 @@ from __future__ import annotations
 
 from rhapsode_worker import Variant
 
-#: Four of the eight standard cues: the ones the open model's card names, in English and in Chinese.
-#: The hosted docs list `(chuckles)`, `(gasps)`, `(sniffs)` and `(groans)` too, but for the hosted
-#: multilingual model, which spells the four claimed here differently (`(laughs)` where the open card
-#: writes `(laugh)`, `[清嗓]` where it writes `[清嗓子]`). A spelling the open weights never saw is read
-#: out loud, so those four wait for the real-weights check. protocol.md § 8.
-CUES: tuple[str, ...] = ("laugh", "sigh", "cough", "clear throat")
+#: Three of the eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
+#: October 2026). The open model's card names a fourth, `(laugh)`, and a listener heard no laugh where
+#: it was written, so it is not claimed, and the core strips `[laugh]`
+#: before it reaches this engine (§ 5). The hosted docs spell it `(laughs)` and list `(chuckles)`,
+#: `(gasps)`, `(sniffs)` and `(groans)` too, but for the hosted multilingual model, which spells even
+#: these three differently (`[清嗓]` where the open card writes `[清嗓子]`). A spelling is claimed only
+#: once it is heard performed. protocol.md § 8.
+CUES: tuple[str, ...] = ("sigh", "cough", "clear throat")
 
 #: How each cue is written for this model, per language. The card's own rule: parentheses in English,
 #: square brackets in Chinese, and never one syntax inside the other language.
 CUE_TAGS: dict[str, dict[str, str]] = {
     "en": {
-        "laugh": "(laugh)",
         "sigh": "(sigh)",
         "cough": "(cough)",
         "clear throat": "(clears throat)",
     },
     "zh": {
-        "laugh": "[笑]",
         "sigh": "[叹气]",
         "cough": "[咳嗽]",
         "clear throat": "[清嗓子]",

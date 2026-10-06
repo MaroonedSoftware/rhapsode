@@ -31,9 +31,10 @@ Then in `rhapsode.config.json`:
 
 ## What it can do
 
-- **Cues:** `laugh`, `sigh`, `cough` and `clear throat`, the four the open model's card spells:
-  `[laugh]` becomes `(laugh)` in English and `[笑]` in Chinese. BreezeBlue's hosted model has more,
-  spelled differently, and those wait for a check on real weights.
+- **Cues:** `sigh`, `cough` and `clear throat`, each heard performed on real weights: `[sigh]`
+  becomes `(sigh)` in English and `[叹气]` in Chinese. Not `laugh`: a listener heard no laugh where
+  the open card's `(laugh)` was written, so the core strips `[laugh]` before it gets here. BreezeBlue's hosted model
+  has more tags, spelled differently, and none is claimed until it is heard performed.
 - **Deliveries:** none yet. An instruction can steer the model, and is how `hushed` and `frantic`
   would be performed, once it is heard to hold for a whole line.
 - **Dials:** `temperature` and `topP`, defaulting to upstream's 0.9 and 1.0. No `speed`, and no
@@ -67,7 +68,7 @@ codec frames, 75 of them, and three different waveforms: the same length, identi
 7,680 samples, then apart by at most 0.03 at a correlation of 0.998. The difference is upstream's
 streaming codec. It is not cuDNN's algorithm choice, and it is not an op PyTorch knows to be
 nondeterministic: `use_deterministic_algorithms` flagged none and changed nothing but the speed, which
-it halved. § 6 allows a seed that does not reproduce, and `rhapsode-conform` then reports the four cue
+it halved. § 6 allows a seed that does not reproduce, and `rhapsode-conform` then reports the cue
 checks as undecided rather than passed, so whether each is performed is a question for a listener. Of
 the 36 checks it could decide, 35 passed; the other was a reload that ran out of memory because two
 other processes had taken 7.4 GiB of the card during the run.

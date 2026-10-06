@@ -41,7 +41,7 @@ _NATIVE_TAG = re.compile(
     re.IGNORECASE,
 )
 
-#: `[laugh]`, for each cue this engine claims. The core has already removed the ones it does not.
+#: `[sigh]`, for each cue this engine claims. The core has already removed the ones it does not.
 _CUE = re.compile(r"\[(" + "|".join(re.escape(cue) for cue in CUE_TAGS["en"]) + r")\]")
 
 _WHITESPACE = re.compile(r"\s+")

@@ -18,8 +18,14 @@ def test_one_build_named_for_the_release() -> None:
     assert list(variants()) == [DEFAULT_VARIANT] == ["2"]
 
 
-def test_only_the_cues_the_open_card_names_are_claimed() -> None:
-    assert set(CUES) == {"laugh", "sigh", "cough", "clear throat"}
+def test_only_the_cues_heard_performed_are_claimed() -> None:
+    assert set(CUES) == {"sigh", "cough", "clear throat"}
+
+
+def test_laugh_is_not_claimed_because_it_was_not_performed() -> None:
+    # `(laugh)` is on the open card, and no laugh was heard where it was written. § 5.
+    assert "laugh" not in CUES
+    assert all("laugh" not in tags for tags in CUE_TAGS.values())
     for variant in variants().values():
         assert set(variant.cues) == set(CUES)
 

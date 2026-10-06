@@ -146,10 +146,10 @@ class TestFetching:
 
 class TestSpeaking:
     def test_a_short_line_is_one_plain_generation(self, breeze: Recorder, tmp_path: Path) -> None:
-        audio = spoken(loaded(tmp_path), "Right. [laugh] Anyway.")
+        audio = spoken(loaded(tmp_path), "Right. [sigh] Anyway.")
         (generation,) = breeze.generations
         assert generation.template == "tts_plain"
-        assert generation.text == "[S0]Right. (laugh) Anyway."
+        assert generation.text == "[S0]Right. (sigh) Anyway."
         assert len(audio) == generation.frames * SAMPLES_PER_FRAME * 2
 
     def test_chinese_cues_are_written_in_chinese(self, breeze: Recorder, tmp_path: Path) -> None:
@@ -226,12 +226,12 @@ class TestLongText:
 class TestVoices:
     def test_a_cloned_voice_is_the_prompt_for_every_piece(self, breeze: Recorder, tmp_path: Path) -> None:
         built = loaded(tmp_path)
-        cloned(built, transcript="The words [laugh] in the clip.")
+        cloned(built, transcript="The words [cough] in the clip.")
         spoken(built, LONG, voice="narrator")
         assert len(breeze.generations) > 1
         assert all(generation.template == "ref_clone_tata" for generation in breeze.generations)
         assert {generation.ref_text for generation in breeze.generations} == {
-            "The words (laugh) in the clip."
+            "The words (cough) in the clip."
         }
         assert all(
             generation.ref_audio == (tmp_path / "narrator.wav").read_bytes()

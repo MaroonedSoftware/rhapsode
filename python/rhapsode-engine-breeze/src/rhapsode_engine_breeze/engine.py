@@ -169,7 +169,7 @@ class BreezeEngine(Engine):
         text = translate_cues(request.text, request.language)
         if not text:
             raise BadRequest(
-                "nothing is left to say once Breeze's own tags are removed; cues are written [laugh]"
+                "nothing is left to say once Breeze's own tags are removed; cues are written [sigh]"
             )
         dials = self.dials_for(request)
 
