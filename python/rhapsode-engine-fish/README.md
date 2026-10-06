@@ -76,3 +76,12 @@ Three things upstream sizes for 24 GB, and the adapter does not:
 
 Measured on that card: everything loaded comes to 11.97 GiB, the worker reports `modelBytes` of
 12.9 GB, and it holds 12.3 GiB while speaking.
+
+## Measured
+
+On an RTX 4070 Ti SUPER, through the worker: it loads in 33 s from a warm cache, holds 12.3 GiB while
+speaking, and speaks at 1.03 to 1.08 times real time. A batch arrives whole, so the first audio of a
+line comes 2.5 to 5.5 s after the request, and of a 32 s text of seven sentences 7.3 s after it.
+`rhapsode-conform` passes 41 of its 42 checks, all four cue checks among them; the 42nd is blending,
+which Fish has no voices to do. Whether a seed reproduces the audio varied between runs: the suite
+found it did, and two seeded requests in an earlier trial did not.
