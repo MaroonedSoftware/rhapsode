@@ -21,6 +21,8 @@ export const catalogRoutes: FastifyPluginAsync = async app => {
         return Object.entries(CATALOG).map(([id, record]): CatalogEntry => {
             const workerVersion = engines.workerVersion(id);
             const outdated = engines.outdated(id);
+            // Only an engine this API installed has a record of what was warmed. § 10.
+            const warmed = managed.isManaged(id) ? managed.entry(id)?.warmed : undefined;
             return {
                 id,
                 displayName: record.displayName,
@@ -31,6 +33,7 @@ export const catalogRoutes: FastifyPluginAsync = async app => {
                 managed: managed.isManaged(id),
                 ...(workerVersion === undefined ? {} : { workerVersion }),
                 ...(outdated === undefined ? {} : { outdated }),
+                ...(warmed === undefined || warmed.length === 0 ? {} : { warmed }),
             };
         });
     });

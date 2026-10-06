@@ -9,7 +9,7 @@ mdx:
 > both licences, because the weights licence is only worth reading before the install.
 
 <details>
-<summary>Attributes (9)</summary>
+<summary>Attributes (10)</summary>
 
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -22,5 +22,6 @@ mdx:
 | `managed` | `boolean` | Yes | Installed through the API, so removable by it. |
 | `workerVersion` | `string` | No | As on EngineSummary, for an installed engine. § 9. |
 | `outdated` | `boolean` | No | As on EngineSummary. § 9. |
+| `warmed` | `string[]` | No | The variants warmed, for an engine this API installed. § 10. |
 
 </details>

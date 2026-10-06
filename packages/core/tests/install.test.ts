@@ -447,6 +447,8 @@ describe('the install routes', () => {
             expect(job).toMatchObject({ state: 'succeeded', step: 'warm', variant: 'compiled' });
             expect(progress()).toBe('fetched compiled\nloaded compiled\nunloaded\n');
             expect(recordedIn(dir).engines.tone).toMatchObject({ warmed: ['compiled'] });
+            const catalog: CatalogEntry[] = (await app.inject({ method: 'GET', url: '/catalog' })).json();
+            expect(catalog.find(entry => entry.id === 'tone')).toMatchObject({ warmed: ['compiled'] });
             const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
             expect(engines.find((engine: { id: string }) => engine.id === 'tone')).toMatchObject({ model: 'unloaded' });
         });
@@ -459,6 +461,8 @@ describe('the install routes', () => {
             expect(job).toMatchObject({ state: 'succeeded', step: 'weights', variant: 'plain' });
             expect(progress()).toBe('fetched plain\n');
             expect(recordedIn(dir).engines.tone).not.toHaveProperty('warmed');
+            const catalog: CatalogEntry[] = (await app.inject({ method: 'GET', url: '/catalog' })).json();
+            expect(catalog.find(entry => entry.id === 'tone')).not.toHaveProperty('warmed');
         });
 
         it.skipIf(!canBindUnixSockets)('fails at warm and leaves the engine installed when the load fails', { timeout: 60_000 }, async () => {

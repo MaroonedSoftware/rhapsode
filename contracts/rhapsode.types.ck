@@ -304,6 +304,7 @@ contract mode(loose) CatalogEntry: {
     managed: boolean                            # Installed through the API, so removable by it.
     workerVersion?: string                      # As on EngineSummary, for an installed engine. § 9.
     outdated?: boolean                          # As on EngineSummary. § 9.
+    warmed?: array(string)                      # The variants warmed, for an engine this API installed. § 10.
 }
 
 contract mode(loose) InstallJob: {
