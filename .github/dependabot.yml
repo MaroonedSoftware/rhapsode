@@ -32,3 +32,19 @@ updates:
       groups:
           minor-and-patch:
               update-types: [minor, patch]
+
+    # Breeze's vendored inference code pins what upstream pins, and those pins are a set: torchaudio
+    # 2.9.1 requires torch==2.9.1 exactly, and qwen-tts 0.1.1 requires transformers==4.57.3 exactly.
+    # Security updates bumped torch to 2.13.0 (#71) and transformers to 5.10.1 (#70) on their own,
+    # the tests passed because they fake torch and upstream, and 0.1.20 and 0.1.21 shipped an engine
+    # pip cannot resolve: the install on the pop-os box failed on ResolutionImpossible in two seconds.
+    # These move when upstream moves them, by hand. The entry exists only to carry the ignore, since
+    # without one for this directory security updates ignore nothing; a limit of 0 opens no version
+    # updates either.
+    - package-ecosystem: pip
+      directory: /python/rhapsode-vendor-breeze
+      schedule:
+          interval: weekly
+      open-pull-requests-limit: 0
+      ignore:
+          - dependency-name: '*'
