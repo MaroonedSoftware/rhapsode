@@ -18,15 +18,16 @@ from __future__ import annotations
 
 from rhapsode_worker import Variant
 
-#: Five of the eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
+#: All eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
 #: October 2026). `laugh` is spelled as BreezeBlue's hosted docs spell it, `(laughs)`, and not as the
 #: open card does: a listener heard no laugh where the card's `(laugh)` was written. `(laughs)`,
 #: `(laughing)`, `(chuckles)` and `(giggles)` were then each heard to laugh on two seeds, and so was
 #: Chinese `[笑]`. `chuckle` is `(chuckles)` and `[轻笑]`, both heard to chuckle on two seeds: a claimed
-#: cue needs a tag in both languages, so neither was enough alone. The hosted docs also list
-#: `(gasps)`, `(sniffs)` and `(groans)`, unheard here. A spelling is claimed only once it is heard
-#: performed. protocol.md § 8.
-CUES: tuple[str, ...] = ("laugh", "chuckle", "sigh", "cough", "clear throat")
+#: cue needs a tag in both languages, so neither was enough alone. `gasp`, `sniff` and `groan` are the
+#: hosted docs' `(gasps)`, `(sniffs)` and `(groans)`, and `[惊呼]`, `[吸鼻子]` and `[呻吟]`, each heard
+#: performed on two seeds in both languages. A spelling is claimed only once it is heard performed.
+#: protocol.md § 8.
+CUES: tuple[str, ...] = ("laugh", "chuckle", "sigh", "gasp", "cough", "clear throat", "sniff", "groan")
 
 #: How each cue is written for this model, per language. The card's own rule: parentheses in English,
 #: square brackets in Chinese, and never one syntax inside the other language.
@@ -37,6 +38,9 @@ CUE_TAGS: dict[str, dict[str, str]] = {
         "sigh": "(sigh)",
         "cough": "(cough)",
         "clear throat": "(clears throat)",
+        "gasp": "(gasps)",
+        "sniff": "(sniffs)",
+        "groan": "(groans)",
     },
     "zh": {
         "laugh": "[笑]",
@@ -44,6 +48,9 @@ CUE_TAGS: dict[str, dict[str, str]] = {
         "sigh": "[叹气]",
         "cough": "[咳嗽]",
         "clear throat": "[清嗓子]",
+        "gasp": "[惊呼]",
+        "sniff": "[吸鼻子]",
+        "groan": "[呻吟]",
     },
 }
 
