@@ -29,3 +29,7 @@ overrides:
     # advisory (v3, v5 and v6 writing into a caller's buffer) does not touch, and which uuid 11 still
     # exports to `require`. Never in the image.
     'sockjs>uuid': ^11.1.1
+    # GHSA-68fv-2mgg-jv7q. postcss and css-tree already accept 1.2.2, but `pnpm update --depth
+    # Infinity` kept 1.2.1, so this pins the floor. Build tooling only, never in the image. Scoped to
+    # `<1.2.2` so it stops doing anything once upstream resolves past it.
+    'source-map-js@<1.2.2': ^1.2.2
