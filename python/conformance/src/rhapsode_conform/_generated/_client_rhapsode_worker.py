@@ -4,7 +4,7 @@ from __future__ import annotations
 from urllib.parse import quote
 from typing import Any, Literal, TypedDict
 from pydantic import TypeAdapter
-from ._base_client import BaseClient, SdkError  # noqa: F401
+from ._base_client import BaseClient, SdkError, _path_text  # noqa: F401
 from ._models_rhapsode_types import Capabilities, CreateVoiceForm, DialogueRequest, ErrorBody, FetchRequest, LoadRequest, SpeakRequest, Voice, WorkerHealth
 
 
@@ -204,7 +204,7 @@ class RhapsodeWorkerClient(BaseClient):
         return { "status": 201, "content_type": "application/json", "data": Voice.model_validate(result) }
 
     async def worker_delete_voice(self, voice: str) -> WorkerDeleteVoice204Response | WorkerDeleteVoice400Response | WorkerDeleteVoice404Response | WorkerDeleteVoice422Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/voices/{quote(str(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(400, 404, 422))
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/voices/{quote(_path_text(voice), safe='')}", method="DELETE", response_kind="auto", expect_statuses=(400, 404, 422))
         if _status == 400:
             return { "status": 400, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         if _status == 404:
@@ -214,7 +214,7 @@ class RhapsodeWorkerClient(BaseClient):
         return { "status": 204 }
 
     async def worker_voice_preview(self, voice: str) -> WorkerVoicePreview200Response | WorkerVoicePreview404Response:
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/voices/{quote(str(voice), safe='')}/preview", method="GET", response_kind="auto", expect_statuses=(404,))
+        _status, _content_type, result, _response_headers = await self._fetch_full(f"/voices/{quote(_path_text(voice), safe='')}/preview", method="GET", response_kind="auto", expect_statuses=(404,))
         if _status == 404:
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "audio/wav", "data": result }
