@@ -2,6 +2,10 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.20
+
+- An install that pulls a variant whose first load compiles now does that load itself, so the first request does not. A variant declares it with `compiles` in its capability document (`Variant(compiles=True)` in the SDK), and Orpheus's `full` does: vLLM compiling the graph made its first load 35 s and 8.05 GB held, against 12 s and 7.26 GB after. `POST /engines/orpheus/install?pull=full` gains a sixth step, `warm`, which loads it through residency and unloads it again, and a reinstall warms it again after the swap, since an upgrade of vLLM or torch moves the compile cache. A pull still loads nothing. In the server image the cache is on the `/data` volume, so it survives the container being recreated.
+
 ## 0.1.19
 
 - Breeze TTS 2 is in the catalog: BreezeBlue's 3B model, which ranked first among open weights on the Artificial Analysis speech arena at its release. It speaks English and Chinese, performs all eight cues in both, streams as it generates, and clones from a clip and its `transcript`. Its code is Apache-2.0 and **its weights are for research and non-commercial use only**, so an install has to accept `BreezeBlue-Research-Non-Commercial`. It needs an NVIDIA card with about 8 GB free. `rhapsode-engine-breeze` is the new adapter package, and `rhapsode-vendor-breeze` carries upstream's inference code, which has no packaging of its own; a catalog record can now name such companions, installed in the same resolve as its adapter.
