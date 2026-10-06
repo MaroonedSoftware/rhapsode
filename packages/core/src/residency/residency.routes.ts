@@ -46,8 +46,8 @@ export const residencyRoutes: FastifyPluginAsync = async app => {
                 throw new RhapsodeError('bad_request', `\`mode\` is ${MODES.join(' or ')}, and defaults to terminate`);
             }
 
-            // Terminate by default: an unload leaves roughly 30% of the card behind, and somebody
-            // asking for memory back means all of it.
+            // Terminate by default: an unload leaves the process's context on the card (§ 3), and
+            // somebody asking for memory back means all of it.
             await request.container.get(ResidencyManager).free(engine, (mode as (typeof MODES)[number]) ?? 'terminate');
             return engines.summaries().find(summary => summary.id === engine);
         },

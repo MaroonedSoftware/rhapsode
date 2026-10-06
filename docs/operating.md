@@ -34,8 +34,8 @@ exception: the file's entry for an engine wins over the one an install recorded 
         // How long a request for a second engine waits for the first to stop speaking before it is
         // told to try again. At maxResidentModels 1 this is simply a queue.
         "evictionWaitSeconds": 30,
-        // How long a model with nothing to do stays on the card. An expiry terminates the worker,
-        // because an unload leaves roughly 30% stranded (§ 3). -1 keeps the model until something
+        // How long a model with nothing to do stays on the card. An expiry unloads it and keeps the
+        // worker, which holds about 300 MiB of CUDA context until something evicts it (§ 3). -1 keeps the model until something
         // else needs the room, which is what this server did before this setting existed; 0 frees
         // it the moment the last request lets go. Replaces idleUnloadSeconds and
         // idleTerminateSeconds, which are still read when this is not set.
@@ -136,7 +136,10 @@ Uninstalling removes the virtualenv and leaves downloaded weights where the engi
 Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokoro's are in
 `~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points. Orpheus's are in
 `~/.cache/huggingface` too: 3.5 GB for `q8`, 2.1 GB for `q4`, 6.6 GB for `full`, and 80 MB for
-the codec they share. Dia's are there as well, 6.4 GB for the model and 0.3 GB for its codec.
+the codec they share. Dia's are there as well, 6.4 GB for the model and 0.3 GB for its codec, and
+so are Breeze's, 7.0 GB for the model and 0.7 GB for its audio tokenizer, and Fish's, 9.1 GB for
+the model and 1.9 GB for its codec. Fish's inference code is in `~/.cache/rhapsode/fish-speech`, or
+wherever `RHAPSODE_FISH_SOURCE` points.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
@@ -191,6 +194,49 @@ and they come back sounding like two people.
 It has no voices of its own. A request that names none is read in whichever voice the model picks,
 which a `seed` holds fixed; a long one keeps its first piece's voice to the end. A cloned voice needs
 the clip's `transcript` (protocol.md § 7), and clones best from 5 to 10 seconds of it.
+
+### Breeze
+
+**Breeze's weights are for research and non-commercial use only**, and BreezeBlue's licence covers
+what you make with them on your own hardware too. The code is Apache-2.0, which is what a licence
+scanner will report. An install has to accept the weights licence by name (protocol.md § 10): the
+page and the wizard show it and ask, and a script sends `?accept=BreezeBlue-Research-Non-Commercial`.
+
+It needs an NVIDIA card. Upstream's runtime runs on CUDA and nothing else, so on a Mac, a CPU box or
+an AMD card the worker refuses to start, saying which card it needs.
+Measured on an RTX 4070 Ti SUPER: it loads in 8.5 s, holds 7.6 GiB and about 8.0 GiB while speaking,
+and streams at 1.02 to 1.05 times real time, the first audio 0.22 s after a request once warm. That
+is enough to keep up with playback, with little to spare. It needs the room: on that 16 GB card, a
+reload beside two other models holding 7.4 GiB between them ran out of memory.
+
+Its inference code has no packaging upstream, so the install brings `rhapsode-vendor-breeze`, a copy
+of it at one commit, in the same pip resolve as the adapter. It pins torch 2.9.1 and transformers
+4.57.3, which upstream tested against.
+
+A seed reproduces the words and not the waveform: two seeded requests make the same speech, with
+differences of a fraction of a percent from upstream's codec. A cloned voice needs the clip's
+`transcript`, and a request with no voice keeps its first piece's voice to the end of a long text.
+
+### Fish
+
+**Fish's code and weights are for research and non-commercial use only**, under the Fish Audio
+Research License, and distributing it, or a product that uses it, requires the agreement, a notice,
+and "Built with Fish Audio". An install has to accept it by name: `?accept=Fish-Audio-Research-License`.
+
+rhapsode ships none of Fish Audio's code. The worker runs `fish-speech`, which a pull or the first
+load downloads from upstream at a pinned commit and checks against a digest of its files
+(protocol.md § 8), because its own package cannot be installed here: it depends on `pyaudio`, which
+needs PortAudio's headers and a compiler. It needs Python 3.11 to 3.13, for torch 2.8.0.
+
+Measured on an RTX 4070 Ti SUPER: it loads in 33 s, holds 12.3 GiB while speaking, and speaks at 1.03
+to 1.08 times real time. Upstream asks for a 24 GB card; it fits 16 because the adapter keeps a
+12,288-position context and drops four 1 GiB causal masks the model and codec build and never need,
+but there is no room beside another model of any size. A batch arrives whole, so the first audio of a
+line comes 2.5 to 5.5 s after the request.
+
+A cloned voice needs the clip's `transcript`. A long text is cut into turns of one conversation, so
+one voice holds from the first to the last. A request that is abandoned keeps the model busy until
+its last batch is generated, because upstream's model thread does not wait for the decoder.
 
 ## The web page
 

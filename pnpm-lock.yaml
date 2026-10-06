@@ -345,8 +345,8 @@ importers:
         specifier: ^0.8.0
         version: 0.8.0(fast-json-stringify@7.0.1)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.30.1
-        version: 1.30.1(supports-color@8.1.1)(zod@4.6.5)
+        specifier: ^1.31.0
+        version: 1.31.0(supports-color@8.1.1)(zod@4.6.5)
       '@rhapsode/contract':
         specifier: workspace:*
         version: link:../contract
@@ -2412,8 +2412,8 @@ packages:
       '@types/react': '>=16'
       react: '>=16'
 
-  '@modelcontextprotocol/sdk@1.30.1':
-    resolution: {integrity: sha512-H2HxLvC3HDNybePJaLdSrU1hhUK5iQw+WvV1b01myFyI7sdVGe1u/IPTE5D9fGCiJDVtgMV/lmFkQXLmQyIFYA==}
+  '@modelcontextprotocol/sdk@1.31.0':
+    resolution: {integrity: sha512-UvTMgnNlnIBO/22ob2RcVGDlcvOslQs8T59+FTGdA0L27a39fdGF/EDETNtDVK4DZGpwomlsYpRdA8UXcVL/pw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -12069,7 +12069,7 @@ snapshots:
       '@maroonedsoftware/errors': 1.9.1
       '@maroonedsoftware/logger': 1.1.9
       '@maroonedsoftware/policies': 0.6.9
-      '@modelcontextprotocol/sdk': 1.30.1(supports-color@8.1.1)(zod@4.6.5)
+      '@modelcontextprotocol/sdk': 1.31.0(supports-color@8.1.1)(zod@4.6.5)
       injectkit: 1.7.1
       luxon: 3.7.2
     optionalDependencies:
@@ -12166,7 +12166,7 @@ snapshots:
       '@types/react': 19.3.0
       react: 19.3.0
 
-  '@modelcontextprotocol/sdk@1.30.1(supports-color@8.1.1)(zod@4.6.5)':
+  '@modelcontextprotocol/sdk@1.31.0(supports-color@8.1.1)(zod@4.6.5)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.8)
       ajv: 8.20.0

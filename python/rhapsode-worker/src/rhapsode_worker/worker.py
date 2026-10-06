@@ -27,7 +27,7 @@ from .engine import (
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
-from .memory import held_bytes
+from .memory import held_bytes, release
 
 
 class Worker:
@@ -230,18 +230,21 @@ class Worker:
             # concerned, and refusing to move on would strand the worker in `unloading` forever.
             self.log.warn("unload raised; treating the model as gone anyway", error=error)
         finally:
+            # After the adapter's own unload, and whether or not it raised: a model in a reference
+            # cycle is only freed by the collector. memory.release says what that cost.
+            collected = await asyncio.to_thread(release)
             self.engine.variant = None
             self.model = "unloaded"
             self.model_bytes = None
         if not quiet:
-            self.log.info("unloaded")
+            self.log.info("unloaded", collected=collected)
 
     async def unload(self) -> None:
         """Idempotent, and never fatal. Unloading nothing is a success.
 
-        An unload reclaims roughly 70% of what the model held, because the graphics runtime keeps
-        the rest until the process exits. That is why the core has `terminate` as well, and why a
-        residency manager with only this verb will slowly lose a card to nothing.
+        An unload gives back the model, once `release` has collected the cycles it sat in, and keeps
+        the process: its CUDA context, about 300 MiB, and anything outside this Python. That is why
+        the core has `terminate` as well. protocol.md § 3.
         """
         async with self._transition:
             if self.model == "unloaded":

@@ -204,6 +204,21 @@ cues, clones from a clip and the words spoken in it, and speaks two people in on
 runs at about a tenth of that, which is enough to hear it and not enough to use it. Its weights are
 6.7 GB.
 
+[`rhapsode-engine-breeze`](python/rhapsode-engine-breeze/) is BreezeBlue's Breeze TTS 2, which ranked
+first among open weights on the Artificial Analysis speech arena at its release. It speaks English
+and Chinese, performs all eight cues in both, and clones from a clip and its transcript. **Its
+weights are for research and non-commercial use only**, so its install has to accept that licence by
+name (`?accept=BreezeBlue-Research-Non-Commercial`; the page and the wizard ask). It needs an NVIDIA
+card: on an RTX 4070 Ti SUPER it holds 7.6 GiB and streams at about real time. Its weights are 7.7 GB.
+
+[`rhapsode-engine-fish`](python/rhapsode-engine-fish/) is Fish Audio's S2 Pro, built with Fish Audio,
+which ranked second among open weights on the same arena at its release. It speaks ten languages,
+performs three of the eight cues, and clones from a clip and its transcript. **Its code and its
+weights are for research and non-commercial use only**, under the Fish Audio Research License, which
+its install has to accept by name. rhapsode ships none of its code: the engine downloads upstream's
+inference code beside the weights. On an RTX 4070 Ti SUPER it holds 12.3 GiB and speaks at about real
+time. Its weights are 11 GB.
+
 ## Contributing an engine
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write

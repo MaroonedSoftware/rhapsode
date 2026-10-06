@@ -15,9 +15,9 @@ interface UnloadOptions {
 /**
  * `pnpm wizard unload <engine>`: give the memory back now.
  *
- * Terminates by default, because an unload leaves roughly 30% of the card behind (protocol.md § 3)
- * and somebody at a terminal asking for memory back means all of it. `--keep-process` is the soft
- * verb, for trading that 30% against a faster next load.
+ * Terminates by default, because an unload keeps the worker's CUDA context, about 300 MiB
+ * (protocol.md § 3), and somebody at a terminal asking for memory back means all of it.
+ * `--keep-process` is the soft verb, for trading that context against a faster next load.
  */
 const command: CommandModule<UnloadOptions> = {
     description: 'Free an engine’s model now, rather than waiting out its keep-alive',
@@ -27,7 +27,7 @@ const command: CommandModule<UnloadOptions> = {
         { flags: '--token <token>', description: 'management.token, for a server on another machine', envVar: 'RHAPSODE_MANAGEMENT_TOKEN' },
         {
             flags: '--keep-process',
-            description: 'Unload the weights but leave the worker running. Faster to load again, and keeps ~30% of the card',
+            description: 'Unload the weights but leave the worker running. Faster to load again, and keeps its ~300 MiB CUDA context',
             type: 'boolean',
         },
     ],

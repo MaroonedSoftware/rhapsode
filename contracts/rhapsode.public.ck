@@ -287,7 +287,8 @@ operation /engines/{engine}/unload: {
         sdk: unloadEngine
         query: {
             # `terminate` (the default) ends the worker process, which is the only way to get back
-            # the roughly 30% an unload strands. `unload` keeps the process for a faster next load.
+            # the CUDA context an unload keeps, about 300 MiB. `unload` keeps the process for a
+            # faster next load.
             mode?: enum(terminate, unload)
         }
         response: {

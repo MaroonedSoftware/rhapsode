@@ -166,7 +166,7 @@ describe('the residency manager', () => {
         const lease = await residency.acquire('kokoro', 'fast');
 
         // Terminate rather than unload: an eviction exists to get the card back, and an unload
-        // leaves roughly 30% stranded. § 3.
+        // keeps the worker's CUDA context. § 3.
         expect(workers.calls).toContain('tone:stop:evict');
         expect(workers.calls).not.toContain('piper:stop:evict');
         lease.release();
@@ -230,7 +230,7 @@ describe('the residency manager', () => {
     });
 
     describe('the keep-alive', () => {
-        it('terminates a model that has been idle for its keep-alive', async () => {
+        it('unloads a model that has been idle for its keep-alive, and keeps the worker', async () => {
             const residency = build({ keepAliveSeconds: 300 });
 
             (await residency.acquire('tone', 'fast')).release();
@@ -238,10 +238,11 @@ describe('the residency manager', () => {
             expect(residency.summary().resident).toBe(1);
 
             await clock.advance(1);
-            // Terminate, not unload: an unload leaves roughly 30% stranded, and an expiry that ran
-            // every five minutes would give a card away 30% at a time. § 3.
-            expect(workers.calls).toContain('tone:stop:evict');
-            expect(workers.calls).not.toContain('tone:unload');
+            // Unload, not terminate: once the SDK collects, an unload leaves only the worker's CUDA
+            // context, about 300 MiB, and the next request reloads in seconds without starting a
+            // worker first. § 3.
+            expect(workers.calls).toContain('tone:unload');
+            expect(workers.calls).not.toContain('tone:stop:evict');
             expect(residency.summary().resident).toBe(0);
             expect(engines.state('tone')).toMatchObject({ model: 'unloaded' });
         });
@@ -265,7 +266,7 @@ describe('the residency manager', () => {
             expect(residency.summary().resident).toBe(1);
 
             await clock.advance(540);
-            expect(workers.calls).toContain('tone:stop:evict');
+            expect(workers.calls).toContain('tone:unload');
         });
 
         it('lets a request outrank the engine and the server', async () => {
@@ -275,7 +276,7 @@ describe('the residency manager', () => {
             (await residency.acquire('tone', 'fast', { keepAliveSeconds: 30 })).release();
             await clock.advance(30);
 
-            expect(workers.calls).toContain('tone:stop:evict');
+            expect(workers.calls).toContain('tone:unload');
         });
 
         it('lets the last request to ask win, which is the only one still waiting', async () => {
@@ -287,7 +288,7 @@ describe('the residency manager', () => {
             second.release();
 
             await clock.advance(30);
-            expect(workers.calls).toContain('tone:stop:evict');
+            expect(workers.calls).toContain('tone:unload');
         });
 
         it('puts the engine’s own answer back when a request says nothing', async () => {
@@ -301,7 +302,7 @@ describe('the residency manager', () => {
             await clock.advance(1);
             expect(residency.summary().resident).toBe(1);
             await clock.advance(59);
-            expect(workers.calls).toContain('tone:stop:evict');
+            expect(workers.calls).toContain('tone:unload');
         });
 
         it('frees a model at zero only once every request has let go', async () => {
@@ -342,7 +343,7 @@ describe('the residency manager', () => {
 
             second.release();
             await clock.advance(0);
-            expect(workers.calls).toContain('tone:stop:evict');
+            expect(workers.calls).toContain('tone:unload');
             expect(residency.summary().resident).toBe(0);
         });
 
@@ -407,7 +408,7 @@ describe('the residency manager', () => {
                 await residency.rearmExpiry();
                 await clock.advance(0);
 
-                expect(workers.calls).toContain('tone:stop:evict');
+                expect(workers.calls).toContain('tone:unload');
                 expect(residency.summary().resident).toBe(0);
             });
 
@@ -570,7 +571,7 @@ describe('the residency manager', () => {
 
         it('still ends a process that is holding no model', async () => {
             // How an operator reclaims what a variant switch left stranded: the unload freed the
-            // weights and the runtime kept roughly 30% until the process goes.
+            // weights and the process keeps its CUDA context until it goes.
             const residency = build();
 
             await residency.free('tone', 'terminate');

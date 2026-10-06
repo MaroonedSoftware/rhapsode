@@ -302,6 +302,7 @@ export class EngineInstaller {
             sources: {
                 sdk: sourceFor(SDK_PACKAGE, this.settings.sourceDir, CORE_VERSION),
                 adapter: sourceFor(record.package, this.settings.sourceDir, CORE_VERSION),
+                companions: (record.companions ?? []).map(pkg => sourceFor(pkg, this.settings.sourceDir, CORE_VERSION)),
             },
         });
 
