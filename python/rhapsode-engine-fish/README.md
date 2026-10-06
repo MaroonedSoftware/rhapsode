@@ -25,9 +25,10 @@ depends on what that code imports, and on nothing it does not.
 
 ## What it can do
 
-- **Cues:** `laugh` and `chuckle`, each heard performed on real weights: `[laugh]` becomes
-  `[laughing]`. Not `sigh` or `clear throat`, though the card lists `[sigh]` and `[clearing throat]`:
-  neither was heard performed, so the core strips them before they get here. Every other bracket a client writes is removed, prose
+- **Cues:** `laugh`, `chuckle` and `clear throat`, each heard performed on two seeds on real
+  weights: `[laugh]` becomes `[laughing]` and `[clear throat]` becomes `[clears throat]`, not the
+  card's `[clearing throat]`, which worked on two seeds of three. Not `sigh`: no spelling tried sighed
+  on both seeds, so the core strips it before it gets here. Every other bracket a client writes is removed, prose
   included, because this model performs any bracketed description rather than reading it.
 - **Deliveries:** none yet. `[whisper]` is on the card's list and is how `hushed` would be
   performed, once it is heard to hold for a whole line.

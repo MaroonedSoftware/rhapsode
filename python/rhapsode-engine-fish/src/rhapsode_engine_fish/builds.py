@@ -17,18 +17,21 @@ from __future__ import annotations
 
 from rhapsode_worker import Variant
 
-#: Two of the eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
-#: October 2026). The card's list of common tags has words for four, and a listener heard no sigh where
-#: `[sigh]` was written and no throat cleared where `[clearing throat]` was, so those two are not
-#: claimed and the core strips them before they get here (§ 5). The card says the model takes any
-#: description in brackets, so other spellings may perform, but a cue is claimed only once it is heard.
-CUES: tuple[str, ...] = ("laugh", "chuckle")
+#: Three of the eight standard cues, each heard performed on two seeds on real weights (an RTX 4070 Ti
+#: SUPER, October 2026). `clear throat` is `[clears throat]` rather than the card's `[clearing throat]`,
+#: which cleared a throat on two seeds of three; `[clears throat]` and `[throat clearing]` did on both
+#: of theirs. `sigh` is not claimed, and the core strips it before it gets here (§ 5): no spelling
+#: sighed on both seeds. `[sigh]`, `[sighs]`, `[sighing]` and `[exhale]` each did on one, and
+#: `[deep sigh]` on neither. The card says the model takes any description in brackets, but a cue is
+#: claimed only once it is heard.
+CUES: tuple[str, ...] = ("laugh", "chuckle", "clear throat")
 
-#: How each cue is written for this model, each spelled as the card's list spells it. Tags are English
+#: How each cue is written for this model, each spelled as it was heard performed. Tags are English
 #: words whatever the language spoken; the card gives them no other spelling.
 CUE_TAGS: dict[str, str] = {
     "laugh": "[laughing]",
     "chuckle": "[chuckle]",
+    "clear throat": "[clears throat]",
 }
 
 #: (min, max, default), every one upstream's own: the bounds `ServeTTSRequest` validates and the

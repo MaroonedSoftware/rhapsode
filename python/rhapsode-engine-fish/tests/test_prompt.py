@@ -13,7 +13,10 @@ class TestCues:
 
     def test_an_unclaimed_cue_that_reaches_it_is_removed(self) -> None:
         # The core strips these first; were one to arrive, it is a bracket like any other.
-        assert translate_cues("[sigh] Fine. [clear throat] Right.") == "Fine. Right."
+        assert translate_cues("[sigh] Fine.") == "Fine."
+
+    def test_clear_throat_keeps_its_space(self) -> None:
+        assert translate_cues("[clear throat] Ahem.") == "[clears throat] Ahem."
 
     def test_every_claimed_cue_has_a_tag(self) -> None:
         for cue in CUES:

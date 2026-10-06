@@ -18,13 +18,18 @@ def test_one_build_named_as_upstream_names_it() -> None:
 
 
 def test_only_the_cues_the_cards_common_tags_cover_are_claimed() -> None:
-    assert set(CUES) == {"laugh", "chuckle"}
+    assert set(CUES) == {"laugh", "chuckle", "clear throat"}
 
 
-def test_sigh_and_clear_throat_are_not_claimed_because_they_were_not_performed() -> None:
-    # A listener heard neither [sigh] nor [clearing throat] performed on real weights. § 5.
-    assert not {"sigh", "clear throat"} & set(CUES)
-    assert not {"sigh", "clear throat"} & set(CUE_TAGS)
+def test_sigh_is_not_claimed_because_no_spelling_sighed_on_both_seeds() -> None:
+    # [sigh], [sighs], [sighing] and [exhale] each sighed on one of two, [deep sigh] on neither. § 5.
+    assert "sigh" not in CUES
+    assert "sigh" not in CUE_TAGS
+
+
+def test_clear_throat_is_the_spelling_that_was_heard_and_not_the_cards() -> None:
+    # The card's [clearing throat] cleared a throat on two seeds of three; [clears throat] on both.
+    assert CUE_TAGS["clear throat"] == "[clears throat]"
     assert set(CUE_TAGS) == set(CUES)
     for variant in variants().values():
         assert set(variant.cues) == set(CUES)

@@ -72,7 +72,7 @@ def test_every_cue_it_claims_changes_the_audio(stubbed: str) -> None:
         report = run(worker)
 
     cue_checks = [result for result in report.results if result.name.startswith("cue ")]
-    assert len(cue_checks) == 2
+    assert len(cue_checks) == 3
     assert all(result.passed for result in cue_checks)
     # Every one decided, which only a seed that reproduces the audio allows.
     seeded = [result for result in report.results if result.name.startswith("a seed reproduces the audio")]
