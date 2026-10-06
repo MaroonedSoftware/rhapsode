@@ -56,7 +56,12 @@ export class EngineInstaller {
         const accepted = typeof accept === 'string' ? accept : undefined;
         return this.jobs.submit('install', id, pull, async context => {
             await this.run(id, record, accepted, context);
-            if (pull !== undefined) await this.installWeights(id, pull, context);
+            if (pull === undefined) return;
+            await this.installWeights(id, pull, context);
+            if (await this.compiles(id, pull)) {
+                await this.warm(id, pull, context);
+                await this.managed.record(id, { ...this.managed.entry(id), warmed: [pull] });
+            }
         });
     }
 
@@ -164,6 +169,32 @@ export class EngineInstaller {
         } catch (error) {
             if (!(error instanceof RhapsodeError) || error.code !== 'unsupported') throw error;
             context.line(`${id} does not download ahead of time; its weights arrive on its first load`);
+        }
+    }
+
+    /** Whether the worker says this variant's first load fills a compile cache. § 8. */
+    private async compiles(id: string, variant: string): Promise<boolean> {
+        const client = await this.workers.client(id);
+        return (await client.capabilities()).variants[variant]?.compiles === true;
+    }
+
+    /**
+     * Step 6: load a variant that compiles and unload it again, so the compiling happens now rather
+     * than on its first `/speak`. Through residency, as a `/speak` loads it, so it takes a slot and
+     * may evict an idle model for one. Unloaded rather than left resident, because a load that
+     * compiled holds what compiling took until it unloads: Orpheus `full` held 8.05 GB after
+     * compiling against 7.26 GB from the cache. § 10.
+     */
+    private async warm(id: string, variant: string, context: JobContext): Promise<void> {
+        context.step('warm');
+        context.line(`loading ${id} ${variant} once, so that it compiles now and not on its first request`);
+        const lease = await this.residency.acquire(id, variant);
+        lease.release();
+        try {
+            await this.residency.free(id, 'unload');
+        } catch (error) {
+            // A `/speak` took the model between the release and the unload. It is warm, and theirs.
+            if (!(error instanceof RhapsodeError) || error.code !== 'conflict') throw error;
         }
     }
 
