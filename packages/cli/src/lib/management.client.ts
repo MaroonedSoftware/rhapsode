@@ -1,4 +1,5 @@
 import {
+    Capabilities,
     CatalogEntry,
     EngineSummary,
     FeedEvent,
@@ -139,6 +140,23 @@ export class ManagementClient {
 
     async pull(engine: string, variant?: string): Promise<InstallJob> {
         return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/pull`, variant === undefined ? {} : { variant }));
+    }
+
+    /**
+     * Load a variant that compiles and unload it, so its first request does not compile. It takes a
+     * slot on the card and may evict an idle model, which is why it is asked for by name. § 10.
+     */
+    async warm(engine: string, variant?: string): Promise<InstallJob> {
+        return InstallJob.parse(await this.json('POST', `/engines/${encodeURIComponent(engine)}/warm`, variant === undefined ? {} : { variant }));
+    }
+
+    /**
+     * An engine's capability document. Not a management route, but the only place a client learns
+     * which variants compile, which is half of what is left to warm. Starts the worker if it is
+     * not running, which costs tens of megabytes and loads nothing. § 4 and § 10.
+     */
+    async capabilities(engine: string): Promise<Capabilities> {
+        return Capabilities.parse(await this.json('GET', `/engines/${encodeURIComponent(engine)}/capabilities`));
     }
 
     async job(id: string): Promise<InstallJob> {

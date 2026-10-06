@@ -18,6 +18,7 @@ import settingsCommand from './commands/settings.command.js';
 import setupCommand from './commands/setup.command.js';
 import unloadCommand from './commands/unload.command.js';
 import updateCommand from './commands/update.command.js';
+import warmCommand from './commands/warm.command.js';
 
 const app = await createCliApp({
     name: 'wizard',
@@ -28,6 +29,7 @@ const app = await createCliApp({
         { path: ['setup'], module: setupCommand },
         { path: ['install'], module: installCommand as CommandModule },
         { path: ['reinstall'], module: reinstallCommand as CommandModule },
+        { path: ['warm'], module: warmCommand as CommandModule },
         { path: ['update'], module: updateCommand as CommandModule },
         { path: ['ps'], module: psCommand as CommandModule },
         { path: ['unload'], module: unloadCommand as CommandModule },
