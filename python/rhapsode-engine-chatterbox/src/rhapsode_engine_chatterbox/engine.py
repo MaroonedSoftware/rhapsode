@@ -155,9 +155,9 @@ class ChatterboxEngine(Engine):
     def unload(self) -> None:
         """Drop the model, then ask the runtime for the memory back.
 
-        It will not all come back. An unload reclaims roughly 70% of what the model held because the
-        graphics runtime keeps the rest until the process exits, which is why the core has
-        `terminate` as well and why a residency manager with only this verb slowly loses a card.
+        None of it comes back here: the model sits in reference cycles, and on an RTX 4070 Ti SUPER
+        this unload left all 2.65 GiB of `turbo` allocated. The SDK collects after it returns, which
+        gives back everything but the process's CUDA context (protocol.md § 3, § 8).
         """
         self._model = None
         self._stock = None

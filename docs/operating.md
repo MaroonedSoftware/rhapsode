@@ -35,7 +35,7 @@ exception: the file's entry for an engine wins over the one an install recorded 
         // told to try again. At maxResidentModels 1 this is simply a queue.
         "evictionWaitSeconds": 30,
         // How long a model with nothing to do stays on the card. An expiry terminates the worker,
-        // because an unload leaves roughly 30% stranded (§ 3). -1 keeps the model until something
+        // because an unload leaves the process's CUDA context behind (§ 3). -1 keeps the model until something
         // else needs the room, which is what this server did before this setting existed; 0 frees
         // it the moment the last request lets go. Replaces idleUnloadSeconds and
         // idleTerminateSeconds, which are still read when this is not set.

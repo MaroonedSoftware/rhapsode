@@ -242,9 +242,9 @@ class Worker:
     async def unload(self) -> None:
         """Idempotent, and never fatal. Unloading nothing is a success.
 
-        An unload reclaims roughly 70% of what the model held, because the graphics runtime keeps
-        the rest until the process exits. That is why the core has `terminate` as well, and why a
-        residency manager with only this verb will slowly lose a card to nothing.
+        An unload gives back the model, once `release` has collected the cycles it sat in, and keeps
+        the process: its CUDA context, about 300 MiB, and anything outside this Python. That is why
+        the core has `terminate` as well. protocol.md § 3.
         """
         async with self._transition:
             if self.model == "unloaded":

@@ -336,7 +336,7 @@ export class LocalWorkerHandle implements WorkerHandle {
         try {
             // An eviction reaches for the verb first, because that is the one reclaim a remote
             // worker can also be given: a core that only signals silently degrades to `unload` over
-            // TCP and loses the 30% an unload strands. § 3. A shutdown keeps signalling, which § 2
+            // TCP and leaves what an unload strands. § 3. A shutdown keeps signalling, which § 2
             // describes as the same sequence, and a worker too wedged to answer gets it anyway.
             if (!(reason === 'evict' && (await this.askToTerminate()))) child.kill('SIGTERM');
             await exited;

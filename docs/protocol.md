@@ -100,8 +100,8 @@ signal.
 
 **Which one the core reaches for, and in what order.** An eviction sends `/terminate` first and
 signals only if the verb does not land, because that is the one reclaim a remote worker can also be
-given: a core that only signals degrades to `unload` over TCP and loses the 30% an unload strands
-(§ 3). A shutdown signals without asking, which is the same sequence by the paragraph above and one
+given: a core that only signals degrades to `unload` over TCP and leaves behind what an unload
+strands (§ 3). A shutdown signals without asking, which is the same sequence by the paragraph above and one
 round trip shorter on a path where every worker is going anyway. Either way the grace period is the
 core's and ends in `SIGKILL`: a worker that took the verb and then hung is not a worker to wait on
 forever. A remote worker gets the verb and keeps its connection, because the process restarting is
@@ -161,16 +161,23 @@ allocations. 3.5 GiB was measured stranded on a 16 GiB card, so an immediate ret
 a GPU it just filled. Unload-then-load-once covers the common case of a card that was briefly full
 and has since freed up. This belongs in the SDK so every adapter gets it without knowing about it.
 
-**Unloading does not reclaim everything; terminating does.** An unload reclaims roughly 70% of what
-the model held, because the graphics runtime keeps the rest until the process exits. So the core
-needs both verbs and must know they differ: `unload` for "I may want this again shortly",
-`terminate` for "I need the card back". A residency manager with only `unload` will slowly lose a
-card to nothing.
+**Unloading does not reclaim everything; terminating does.** An unload gives back the model and
+keeps the process: its CUDA context, about 300 MiB, which only the process exiting returns, and
+anything held outside the worker's Python, such as a vLLM engine in a child process, which no unload
+in the adapter reaches. So the core needs both verbs and must know they differ: `unload` for "I may
+want this again shortly", `terminate` for "I need the card back". A residency manager with only
+`unload` keeps a context on the card for every engine it has ever loaded.
+
+This was written as "an unload reclaims roughly 70%" until October 2026, and the cause given, the
+graphics runtime keeping the rest, was wrong. Measured on an RTX 4070 Ti SUPER, Chatterbox `turbo`'s
+own unload freed none of its 2.65 GiB: the model sat in reference cycles until Python's collector
+next ran, so how much came back depended on when that happened to be. The SDK now collects after
+every unload (§ 8), and three unloads in a row each left the card at 311 MiB, the context alone.
 
 **Which is why `terminate` is a worker verb and not a core one.** The obvious implementation is for
 the core to signal the process it spawned, and that works for exactly as long as every worker is
 local. A remote worker (§1) is a URL on somebody else's box, so a core that terminates by signalling
-silently degrades to `unload` over TCP, and the 30% it cannot reclaim goes unreported.
+silently degrades to `unload` over TCP, and what that cannot reclaim goes unreported.
 `POST /terminate` means drain and exit 0: the worker ends its own process, and whatever supervises
 it locally restarts it. The core still sends the signal to a local worker that has stopped
 answering, but the verb is what it reaches for first, and it is the only thing that works in both
@@ -189,8 +196,9 @@ The worker obeys; the core decides. Default policy, all of it settable, and with
   engine: a model that takes forty seconds to load has earned a longer deadline than one that takes
   two.
 
-An expiry terminates rather than unloads, by rule 3 above: an unload leaves roughly 30% behind, and
-a deadline that runs every few minutes would give a card away 30% at a time. This replaces the
+An expiry terminates rather than unloads, by rule 3 above: an unload leaves the process, its CUDA
+context and anything outside its Python on the card, and a deadline meant to give the card back
+should give back all of it. This replaces the
 `idleUnloadSeconds` and `idleTerminateSeconds` pair, which was two deadlines for two verbs and is
 one deadline now that there is one verb.
 
@@ -239,7 +247,7 @@ every synthesis on the box pay a cold start.
 
 It is idempotent, like the worker verb it reaches for, and answers `200` with the engine's summary.
 `terminate` ends the process even when no model is loaded, which is how an operator reclaims what a
-variant switch left stranded (rule 3: an unload keeps roughly 30% until the process exits).
+variant switch left stranded (rule 3: an unload keeps the process's context until it exits).
 
 **It is refused with `409` while the engine is speaking**, for the reason § 7 gives about uninstall:
 cutting off a stream in progress hands that caller a truncated file for something they could not

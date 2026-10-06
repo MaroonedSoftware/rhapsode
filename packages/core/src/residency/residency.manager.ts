@@ -136,8 +136,8 @@ export class ResidencyManager {
                 return undefined;
             }
             // Terminate rather than unload, because the whole point of an eviction is getting the
-            // card back. An unload leaves roughly 30% stranded on a card that then reads as free,
-            // and the next load OOMs against a leak nobody can see.
+            // card back. An unload leaves the process's CUDA context, and anything outside its
+            // Python, on a card that then reads as free. § 3.
             await this.release(victim, 'terminate');
         }
 
@@ -313,8 +313,9 @@ export class ResidencyManager {
     /**
      * Put a deadline on a model nobody is holding.
      *
-     * Terminate rather than unload, for the reason § 3 measured: an unload leaves roughly 30%
-     * stranded, and a card given away 30% at a time is gone by morning. An expiry is not a promise
+     * Terminate rather than unload, for the reason § 3 measured: an unload leaves the process's
+     * CUDA context, about 300 MiB, and anything outside its Python, and an expiry is for giving the
+     * card back. An expiry is not a promise
      * the model survives that long either, since a budget eviction can still take it first.
      */
     private armExpiry(resident: Resident): void {
