@@ -18,27 +18,29 @@ from __future__ import annotations
 
 from rhapsode_worker import Variant
 
-#: Four of the eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
+#: Five of the eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
 #: October 2026). `laugh` is spelled as BreezeBlue's hosted docs spell it, `(laughs)`, and not as the
 #: open card does: a listener heard no laugh where the card's `(laugh)` was written. `(laughs)`,
 #: `(laughing)`, `(chuckles)` and `(giggles)` were then each heard to laugh on two seeds, and so was
-#: Chinese `[笑]`. `chuckle` is not claimed yet, although `(chuckles)` performs, because a claimed cue
-#: needs a tag in both languages and Chinese `[轻笑]` has not been heard. The hosted docs also list
+#: Chinese `[笑]`. `chuckle` is `(chuckles)` and `[轻笑]`, both heard to chuckle on two seeds: a claimed
+#: cue needs a tag in both languages, so neither was enough alone. The hosted docs also list
 #: `(gasps)`, `(sniffs)` and `(groans)`, unheard here. A spelling is claimed only once it is heard
 #: performed. protocol.md § 8.
-CUES: tuple[str, ...] = ("laugh", "sigh", "cough", "clear throat")
+CUES: tuple[str, ...] = ("laugh", "chuckle", "sigh", "cough", "clear throat")
 
 #: How each cue is written for this model, per language. The card's own rule: parentheses in English,
 #: square brackets in Chinese, and never one syntax inside the other language.
 CUE_TAGS: dict[str, dict[str, str]] = {
     "en": {
         "laugh": "(laughs)",
+        "chuckle": "(chuckles)",
         "sigh": "(sigh)",
         "cough": "(cough)",
         "clear throat": "(clears throat)",
     },
     "zh": {
         "laugh": "[笑]",
+        "chuckle": "[轻笑]",
         "sigh": "[叹气]",
         "cough": "[咳嗽]",
         "clear throat": "[清嗓子]",

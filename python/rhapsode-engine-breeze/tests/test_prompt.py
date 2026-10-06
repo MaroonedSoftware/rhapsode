@@ -13,6 +13,7 @@ class TestCues:
         assert translate_cues("Right. [sigh] Anyway.") == "Right. (sigh) Anyway."
         assert translate_cues("[sigh] [cough]") == "(sigh) (cough)"
         assert translate_cues("Right. [laugh] Anyway.") == "Right. (laughs) Anyway."
+        assert translate_cues("[chuckle] Sure.") == "(chuckles) Sure."
 
     def test_clear_throat_keeps_its_space(self) -> None:
         assert translate_cues("[clear throat] Ahem.") == "(clears throat) Ahem."
@@ -21,6 +22,7 @@ class TestCues:
         assert translate_cues("[sigh] 没想到。", "zh") == "[叹气] 没想到。"
         assert translate_cues("[clear throat]", "zh") == "[清嗓子]"
         assert translate_cues("[laugh]", "zh") == "[笑]"
+        assert translate_cues("[chuckle]", "zh") == "[轻笑]"
 
     def test_every_claimed_cue_has_a_tag_in_both_languages(self) -> None:
         for cue in CUES:

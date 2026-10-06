@@ -19,7 +19,7 @@ def test_one_build_named_for_the_release() -> None:
 
 
 def test_only_the_cues_heard_performed_are_claimed() -> None:
-    assert set(CUES) == {"laugh", "sigh", "cough", "clear throat"}
+    assert set(CUES) == {"laugh", "chuckle", "sigh", "cough", "clear throat"}
 
 
 def test_laugh_is_the_spelling_that_was_heard_and_not_the_cards() -> None:

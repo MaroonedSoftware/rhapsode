@@ -31,11 +31,10 @@ Then in `rhapsode.config.json`:
 
 ## What it can do
 
-- **Cues:** `laugh`, `sigh`, `cough` and `clear throat`, each heard performed on real weights:
+- **Cues:** `laugh`, `chuckle`, `sigh`, `cough` and `clear throat`, each heard performed on real weights:
   `[sigh]` becomes `(sigh)` in English and `[叹气]` in Chinese. `[laugh]` becomes `(laughs)`, not the
-  open card's `(laugh)`, which was heard not to laugh. Not `chuckle` yet: `(chuckles)` performs, but
-  its Chinese tag has not been heard. BreezeBlue's hosted model has more tags, and none is claimed
-  until it is heard performed.
+  open card's `(laugh)`, which was heard not to laugh, and `[chuckle]` becomes `(chuckles)` and
+  `[轻笑]`. BreezeBlue's hosted model has more tags, and none is claimed until it is heard performed.
 - **Deliveries:** none yet. An instruction can steer the model, and is how `hushed` and `frantic`
   would be performed, once it is heard to hold for a whole line.
 - **Dials:** `temperature` and `topP`, defaulting to upstream's 0.9 and 1.0. No `speed`, and no
