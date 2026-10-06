@@ -1,0 +1,11 @@
+This package contains the inference code of Breeze TTS 2 by BreezeBlue (Resonia, Inc.),
+https://github.com/breezeblue-ai/breeze-tts, at commit 58ec70ce5fa4cc361bdebf77ec40d1365da00ab2,
+licensed under the Apache License, Version 2.0 (see LICENSE). The directories breeze_infer/ and
+models/ are copied from that commit without modification.
+
+Upstream's audio tokenizer is based on Qwen3-TTS by the Alibaba Qwen Team, also Apache-2.0.
+
+The Breeze TTS 2 model weights are NOT part of this package and are NOT covered by the Apache
+License. They are governed by the BreezeBlue Research and Non-Commercial License, which also covers
+derivative models and outputs generated with them on your own hardware:
+https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE
