@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-fish"
+version = "0.1.17"
+description = "Fish Audio S2 Pro for rhapsode: eighty languages and free-form direction, on research-only weights."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker==0.1.17",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_fish"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60

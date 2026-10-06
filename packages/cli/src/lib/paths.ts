@@ -7,7 +7,7 @@ export const CONFIG_FILE = 'rhapsode.config.json';
 
 /**
  * The Python modules `pnpm python:sync` installs into the shared dev venv. Chatterbox, Kokoro, Orpheus,
- * Dia and Breeze are here without their engines: each adapter imports its engine lazily, so the module loads
+ * Dia, Breeze and Fish are here without their engines: each adapter imports its engine lazily, so the module loads
  * and its tests stub the model.
  */
 export const DEV_MODULES = [
@@ -19,6 +19,7 @@ export const DEV_MODULES = [
     'rhapsode_engine_orpheus',
     'rhapsode_engine_dia',
     'rhapsode_engine_breeze',
+    'rhapsode_engine_fish',
 ];
 
 /** The interpreter inside a virtualenv, laid out the way `venv` and `uv` both lay it out. */
