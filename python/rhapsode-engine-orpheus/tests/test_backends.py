@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from harness.stubs import Recorder
 
-from rhapsode_engine_orpheus.backends import CONTEXT_TOKENS, LlamaCppSource, Sampling, VllmSource
+from rhapsode_engine_orpheus.backends import (
+    CONTEXT_TOKENS,
+    KV_BLOCK_TOKENS,
+    KV_CACHE_BYTES,
+    LlamaCppSource,
+    Sampling,
+    VllmSource,
+)
 from rhapsode_engine_orpheus.prompt import END_OF_PROMPT, END_OF_SPEECH, START_OF_HUMAN
 
 SAMPLING = Sampling(temperature=0.6, top_p=0.8, repetition_penalty=1.3, seed=7)
@@ -100,7 +107,7 @@ def test_close_closes_the_model(orpheus: Recorder) -> None:
 
 class TestVllm:
     def source(self) -> VllmSource:
-        return VllmSource("/models/full", memory_fraction=0.4)
+        return VllmSource("/models/full", memory_fraction=0.4, kv_cache_bytes=KV_CACHE_BYTES)
 
     def test_the_engine_is_made_and_used_on_its_own_loop(self, orpheus: Recorder) -> None:
         # vLLM's output handling runs on the loop that made the engine, and the SDK calls speak from
@@ -115,6 +122,16 @@ class TestVllm:
         assert options["gpu_memory_utilization"] == 0.4
         assert options["dtype"] == "bfloat16"
         assert options["max_model_len"] == CONTEXT_TOKENS
+
+    def test_it_gives_the_kv_cache_one_sequence_rather_than_what_profiling_leaves(
+        self, orpheus: Recorder
+    ) -> None:
+        self.source()
+        options = orpheus.vllms[0].arguments.options
+        assert options["kv_cache_memory_bytes"] == KV_CACHE_BYTES
+        assert options["block_size"] == KV_BLOCK_TOKENS
+        # One 2048-token sequence and vLLM's null block, about 0.22 GiB.
+        assert KV_CACHE_BYTES == (2048 + 16) * 114_688
 
     def test_the_prompt_is_framed_as_the_finetune_was_trained(self, orpheus: Recorder) -> None:
         list(self.source().tokens("tara: hi", SAMPLING))

@@ -10,7 +10,7 @@ from typing import Any, ClassVar
 from rhapsode_worker import Engine, NativeFormat, SpeakRequest, UnknownVoice, Unsupported, Variant, Voice
 from rhapsode_worker.engine import Device
 
-from .backends import LlamaCppSource, Sampling, TokenSource, VllmSource
+from .backends import KV_CACHE_BYTES, LlamaCppSource, Sampling, TokenSource, VllmSource
 from .builds import (
     DEFAULT_VOICE,
     FULL_FILES,
@@ -31,12 +31,12 @@ from .prompt import MAX_TOKENS, SEGMENT_CHARACTERS, prompt, segments, translate_
 #: SNAC 24 kHz, mono.
 SAMPLE_RATE = 24_000
 
-#: What the `full` build asks vLLM for, when the operator has not said. Measured on an RTX 4070 Ti
-#: SUPER (vLLM 0.29): 6.29 GiB for the weights and the runtime, 0.16 for activations and 0.02 for CUDA
-#: graphs, and one 2048-token sequence needs 0.22 of KV cache (28 layers, 8 KV heads of 128, bfloat16).
-#: That is 6.7 GiB, and this leaves the rest for more cache. vLLM's own default, 90% of the card, was
-#: an out-of-memory on a 16 GB card another engine was already using 5.3 GB of.
-#: `RHAPSODE_ORPHEUS_GPU_MEMORY`, a fraction of the card, overrides it.
+#: What the `full` build asks vLLM to find free, when the operator has not said. Measured on an RTX
+#: 4070 Ti SUPER (vLLM 0.29): 6.29 GiB for the weights and the runtime, 0.16 for activations and 0.02
+#: for CUDA graphs, and one 2048-token sequence needs 0.22 of KV cache (`KV_CACHE_BYTES`). That is
+#: 6.7 GiB. vLLM's own default, 90% of the card, was an out-of-memory on a 16 GB card another engine
+#: was already using 5.3 GB of. `RHAPSODE_ORPHEUS_GPU_MEMORY`, a fraction of the card, overrides it,
+#: and hands the KV cache's sizing back to vLLM.
 FULL_MEMORY_BYTES = 7 * 2**30
 
 #: vLLM's own default, and the most this engine will ask for however small the card.
@@ -102,7 +102,9 @@ class OrpheusEngine(Engine):
     def load(self, variant: str) -> None:
         self._check(variant)
         if variant == "full":
-            self._source = VllmSource(_full(), memory_fraction=memory_fraction(self.device))
+            self._source = VllmSource(
+                _full(), memory_fraction=memory_fraction(self.device), kv_cache_bytes=kv_cache_bytes()
+            )
         else:
             accelerated = self.device.type in {"cuda", "rocm", "mps"}
             self._source = LlamaCppSource(_gguf(variant), gpu=accelerated)
@@ -252,6 +254,11 @@ def memory_fraction(device: Device) -> float:
     if not device.vram_bytes:
         return MOST_OF_A_CARD
     return round(min(MOST_OF_A_CARD, FULL_MEMORY_BYTES / device.vram_bytes), 3)
+
+
+def kv_cache_bytes() -> int | None:
+    """The KV cache vLLM is given, or None for vLLM to size it from the operator's fraction."""
+    return None if os.getenv("RHAPSODE_ORPHEUS_GPU_MEMORY") else KV_CACHE_BYTES
 
 
 def _snac() -> None:

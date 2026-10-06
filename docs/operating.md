@@ -147,9 +147,10 @@ What an Orpheus install brings depends on the box, because only one of its two b
 without compiling anything:
 
 - **Linux x86_64, the server image included: vLLM**, and the `full` build on an NVIDIA card. The
-  weights are unsloth's ungated copy, 6.6 GB, so no token is needed. vLLM claims 7 GiB of the card
-  when it loads; `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, a fraction of the card, moves
-  that.
+  weights are unsloth's ungated copy, 6.6 GB, so no token is needed. vLLM wants 7 GiB of the card
+  free when it loads and holds about 7.3 GB, or 8.1 GB on the first load after an install, which
+  compiles the graph; `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, a fraction of the card,
+  moves that.
 - **Anywhere else: llama.cpp**, and the `q8` and `q4` builds. On a Mac pip builds it with Metal,
   which needs the Xcode command line tools (`xcode-select --install`).
 

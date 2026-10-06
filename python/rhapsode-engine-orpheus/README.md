@@ -54,8 +54,11 @@ The default is the first build the worker lists: `full` where it can run, then `
 
 Measured on an RTX 4070 Ti SUPER in the server image, beside another engine holding 5.3 GB: `full`
 loaded in 17 to 26 seconds, streamed at 1.05 times real time with the first audio after 0.34
-seconds, and held 7.5 GB. vLLM claims 7 GiB of the card up front.
-`RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, as a fraction of the card, overrides that.
+seconds, and held 7.5 GB. vLLM checks for 7 GiB of the card free up front and gives the KV cache
+one 2048-token sequence, 0.22 GiB. On a 4070 Ti SUPER with vLLM 0.31 a cold first load, compiling
+the graph, takes 35 s and holds 8.05 GB until it unloads; every load after takes 12 s and holds
+7.26 GB. `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, as a fraction of the card, overrides
+the 7 GiB and lets vLLM fill what the weights leave of it with cache.
 
 On an Apple M5 Pro, `q8` ran at about a quarter of real time: fine for `stream: false`, too slow
 to feed a live stream.
