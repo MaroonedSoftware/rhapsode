@@ -64,7 +64,8 @@ export const ENGINES: Engine[] = [
     {
         id: 'breeze',
         name: 'Breeze TTS 2',
-        summary: 'English and Chinese from the model that ranked first among open weights on the Artificial Analysis arena at its release. Non-commercial use only.',
+        summary:
+            'English and Chinese from the model that ranked first among open weights on the Artificial Analysis arena at its release. Non-commercial use only.',
         runsOn: 'NVIDIA GPU',
         weights: '2, 7.7 GB',
         cues: 8,
@@ -74,7 +75,8 @@ export const ENGINES: Engine[] = [
     {
         id: 'fish',
         name: 'Fish Audio S2 Pro',
-        summary: 'Ten languages and free-form direction, from the model that ranked second among open weights at its release. Non-commercial use only.',
+        summary:
+            'Ten languages and free-form direction, from the model that ranked second among open weights at its release. Non-commercial use only.',
         runsOn: 'GPU',
         weights: 's2-pro, 11 GB',
         cues: 3,
