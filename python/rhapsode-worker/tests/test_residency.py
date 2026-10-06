@@ -97,8 +97,8 @@ class TestTerminate:
         assert process.wait(timeout=30) == 0
 
     def test_it_is_what_reclaims_what_an_unload_cannot(self, failing) -> None:
-        # An unload leaves roughly 30% behind because the graphics runtime holds it until the
-        # process exits, which is the entire reason this verb exists next to the other one.
+        # An unload keeps the process's CUDA context, about 300 MiB, until the process exits, which
+        # is the reason this verb exists next to the other one. protocol.md § 3.
         process, base = failing("ok")
         call(base, "/load", {}, method="POST")
         call(base, "/terminate", {}, method="POST")

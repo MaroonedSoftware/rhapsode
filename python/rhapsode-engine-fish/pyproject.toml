@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-fish"
+version = "0.1.18"
+description = "Fish Audio S2 Pro for rhapsode: eighty languages and free-form direction, on research-only weights."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker==0.1.18",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "numpy>=1.26",
+    "huggingface_hub>=0.23",
+    # Reads a reference clip in any of the four formats a clone accepts. 0.12 is the first whose
+    # wheels carry a libsndfile that reads MP3.
+    "soundfile>=0.12",
+    # What upstream's inference path imports, found by importing it in a clean virtualenv on Python
+    # 3.12: fish_speech.inference_engine, models.text2semantic.inference and models.dac.inference.
+    # Upstream's code itself is fetched beside the weights (upstream.py), so its own pyproject, which
+    # adds pyaudio, gradio, wandb, datasets and modelscope, is never installed. Pinned where upstream
+    # pins: torch 2.8.0, which has wheels up to Python 3.13, and transformers up to 4.57.3. Not its
+    # pydantic==2.9.2: its schema works on 2.13 and the SDK needs only 2.0.
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "transformers<=4.57.3",
+    # fish_speech.utils imports Lightning and Rich at import time, though inference uses neither.
+    "lightning>=2.1.0",
+    "rich>=13.5.3",
+    "hydra-core>=1.3.2",
+    "pyrootutils>=1.0.4",
+    "einops>=0.7.0",
+    "loguru>=0.6.0",
+    "natsort>=8.4.0",
+    "safetensors",
+    "tiktoken>=0.8.0",
+    "cachetools",
+    "click",
+    # The codec's layers come from Descript's codec and audiotools.
+    "descript-audio-codec",
+    # Imported by models.text2semantic on the way in, though inference applies no LoRA.
+    "loralib>=0.1.2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_fish"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*", "numpy.*", "huggingface_hub", "huggingface_hub.*", "soundfile", "fish_speech", "fish_speech.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts fakes where torch and upstream's code would be.
+pythonpath = ["tests"]
+timeout = 60

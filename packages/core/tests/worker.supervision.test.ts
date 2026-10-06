@@ -128,8 +128,9 @@ describeWithSockets('supervising a real worker', () => {
         const began = Date.now();
         const response = await builder.app.inject({ method: 'GET', url: '/engines/tone/capabilities' });
 
-        expect(response.statusCode).toBe(503);
-        expect(response.json().error).toMatchObject({ code: 'model_unavailable', retryable: true });
+        // A wrong venv path is wrong on every attempt, so a client must not be told to retry it.
+        expect(response.statusCode).toBe(500);
+        expect(response.json().error).toMatchObject({ code: 'internal', retryable: false });
         expect(response.json().error.message).toContain('ENOENT');
         expect(Date.now() - began).toBeLessThan(5_000);
     }, 60_000);
@@ -140,8 +141,21 @@ describeWithSockets('supervising a real worker', () => {
         const builder = await start({ command: process.execPath, args: ['-e', 'console.error("no thanks"); process.exit(3)'] });
         const response = await builder.app.inject({ method: 'GET', url: '/engines/tone/capabilities' });
 
-        expect(response.statusCode).toBe(503);
+        // It refused to start, before any model, so the next attempt refuses the same way: Breeze on
+        // a Mac exits 1 naming the card it needs. Not retryable.
+        expect(response.statusCode).toBe(500);
+        expect(response.json().error).toMatchObject({ code: 'internal', retryable: false });
         expect(response.json().error.message).toContain('no thanks');
+    }, 60_000);
+
+    it('reports a worker killed before its handshake as retryable, since something outside stopped it', async () => {
+        // A signal is the OOM killer or an operator, not the adapter's own verdict on this box.
+        const builder = await start({ command: process.execPath, args: ['-e', 'process.kill(process.pid, "SIGKILL")'] });
+        const response = await builder.app.inject({ method: 'GET', url: '/engines/tone/capabilities' });
+
+        expect(response.statusCode).toBe(503);
+        expect(response.json().error).toMatchObject({ code: 'model_unavailable', retryable: true });
+        expect(response.json().error.message).toContain('SIGKILL');
     }, 60_000);
 
     it('refuses an engine it was never told about', async () => {

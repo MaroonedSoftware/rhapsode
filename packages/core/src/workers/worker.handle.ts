@@ -175,7 +175,7 @@ export class LocalWorkerHandle implements WorkerHandle {
      */
     private async awaitHandshake(child: ChildProcess): Promise<Handshake> {
         const lines = createInterface({ input: child.stdout!, crlfDelay: Infinity });
-        let exitDuringStartup: ((code: number | null) => void) | undefined;
+        let exitDuringStartup: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
         let spawnFailed: ((error: Error) => void) | undefined;
         let timer: NodeJS.Timeout | undefined;
 
@@ -200,7 +200,7 @@ export class LocalWorkerHandle implements WorkerHandle {
                     }
                 });
 
-                exitDuringStartup = code => {
+                exitDuringStartup = (code, signal) => {
                     // The whole of stderr goes to the log, where an operator will look. What goes
                     // to the client is one line: a stack trace from somebody else's virtualenv is
                     // not something a caller can act on, and a multi-kilobyte error body for a
@@ -210,10 +210,17 @@ export class LocalWorkerHandle implements WorkerHandle {
                         code,
                         stderr: this.stderrRing.join('\n'),
                     });
+                    // A worker that exits with a status before its handshake has refused to start,
+                    // and has not loaded a model yet, so nothing about the next attempt is different:
+                    // Breeze on a Mac exits 1 saying it needs an NVIDIA card, and said so again on
+                    // every retry a client made because § 6 called it retryable. That is `internal`.
+                    // One killed by a signal was stopped from outside, by the OOM killer or an
+                    // operator, and may well start next time, so it stays `model_unavailable`.
+                    const refused = code !== null;
                     reject(
                         new RhapsodeError(
-                            'model_unavailable',
-                            `engine "${this.id}" exited ${code} before announcing itself: ${summarise(this.stderrRing)}`,
+                            refused ? 'internal' : 'model_unavailable',
+                            `engine "${this.id}" exited ${code ?? signal} before announcing itself: ${summarise(this.stderrRing)}`,
                         ),
                     );
                 };
@@ -223,8 +230,10 @@ export class LocalWorkerHandle implements WorkerHandle {
                 // nothing listening that is an uncaught exception, which takes the whole core down
                 // because one engine's venv path is wrong. It is also the difference between
                 // failing now and failing when the startup timeout eventually gives up.
+                // Not retryable either: an interpreter that is not there will not be there on the
+                // next attempt. It is a wrong venv path, and an operator has to mend it.
                 spawnFailed = error => {
-                    reject(new RhapsodeError('model_unavailable', `engine "${this.id}" could not be started: ${error.message}`, { cause: error }));
+                    reject(new RhapsodeError('internal', `engine "${this.id}" could not be started: ${error.message}`, { cause: error }));
                 };
                 child.once('error', spawnFailed);
             });
@@ -327,7 +336,7 @@ export class LocalWorkerHandle implements WorkerHandle {
         try {
             // An eviction reaches for the verb first, because that is the one reclaim a remote
             // worker can also be given: a core that only signals silently degrades to `unload` over
-            // TCP and loses the 30% an unload strands. § 3. A shutdown keeps signalling, which § 2
+            // TCP and leaves what an unload strands. § 3. A shutdown keeps signalling, which § 2
             // describes as the same sequence, and a worker too wedged to answer gets it anyway.
             if (!(reason === 'evict' && (await this.askToTerminate()))) child.kill('SIGTERM');
             await exited;

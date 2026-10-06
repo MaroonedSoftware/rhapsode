@@ -100,8 +100,8 @@ signal.
 
 **Which one the core reaches for, and in what order.** An eviction sends `/terminate` first and
 signals only if the verb does not land, because that is the one reclaim a remote worker can also be
-given: a core that only signals degrades to `unload` over TCP and loses the 30% an unload strands
-(§ 3). A shutdown signals without asking, which is the same sequence by the paragraph above and one
+given: a core that only signals degrades to `unload` over TCP and leaves behind what an unload
+strands (§ 3). A shutdown signals without asking, which is the same sequence by the paragraph above and one
 round trip shorter on a path where every worker is going anyway. Either way the grace period is the
 core's and ends in `SIGKILL`: a worker that took the verb and then hung is not a worker to wait on
 forever. A remote worker gets the verb and keeps its connection, because the process restarting is
@@ -161,16 +161,23 @@ allocations. 3.5 GiB was measured stranded on a 16 GiB card, so an immediate ret
 a GPU it just filled. Unload-then-load-once covers the common case of a card that was briefly full
 and has since freed up. This belongs in the SDK so every adapter gets it without knowing about it.
 
-**Unloading does not reclaim everything; terminating does.** An unload reclaims roughly 70% of what
-the model held, because the graphics runtime keeps the rest until the process exits. So the core
-needs both verbs and must know they differ: `unload` for "I may want this again shortly",
-`terminate` for "I need the card back". A residency manager with only `unload` will slowly lose a
-card to nothing.
+**Unloading does not reclaim everything; terminating does.** An unload gives back the model and
+keeps the process: its CUDA context, about 300 MiB, which only the process exiting returns, and
+anything held outside the worker's Python, such as a vLLM engine in a child process, which no unload
+in the adapter reaches. So the core needs both verbs and must know they differ: `unload` for "I may
+want this again shortly", `terminate` for "I need the card back". A residency manager with only
+`unload` keeps a context on the card for every engine it has ever loaded.
+
+This was written as "an unload reclaims roughly 70%" until October 2026, and the cause given, the
+graphics runtime keeping the rest, was wrong. Measured on an RTX 4070 Ti SUPER, Chatterbox `turbo`'s
+own unload freed none of its 2.65 GiB: the model sat in reference cycles until Python's collector
+next ran, so how much came back depended on when that happened to be. The SDK now collects after
+every unload (§ 8), and three unloads in a row each left the card at 311 MiB, the context alone.
 
 **Which is why `terminate` is a worker verb and not a core one.** The obvious implementation is for
 the core to signal the process it spawned, and that works for exactly as long as every worker is
 local. A remote worker (§1) is a URL on somebody else's box, so a core that terminates by signalling
-silently degrades to `unload` over TCP, and the 30% it cannot reclaim goes unreported.
+silently degrades to `unload` over TCP, and what that cannot reclaim goes unreported.
 `POST /terminate` means drain and exit 0: the worker ends its own process, and whatever supervises
 it locally restarts it. The core still sends the signal to a local worker that has stopped
 answering, but the verb is what it reaches for first, and it is the only thing that works in both
@@ -189,10 +196,19 @@ The worker obeys; the core decides. Default policy, all of it settable, and with
   engine: a model that takes forty seconds to load has earned a longer deadline than one that takes
   two.
 
-An expiry terminates rather than unloads, by rule 3 above: an unload leaves roughly 30% behind, and
-a deadline that runs every few minutes would give a card away 30% at a time. This replaces the
+An expiry unloads rather than terminates. Rule 3 keeps the two verbs apart, and what separates them
+was measured on an RTX 4070 Ti SUPER in October 2026: once the SDK collects after an unload (§ 8),
+an unload leaves the worker's CUDA context and nothing else, 250 to 310 MiB for Breeze, Fish,
+Chatterbox and Orpheus's `full` build, whose vLLM engine exits with it. The model comes back in
+seconds where a terminated worker would have to start again first: Breeze reloaded in 1.4 s,
+Chatterbox in 4 s, Orpheus in 13 s. So a deadline that runs every few minutes costs a context per
+idle engine and saves a process start each time. An eviction still terminates, because it needs the
+card back now, and so does `POST /engines/{engine}/unload` by default. This replaces the
 `idleUnloadSeconds` and `idleTerminateSeconds` pair, which was two deadlines for two verbs and is
 one deadline now that there is one verb.
+
+Until then an expiry terminated, on the strength of "an unload leaves roughly 30% behind", which
+rule 3 now corrects.
 
 The default is on, which is a reversal. Off was defensible while an expiry was something an operator
 opted into: it trades a cold start for memory nobody asked for. It stops being defensible as the
@@ -239,7 +255,7 @@ every synthesis on the box pay a cold start.
 
 It is idempotent, like the worker verb it reaches for, and answers `200` with the engine's summary.
 `terminate` ends the process even when no model is loaded, which is how an operator reclaims what a
-variant switch left stranded (rule 3: an unload keeps roughly 30% until the process exits).
+variant switch left stranded (rule 3: an unload keeps the process's context until it exits).
 
 **It is refused with `409` while the engine is speaking**, for the reason § 7 gives about uninstall:
 cutting off a stream in progress hands that caller a truncated file for something they could not
@@ -560,10 +576,10 @@ player should ask for `stream: false` and will get a better error the day someth
 | `unknown_engine` | 404 | no | Not in `GET /engines`. Core only; a worker is one engine |
 | `unknown_voice` | 404 | no | Not in `GET /voices` |
 | `unsupported` | 422 | no | A format, language or feature this variant does not do |
-| `model_unavailable` | 503 | **yes** | Loading, evicted, or a load that ran out of time |
+| `model_unavailable` | 503 | **yes** | Loading, evicted, a load that ran out of time, or a worker stopped from outside before it started |
 | `oom` | 503 | **yes** | Out of device memory |
 | `overloaded` | 429 | **yes** | Draining, or at the concurrency limit |
-| `internal` | 500 | no | The adapter threw |
+| `internal` | 500 | no | The adapter threw, or its worker refused to start |
 | `forbidden` | 403 | no | A management route (§ 10) called from somewhere it does not answer |
 | `conflict` | 409 | no | A management route (§ 10) asked for something the current state rules out |
 
@@ -572,6 +588,14 @@ matters is between "this request was wrong" and "this request was fine and the s
 a caller that conflates them either retries a permanent failure forever or discards work that would
 have succeeded on the next pass. A cold start that ran out of its budget is `model_unavailable`, and
 a client that understands that keeps the job rather than writing it off.
+
+**A worker that exits with a status before its handshake has refused to start**, and that is
+`internal`. It has not loaded a model yet, since the handshake comes first, so whatever stopped it
+stops the next attempt too: Breeze TTS 2 on a Mac exits 1 saying it needs an NVIDIA card, and was
+reported as a retryable `model_unavailable`, which a client trusting the flag would retry forever. An interpreter
+that does not exist, a wrong venv path, is `internal` for the same reason. A worker killed by a
+signal before its handshake was stopped from outside, by the OOM killer or an operator, and stays
+`model_unavailable`, as does one that did not announce itself in time.
 
 ### Dialogue
 
@@ -798,6 +822,10 @@ serve(ChatterboxEngine())
   through ffmpeg. Without this, every adapter reimplements format conversion and they all do it
   differently. This is the single largest reduction in adapter burden in the design.
 - **Applies the unload-then-load-once retry** around `load()`, so the OOM lesson is free.
+- **Collects after every unload**, then empties torch's cache if an adapter imported torch. A model
+  held in a reference cycle is freed by the collector, not when the adapter drops it, so an adapter's
+  own `empty_cache` finds nothing to return: Fish Audio S2 Pro left 3.93 GiB of the 11.97 GiB a load
+  took on the card after its unload, and every reload ran out of memory, until a collection ran.
 - **Measures what a load cost**, as a device-wide delta across `load()`, and reports it as
   `modelBytes` (§ 3). An adapter that knows better overrides `memory_bytes()`; one that does not
   gets a figure for free, and one on a device nothing can measure reports nothing rather than zero.
@@ -884,6 +912,17 @@ that does not override it answers `unsupported`. It exists because the alternati
 `/speak` doing the download: Chatterbox's `turbo` is 3.8 GB and took about 75 seconds on a first
 load, and a caller waiting on one utterance cannot tell that from a hang. An engine whose weights
 ship inside its package, or that has none, leaves it alone.
+
+**`fetch` may bring upstream's code as well as its weights**, where that code cannot ship in a
+package. Fish Audio S2 Pro's inference code is `fish-speech`, which cannot be installed as a
+package: its pyproject depends on `pyaudio`, which needs PortAudio's headers and a compiler that the
+server image does not have, though nothing that runs inference imports it. And its code is under
+the same research licence as its weights, so a copy in a rhapsode package would be rhapsode
+distributing it. So the adapter fetches upstream's archive at one pinned commit, keeps only the
+package and its licence, and checks the unpacked files against a pinned digest of them rather than
+the archive's bytes, which GitHub does not promise to keep the same. The operator's box downloads
+it from upstream, after an install that accepted that licence by name (§ 10). The adapter's own
+dependencies are the ones inference imports, found by importing it.
 
 ### `dialogue`, which is declared rather than discovered
 
@@ -1341,7 +1380,11 @@ An install is four steps, and a job reports which one it is on:
    installed from there, whatever version the directory holds; otherwise it is installed by name
    from the package index, pinned to the core's own version (§ 9). The first is how a checkout and
    the server image work, and the second is how an installed core works once adapters are
-   published.
+   published. An engine whose upstream has no packaging names **companions** in its catalog
+   record: distributions found the same way and installed in the same resolve as the SDK and the
+   adapter. Breeze TTS 2's inference code is a repository with no pyproject, which pip cannot
+   install, so `rhapsode-vendor-breeze` is a copy of it at one commit with a pyproject added, and
+   the Breeze adapter depends on it by name like any other package.
 3. **`verify`**: import the engine's module with the new interpreter. That is the command the core
    will spawn, minus serving, and it is the check that a virtualenv pip abandoned halfway fails,
    although its `bin/python` runs perfectly well.

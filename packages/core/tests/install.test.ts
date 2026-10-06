@@ -73,6 +73,15 @@ describe('planInstall', () => {
         expect(commands[3]).toEqual({ step: 'verify', command: '/v/chatterbox/bin/python', args: ['-c', 'import rhapsode_engine_chatterbox'] });
     });
 
+    it('installs an adapter’s companions in the same resolve, between the SDK and the adapter', () => {
+        const { commands } = planInstall({
+            ...base,
+            sources: { ...base.sources, companions: ['/src/rhapsode-vendor-breeze'] },
+        });
+
+        expect(commands[2]!.args.slice(-3)).toEqual(['/src/rhapsode-worker', '/src/rhapsode-vendor-breeze', '/src/rhapsode-engine-chatterbox']);
+    });
+
     it('seeds pip into a uv venv, because every later step is pip', () => {
         const { commands } = planInstall({ ...base, uv: true });
         expect(commands[0]).toEqual({ step: 'venv', command: 'uv', args: ['venv', '--seed', '--python', 'python3', '/v/chatterbox'] });

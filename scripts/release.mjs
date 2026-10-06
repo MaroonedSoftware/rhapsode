@@ -47,6 +47,9 @@ const PYTHON = [
     'python/rhapsode-engine-kokoro',
     'python/rhapsode-engine-orpheus',
     'python/rhapsode-engine-dia',
+    'python/rhapsode-engine-breeze',
+    'python/rhapsode-vendor-breeze',
+    'python/rhapsode-engine-fish',
     'python/rhapsode-engine-tone',
 ];
 
@@ -61,8 +64,9 @@ const CHANGESETS = join(root, '.changeset');
 const CHANGELOG = join(root, 'CHANGELOG.md');
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const PYPROJECT_VERSION = /^version = "([^"]+)"$/m;
-// An engine's pin on the SDK. protocol.md § 9: its own version, exactly.
-const WORKER_PIN = /"rhapsode-worker==[^"]+"/g;
+// An engine's pin on the SDK, or on a companion it installs beside it. protocol.md § 9: its own
+// version, exactly. Nothing from an index is named rhapsode-, so this matches only what is here.
+const INTERNAL_PIN = /"(rhapsode-[a-z-]+)==([^"]+)"/g;
 
 const read = path => readFileSync(join(root, path), 'utf8');
 const write = (path, text) => writeFileSync(join(root, path), text);
@@ -78,9 +82,9 @@ function current() {
         ...VERSIONED.map(dir => ({ where: `${dir}/package.json`, version: JSON.parse(read(`${dir}/package.json`)).version })),
         ...PYTHON.flatMap(dir => {
             const text = read(`${dir}/pyproject.toml`);
-            const pins = [...text.matchAll(WORKER_PIN)].map(match => ({
-                where: `${dir}/pyproject.toml, its rhapsode-worker pin`,
-                version: match[0].slice(18, -1),
+            const pins = [...text.matchAll(INTERNAL_PIN)].map(match => ({
+                where: `${dir}/pyproject.toml, its ${match[1]} pin`,
+                version: match[2],
             }));
             return [{ where: `${dir}/pyproject.toml`, version: PYPROJECT_VERSION.exec(text)?.[1] }, ...pins];
         }),
@@ -95,7 +99,7 @@ function setVersions(version) {
     }
     for (const dir of PYTHON) {
         const path = `${dir}/pyproject.toml`;
-        write(path, read(path).replace(PYPROJECT_VERSION, `version = "${version}"`).replace(WORKER_PIN, `"rhapsode-worker==${version}"`));
+        write(path, read(path).replace(PYPROJECT_VERSION, `version = "${version}"`).replace(INTERNAL_PIN, `"$1==${version}"`));
     }
     for (const [path, pattern] of OPENAPI_VERSION) {
         const text = read(path);

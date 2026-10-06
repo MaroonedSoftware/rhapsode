@@ -28,8 +28,11 @@ export interface PlanInputs {
     uv: boolean;
     /** From `RHAPSODE_PIP_TRUSTED_HOSTS` on the server, never from a request. */
     trustedHosts: string[];
-    /** Where to install the SDK and the adapter from: a directory if one was found, else a name. */
-    sources: { sdk: string; adapter: string };
+    /**
+     * Where to install the SDK, the adapter and its companions from: each a directory if one was
+     * found, else a name.
+     */
+    sources: { sdk: string; adapter: string; companions?: string[] };
 }
 
 /** The worker SDK every adapter depends on, installed alongside it and at the same version. § 9. */
@@ -79,10 +82,10 @@ export function planInstall(inputs: PlanInputs): InstallPlan {
         commands: [
             ...venvCommands,
             pip('--upgrade', 'pip'),
-            // Both in one resolve. The adapter depends on rhapsode-worker by name, and naming a
-            // directory that provides it in the same command is what lets pip satisfy that without
-            // going to an index that does not have it yet.
-            pip(sources.sdk, sources.adapter),
+            // All in one resolve. The adapter depends on rhapsode-worker and on its companions by
+            // name, and naming a directory that provides each in the same command is what lets pip
+            // satisfy them without going to an index that does not have them.
+            pip(sources.sdk, ...(sources.companions ?? []), sources.adapter),
             { step: 'verify', command: interpreter, args: ['-c', `import ${record.module}`] },
         ],
     };

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-vendor-breeze"
+version = "0.1.18"
+description = "BreezeBlue's Breeze TTS 2 inference code at one commit, packaged so pip can install it."
+readme = "README.md"
+# Upstream's own licence for its code. The weights it loads are not covered by it, and are for
+# research and non-commercial use only.
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.10"
+# Upstream's requirements.txt at 58ec70c, less what only its HTTP server and its own tests import
+# (fastapi, uvicorn, python-multipart, pytest, ruff). Pinned where upstream pins, because this is the
+# set it was tested against. flash-attn is left out as upstream's Dockerfile leaves it out of the
+# requirements: it builds from source for one GPU architecture, and only the fast path wants it.
+dependencies = [
+    "torch==2.9.1",
+    "torchaudio==2.9.1",
+    "qwen-tts==0.1.1",
+    "transformers==4.57.3",
+    "numpy>=2.0",
+    "soundfile>=0.13",
+]
+
+[tool.hatch.build]
+# The repository ignores `models/` everywhere, for weights, and hatch applies that pattern here
+# without the exception the repository makes for this directory: the first wheel built had
+# `breeze_infer` and no `models`, and would have failed on its first import.
+ignore-vcs = true
+exclude = ["__pycache__"]
+
+[tool.hatch.build.targets.wheel]
+# Upstream's two top-level packages under their own names, so that every `from models.breeze import`
+# in its code works unchanged and a refresh is a copy rather than an edit.
+packages = ["breeze_infer", "models"]
+
+[tool.ruff]
+# Someone else's code, kept byte for byte. Formatting it to this repository's rules would turn every
+# refresh from upstream into a diff of the whole tree.
+exclude = ["breeze_infer", "models"]
