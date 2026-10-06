@@ -4,6 +4,7 @@ import { IconDownload, IconPackage, IconRefresh, IconTrash } from '@tabler/icons
 import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useCatalog } from '../../api/catalog.queries';
+import { useEngines } from '../../api/engines.queries';
 import {
     useInstallEngine,
     useInstallJobs,
@@ -11,11 +12,13 @@ import {
     useReinstallEngine,
     useReinstallOutdated,
     useUninstallEngine,
+    useWarmEngine,
 } from '../../api/installs.queries';
 import { apiErrorCode } from '../../api/sdk.error';
 import { InstallModal } from '../installs/install.modal';
 import { JobPanel } from '../installs/job.panel';
 import { JobsList } from '../installs/jobs.list';
+import { WARM_COST, WarmOffer } from '../installs/warm.offer';
 import { ConfirmModal } from '../shared/confirm.modal';
 import { EmptyState } from '../shared/empty.state';
 import { ErrorAlert } from '../shared/error.alert';
@@ -36,11 +39,22 @@ export function CatalogPage() {
     const uninstall = useUninstallEngine();
     const reinstall = useReinstallEngine();
     const reinstallAll = useReinstallOutdated();
+    const warm = useWarmEngine();
+    const engines = useEngines();
 
     const [installing, setInstalling] = useState<CatalogEntry | undefined>(undefined);
     const [removing, setRemoving] = useState<CatalogEntry | undefined>(undefined);
     const [rebuilding, setRebuilding] = useState<CatalogEntry | undefined>(undefined);
     const [watching, setWatching] = useState<string | undefined>(undefined);
+    const [warming, setWarming] = useState<{ entry: CatalogEntry; variant: string } | undefined>(undefined);
+    // A worker already running answers its capability document without anything being started.
+    const running = (engine: string) => engines.data?.find(summary => summary.id === engine)?.process === 'up';
+    const askToWarm = (engine: string, variant: string) => {
+        const entry = catalog.data?.find(candidate => candidate.id === engine);
+        if (entry === undefined) return;
+        warm.reset();
+        setWarming({ entry, variant });
+    };
 
     // The job list is a management route and the catalog is not, so a page opened from another
     // machine can read the catalog and be refused this. That refusal is the whole answer to "why
@@ -102,6 +116,19 @@ export function CatalogPage() {
         );
     };
 
+    const confirmWarm = () => {
+        if (warming === undefined) return;
+        warm.mutate(
+            { engine: warming.entry.id, variant: warming.variant },
+            {
+                onSuccess: job => {
+                    setWarming(undefined);
+                    setWatching(job.id);
+                },
+            },
+        );
+    };
+
     const startReinstallAll = () =>
         reinstallAll.mutate(undefined, {
             onSuccess: ({ jobs: started, skipped }) => {
@@ -157,6 +184,7 @@ export function CatalogPage() {
                         Reinstall
                     </Button>
                 ) : undefined}
+                <WarmOffer entry={entry} ask={running(entry.id)} onWarm={variant => askToWarm(entry.id, variant)} />
                 {entry.defaultVariant === undefined ? undefined : (
                     <Button
                         variant="light"
@@ -239,7 +267,7 @@ export function CatalogPage() {
                             </Card>
                         </Grid.Col>
                         <Grid.Col span={{ base: 12, md: 8 }}>
-                            <JobPanel key={shown} jobId={shown} />
+                            <JobPanel key={shown} jobId={shown} onWarm={askToWarm} />
                         </Grid.Col>
                     </Grid>
                 </Stack>
@@ -265,6 +293,17 @@ export function CatalogPage() {
             >
                 Its worker is stopped and its virtualenv deleted. Downloaded weights stay where the engine put them, because other tools on this
                 machine may share that cache.
+            </ConfirmModal>
+            <ConfirmModal
+                opened={warming !== undefined}
+                onClose={() => setWarming(undefined)}
+                onConfirm={confirmWarm}
+                title={warming ? `Warm ${warming.entry.displayName} ${warming.variant}?` : ''}
+                confirmLabel="Warm"
+                confirming={warm.isPending}
+                error={warm.error ?? undefined}
+            >
+                {`${warming?.entry.displayName ?? ''} ${warming?.variant ?? ''} compiles on its first load, and nothing has warmed it here, so its first request would wait for that. ${WARM_COST}`}
             </ConfirmModal>
             <ConfirmModal
                 opened={rebuilding !== undefined}

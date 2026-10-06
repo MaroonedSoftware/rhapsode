@@ -57,6 +57,19 @@ export function usePullEngine() {
     });
 }
 
+/**
+ * Load a variant that compiles and unload it, so its first request does not compile. It takes a slot
+ * on the card and may evict an idle model, which is why the page asks first. § 10.
+ */
+export function useWarmEngine() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ engine, variant }: { engine: string; variant: string }) =>
+            unwrap<InstallJob>(await sdk.public.warmEngine(engine, { variant })),
+        onSettled: () => invalidateAfterJob(queryClient),
+    });
+}
+
 export function useUninstallEngine() {
     const queryClient = useQueryClient();
     return useMutation({

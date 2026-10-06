@@ -16,6 +16,9 @@ const api = vi.hoisted(() => ({
     uninstallEngine: vi.fn(),
     reinstallEngine: vi.fn(),
     reinstallOutdated: vi.fn(),
+    engines: vi.fn(),
+    engineCapabilities: vi.fn(),
+    warmEngine: vi.fn(),
 }));
 
 vi.mock('../../../src/api/client', () => ({ BASE_URL: '/api', sdk: { public: api } }));
@@ -51,6 +54,7 @@ describe('installing from the page', () => {
         api.catalog.mockResolvedValue([chatterbox]);
         api.installJobs.mockImplementation(async () => ({ status: 200, data: jobs }));
         api.installJob.mockImplementation(async (id: string) => ({ status: 200, data: jobs.find(candidate => candidate.id === id) }));
+        api.engines.mockResolvedValue([]);
     });
 
     afterEach(() => {
@@ -254,6 +258,70 @@ describe('installing from the page', () => {
 
         expect(await screen.findByText('Nothing to download ahead of time')).toBeInTheDocument();
         expect(screen.queryByText('Failed at weights')).not.toBeInTheDocument();
+    });
+
+    describe('warming a variant that compiles', () => {
+        const installed: CatalogEntry = { ...chatterbox, installed: 'yes', managed: true };
+        const variant = (compiles?: boolean) => ({ cues: [], deliveries: [], dials: {}, ...(compiles ? { compiles } : {}) });
+        const capabilities = { status: 200, data: { variants: { turbo: variant(true), original: variant() } } };
+
+        beforeEach(() => {
+            api.engineCapabilities.mockResolvedValue(capabilities);
+        });
+
+        it('offers it on the card of an engine whose worker is up, and warms it once the dialog has said what it costs', async () => {
+            const user = setupUser();
+            api.catalog.mockResolvedValue([installed]);
+            api.engines.mockResolvedValue([{ id: 'chatterbox', process: 'up', model: 'unloaded' }]);
+            api.warmEngine.mockImplementation(async () => {
+                jobs = [job({ kind: 'warm', variant: 'turbo', step: 'warm' })];
+                return { status: 202, data: jobs[0] };
+            });
+            render(<CatalogPage />);
+
+            await user.click(await screen.findByRole('button', { name: 'Warm turbo' }));
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).getByText(/evicting an idle model/)).toBeInTheDocument();
+            await user.click(within(dialog).getByRole('button', { name: 'Warm' }));
+
+            await waitFor(() => expect(api.warmEngine).toHaveBeenCalledWith('chatterbox', { variant: 'turbo' }));
+            expect((await screen.findAllByText('Warming chatterbox turbo')).length).toBeGreaterThan(0);
+        });
+
+        it('starts no worker to ask: an engine whose worker is down offers nothing', async () => {
+            api.catalog.mockResolvedValue([installed]);
+            api.engines.mockResolvedValue([{ id: 'chatterbox', process: 'down', model: 'unloaded' }]);
+            render(<CatalogPage />);
+
+            expect(await screen.findByRole('button', { name: 'Uninstall' })).toBeInTheDocument();
+            expect(api.engineCapabilities).not.toHaveBeenCalled();
+            expect(screen.queryByRole('button', { name: /^Warm/ })).not.toBeInTheDocument();
+        });
+
+        it('offers nothing for what was warmed, or for an engine configured by hand', async () => {
+            api.catalog.mockResolvedValue([
+                { ...installed, warmed: ['turbo'] },
+                { ...chatterbox, id: 'mine', displayName: 'Mine', installed: 'yes', managed: false },
+            ]);
+            api.engines.mockResolvedValue([
+                { id: 'chatterbox', process: 'up', model: 'unloaded' },
+                { id: 'mine', process: 'up', model: 'unloaded' },
+            ]);
+            render(<CatalogPage />);
+
+            await waitFor(() => expect(api.engineCapabilities).toHaveBeenCalledWith('chatterbox'));
+            expect(api.engineCapabilities).not.toHaveBeenCalledWith('mine');
+            expect(screen.queryByRole('button', { name: /^Warm/ })).not.toBeInTheDocument();
+        });
+
+        it('offers it once a reinstall succeeds, whose new worker the card cannot see', async () => {
+            api.catalog.mockResolvedValue([installed]);
+            jobs = [job({ kind: 'reinstall', state: 'succeeded', step: 'register' })];
+            render(<CatalogPage />);
+
+            expect(await screen.findByText(/now runs from a virtualenv this server built/)).toBeInTheDocument();
+            expect(await screen.findByRole('button', { name: 'Warm turbo' })).toBeInTheDocument();
+        });
     });
 
     describe('reinstalling what an upgrade left behind', () => {
