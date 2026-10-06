@@ -135,6 +135,29 @@ describe('installing from the page', () => {
         expect(screen.getByText(/chatterbox is installed; download the weights again from its card/)).toBeInTheDocument();
     });
 
+    it('shows a sixth step once the job warms a variant that compiles, and says it is compiled', async () => {
+        jobs = [job({ variant: 'full', step: 'warm', state: 'succeeded' })];
+        render(<CatalogPage />);
+
+        expect(await screen.findByText('Warm')).toBeInTheDocument();
+        expect(screen.getByText(/with the full weights on this machine and compiled/)).toBeInTheDocument();
+    });
+
+    it('says the engine is installed with its weights when only its warm failed', async () => {
+        jobs = [
+            job({
+                variant: 'full',
+                state: 'failed',
+                step: 'warm',
+                error: { code: 'model_unavailable', message: 'No available memory for the cache blocks', retryable: true },
+            }),
+        ];
+        render(<CatalogPage />);
+
+        expect(await screen.findByText('Failed at warm')).toBeInTheDocument();
+        expect(screen.getByText(/chatterbox is installed with its weights; its first request tries that load again/)).toBeInTheDocument();
+    });
+
     it('shows the core’s own reason when a job fails', async () => {
         jobs = [
             job({
@@ -289,6 +312,15 @@ describe('installing from the page', () => {
             expect(await screen.findByText(/rebuilding it is the operator’s to do/)).toBeInTheDocument();
             expect(screen.queryByRole('button', { name: 'Reinstall' })).not.toBeInTheDocument();
             expect(screen.queryByRole('button', { name: 'Reinstall all' })).not.toBeInTheDocument();
+        });
+
+        it('does not claim the old virtualenv is running when only the warm after the swap failed', async () => {
+            api.catalog.mockResolvedValue([stale]);
+            jobs = [job({ kind: 'reinstall', state: 'failed', step: 'warm', error: { code: 'internal', message: 'load failed', retryable: false } })];
+            render(<CatalogPage />);
+
+            expect(await screen.findByText(/chatterbox is reinstalled; its first request tries that load again/)).toBeInTheDocument();
+            expect(screen.queryByText(/is still running from its previous virtualenv/)).not.toBeInTheDocument();
         });
 
         it('says a failed reinstall left the engine running as it was', async () => {
