@@ -560,10 +560,10 @@ player should ask for `stream: false` and will get a better error the day someth
 | `unknown_engine` | 404 | no | Not in `GET /engines`. Core only; a worker is one engine |
 | `unknown_voice` | 404 | no | Not in `GET /voices` |
 | `unsupported` | 422 | no | A format, language or feature this variant does not do |
-| `model_unavailable` | 503 | **yes** | Loading, evicted, or a load that ran out of time |
+| `model_unavailable` | 503 | **yes** | Loading, evicted, a load that ran out of time, or a worker stopped from outside before it started |
 | `oom` | 503 | **yes** | Out of device memory |
 | `overloaded` | 429 | **yes** | Draining, or at the concurrency limit |
-| `internal` | 500 | no | The adapter threw |
+| `internal` | 500 | no | The adapter threw, or its worker refused to start |
 | `forbidden` | 403 | no | A management route (§ 10) called from somewhere it does not answer |
 | `conflict` | 409 | no | A management route (§ 10) asked for something the current state rules out |
 
@@ -572,6 +572,14 @@ matters is between "this request was wrong" and "this request was fine and the s
 a caller that conflates them either retries a permanent failure forever or discards work that would
 have succeeded on the next pass. A cold start that ran out of its budget is `model_unavailable`, and
 a client that understands that keeps the job rather than writing it off.
+
+**A worker that exits with a status before its handshake has refused to start**, and that is
+`internal`. It has not loaded a model yet, since the handshake comes first, so whatever stopped it
+stops the next attempt too: Breeze TTS 2 on a Mac exits 1 saying it needs an NVIDIA card, and was
+reported as a retryable `model_unavailable`, which a client trusting the flag would retry forever. An interpreter
+that does not exist, a wrong venv path, is `internal` for the same reason. A worker killed by a
+signal before its handshake was stopped from outside, by the OOM killer or an operator, and stays
+`model_unavailable`, as does one that did not announce itself in time.
 
 ### Dialogue
 
