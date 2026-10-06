@@ -143,6 +143,14 @@ describe('installing from the page', () => {
         expect(screen.getByText(/with the full weights on this machine and compiled/)).toBeInTheDocument();
     });
 
+    it('names a warm job, and says the variant is compiled once it is', async () => {
+        jobs = [job({ kind: 'warm', variant: 'full', step: 'warm', state: 'succeeded' })];
+        render(<CatalogPage />);
+
+        expect(await screen.findByText('Warm chatterbox full')).toBeInTheDocument();
+        expect(await screen.findByText(/chatterbox full is compiled, so its first request loads it from the cache/)).toBeInTheDocument();
+    });
+
     it('says the engine is installed with its weights when only its warm failed', async () => {
         jobs = [
             job({

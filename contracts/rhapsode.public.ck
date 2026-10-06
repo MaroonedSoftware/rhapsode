@@ -369,6 +369,28 @@ operation /engines/{engine}/pull: {
     }
 }
 
+operation /engines/{engine}/warm: {
+    params: {
+        engine: string
+    }
+    post: { # Loads a variant that compiles and unloads it, so its first request does not compile.
+        name: Warm a variant
+        sdk: warmEngine
+        # Through residency, as a /speak loads: it takes a slot and may evict an idle model, which
+        # is why it is its own route and not part of a pull. Fails the job with `unsupported` for a
+        # variant that does not declare `compiles`. protocol.md § 10.
+        request: {
+            application/json: WarmRequest
+        }
+        response: {
+            202: { application/json: InstallJob }
+            403: { application/json: ErrorBody }
+            404: { application/json: ErrorBody }
+            409: { application/json: ErrorBody }
+        }
+    }
+}
+
 operation /installs: {
     get: { # Every install job, running and finished.
         name: Install jobs

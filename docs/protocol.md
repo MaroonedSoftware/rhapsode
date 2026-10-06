@@ -1505,7 +1505,7 @@ the engine from the file would no longer remove it. A setting only tunes somethi
 An engine's entry is an engine entry like one in the config, plus one field the core keeps for
 itself: `accepted`, the weights licence the last install or reinstall accepted, as the `accept`
 query named it, and absent when none was needed. And `warmed`, the variants step 6 of the install
-warmed, absent when it warmed none. Boot ignores both. A reinstall reads both (below).
+or a warm since (below) warmed, absent when nothing has been. Boot ignores both. A reinstall reads both (below).
 
 ### Uninstalling
 
@@ -1614,7 +1614,32 @@ without loading them. The worker process is started if it is not running, which 
 megabytes, and no model is loaded, so it takes no residency slot and evicts nothing. An engine that
 does not implement `fetch` answers `unsupported`, and its weights arrive on first load as before.
 A pull never warms, even a variant that declares `compiles`: evicting nothing is the promise that
-lets a client pull on a busy box, and only an install's step 6 loads anything.
+lets a client pull on a busy box, and warming is asked for by name (below).
+
+### Warming
+
+`POST /engines/{id}/warm` with `{ "variant": "full" }` loads a variant that declares `compiles`
+(§ 8) and unloads it again, exactly as an install's step 6 does, as a job whose `kind` is `warm` and
+whose one step is `warm`. An absent `variant` is the engine's default, as for a pull. It is the way
+to warm an engine an install did not: one installed without `?pull`, one installed by a core that
+had no step 6, and one the operator configured. An Orpheus installed before step 6 existed has no
+`warmed`, so the reinstall an upgrade asks for would rebuild it and leave its first request to
+compile from cold, 35 seconds against 12.
+
+It is a route of its own rather than a pull that also warms, because the two make opposite promises
+about the card: a pull evicts nothing, and a warm takes a slot as a `/speak` would, may evict an
+idle model for it, and waits behind one that is speaking. A client that asks for a warm has asked
+for that by name.
+
+- **A variant that does not compile fails the job with `unsupported`**, and so does one the worker
+  does not declare. Which variants compile is the worker's to say, so it is a job's answer and not a
+  refusal before one: the core has not asked the worker yet.
+- **What it warms is recorded**, added to the engine's `warmed` when this API installed it, so a
+  reinstall warms it again from then on. An engine the operator configured is warmed and nothing is
+  recorded, because the state database does not hold an entry for an engine it does not own, and a
+  reinstall refuses that engine anyway.
+- **The refusals before a job are a pull's**: an engine that is not installed is `unknown_engine`,
+  and one with a job queued or running is `conflict`.
 
 ### Jobs
 
@@ -1630,7 +1655,7 @@ lets a client pull on a busy box, and only an install's step 6 loads anything.
 }
 ```
 
-`kind` is `install`, `pull` or `reinstall`. `variant` is the variant a pull fetches, or an install fetches in
+`kind` is `install`, `pull`, `reinstall` or `warm`. `variant` is the variant a pull fetches, or an install fetches in
 step 5; an install without it stops at `register`. `step` is one of `venv`, `packages`, `verify`,
 `register`, `weights` and `warm`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
 carries `error`, an ordinary error envelope body. Its message names the command and the line of

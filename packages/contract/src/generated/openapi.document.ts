@@ -1007,6 +1007,75 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 }
             }
         },
+        "/engines/{engine}/warm": {
+            "post": {
+                "operationId": "warmEngine",
+                "summary": "Warm a variant",
+                "description": "Loads a variant that compiles and unloads it, so its first request does not compile.",
+                "parameters": [
+                    {
+                        "name": "engine",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WarmRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Response 202",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InstallJob"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorBody"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/installs": {
             "get": {
                 "operationId": "installJobs",
@@ -2275,12 +2344,13 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "enum": [
                             "install",
                             "pull",
-                            "reinstall"
+                            "reinstall",
+                            "warm"
                         ]
                     },
                     "variant": {
                         "type": "string",
-                        "description": "What a pull fetches, or an install fetches in step 5."
+                        "description": "What a pull fetches or a warm loads, or an install fetches in step 5."
                     },
                     "state": {
                         "type": "string",
@@ -2370,6 +2440,15 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 ]
             },
             "PullRequest": {
+                "type": "object",
+                "properties": {
+                    "variant": {
+                        "type": "string",
+                        "description": "Absent means the engine's default variant."
+                    }
+                }
+            },
+            "WarmRequest": {
                 "type": "object",
                 "properties": {
                     "variant": {

@@ -24,6 +24,7 @@ const INSTALL_STEPS: InstallStep[] = ['venv', 'packages', 'verify', 'register'];
  */
 function stepsOf(job: InstallJob): InstallStep[] {
     if (job.kind === 'pull') return ['weights'];
+    if (job.kind === 'warm') return ['warm'];
     return job.variant === undefined ? INSTALL_STEPS : [...INSTALL_STEPS, 'weights'];
 }
 
@@ -102,6 +103,9 @@ export class InstallJobs {
             job,
             signal: this.stopping.signal,
             step: step => {
+                // Once per step: a warm job names its step before asking the worker whether the
+                // variant compiles, so a refusal reports it, and the warm itself names it again.
+                if (job.step === step) return;
                 job.step = step;
                 if (!steps.includes(step)) steps.push(step);
                 this.feed.progress(INSTALL_SOURCE, job.id, { phase: step, index: steps.indexOf(step) + 1, total: steps.length, status: 'running' });

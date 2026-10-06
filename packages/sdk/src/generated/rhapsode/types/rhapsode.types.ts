@@ -289,6 +289,14 @@ export interface PullRequest {
 }
 
 /**
+ * generated from [WarmRequest](../../../../../../contracts/rhapsode.types.ck)
+ */
+export interface WarmRequest {
+    /** Absent means the engine's default variant. */
+    variant?: string;
+}
+
+/**
  * One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,
  * declared here so a client can parse it without depending on ServerKit.
  * generated from [FeedProgress](../../../../../../contracts/rhapsode.types.ck)
@@ -417,8 +425,8 @@ export interface ErrorBody {
 export interface InstallJob {
     id: string;
     engine: string;
-    kind: 'install' | 'pull' | 'reinstall';
-    /** What a pull fetches, or an install fetches in step 5. */
+    kind: 'install' | 'pull' | 'reinstall' | 'warm';
+    /** What a pull fetches or a warm loads, or an install fetches in step 5. */
     variant?: string;
     state: 'queued' | 'running' | 'succeeded' | 'failed';
     step?: 'venv' | 'packages' | 'verify' | 'register' | 'weights' | 'warm';

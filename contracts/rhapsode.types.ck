@@ -309,8 +309,8 @@ contract mode(loose) CatalogEntry: {
 contract mode(loose) InstallJob: {
     id: string
     engine: string
-    kind: enum(install, pull, reinstall)
-    variant?: string                            # What a pull fetches, or an install fetches in step 5.
+    kind: enum(install, pull, reinstall, warm)
+    variant?: string                            # What a pull fetches or a warm loads, or an install fetches in step 5.
     state: enum(queued, running, succeeded, failed)
     step?: enum(venv, packages, verify, register, weights, warm)
     createdAt: string                           # ISO 8601, UTC.
@@ -332,6 +332,10 @@ contract mode(loose) ReinstallOutdated: {
 }
 
 contract PullRequest: {
+    variant?: string                            # Absent means the engine's default variant.
+}
+
+contract WarmRequest: {
     variant?: string                            # Absent means the engine's default variant.
 }
 

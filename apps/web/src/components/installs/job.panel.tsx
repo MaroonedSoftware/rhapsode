@@ -28,6 +28,7 @@ const INSTALL: Step[] = [
  */
 function stepsOf(job: InstallJob, current: string | undefined): Step[] {
     if (job.kind === 'pull') return [WEIGHTS];
+    if (job.kind === 'warm') return [WARM];
     const warm = current === 'warm' ? [WARM] : [];
     if (job.kind === 'reinstall') return [...INSTALL, ...warm];
     return job.variant === undefined ? INSTALL : [...INSTALL, WEIGHTS, ...warm];
@@ -38,10 +39,11 @@ export function jobTitle(job: InstallJob): string {
     const doing = job.state === 'queued' || job.state === 'running';
     if (job.kind === 'install') return `${doing ? 'Installing' : 'Install'} ${job.engine}`;
     if (job.kind === 'reinstall') return `${doing ? 'Reinstalling' : 'Reinstall'} ${job.engine}`;
+    if (job.kind === 'warm') return `${doing ? 'Warming' : 'Warm'} ${`${job.engine} ${job.variant ?? ''}`.trim()}`;
     return `${doing ? 'Downloading' : 'Download'} ${`${job.engine} ${job.variant ?? ''}`.trim()}`;
 }
 
-const SUCCEEDED: Record<InstallJob['kind'], string> = { install: 'Installed', reinstall: 'Reinstalled', pull: 'Downloaded' };
+const SUCCEEDED: Record<InstallJob['kind'], string> = { install: 'Installed', reinstall: 'Reinstalled', pull: 'Downloaded', warm: 'Warmed' };
 
 /** One job, followed as it happens: which step, what it printed, and how it ended. */
 export function JobPanel({ jobId }: { jobId: string }) {
@@ -94,13 +96,15 @@ export function JobPanel({ jobId }: { jobId: string }) {
                     <Alert color={severityColor.success} title={SUCCEEDED[data.kind]}>
                         {data.kind === 'pull'
                             ? `The ${data.variant ?? 'default'} weights are on this machine, so the first request only has to load them.`
-                            : data.kind === 'reinstall'
-                              ? `${data.engine} now runs from a virtualenv this server built. Its next request loads the model again${warmed ? ', from the compile cache this filled' : ''}.`
-                              : data.variant === undefined
-                                ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
-                                : warmed
-                                  ? `${data.engine} is ready, with the ${data.variant} weights on this machine and compiled, so its first request loads them from the cache.`
-                                  : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
+                            : data.kind === 'warm'
+                              ? `${data.engine} ${data.variant ?? ''} is compiled, so its first request loads it from the cache.`
+                              : data.kind === 'reinstall'
+                                ? `${data.engine} now runs from a virtualenv this server built. Its next request loads the model again${warmed ? ', from the compile cache this filled' : ''}.`
+                                : data.variant === undefined
+                                  ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
+                                  : warmed
+                                    ? `${data.engine} is ready, with the ${data.variant} weights on this machine and compiled, so its first request loads them from the cache.`
+                                    : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
                     </Alert>
                 ) : noFetch ? (
                     <Alert color={severityColor.info} title="Nothing to download ahead of time">
@@ -113,7 +117,9 @@ export function JobPanel({ jobId }: { jobId: string }) {
                         {data.kind === 'reinstall' && !warmed ? ` ${data.engine} is still running from its previous virtualenv.` : undefined}
                         {/* A warm comes after the swap or the download, so all that failed is one load. § 10. */}
                         {warmed
-                            ? ` ${data.engine} is ${data.kind === 'reinstall' ? 'reinstalled' : 'installed with its weights'}; its first request tries that load again.`
+                            ? data.kind === 'warm'
+                                ? ` Nothing else about ${data.engine} changed; its first request tries that load again.`
+                                : ` ${data.engine} is ${data.kind === 'reinstall' ? 'reinstalled' : 'installed with its weights'}; its first request tries that load again.`
                             : undefined}
                         {/* The engine was registered before its weights were asked for, so it is installed. § 10. */}
                         {data.kind === 'install' && current === 'weights'

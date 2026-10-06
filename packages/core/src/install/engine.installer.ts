@@ -127,6 +127,33 @@ export class EngineInstaller {
     }
 
     /**
+     * Queue a warm of a variant that compiles, for an engine no install warmed. § 10.
+     *
+     * Unlike a pull it takes a residency slot, and may evict an idle model for one, which is why it
+     * is asked for by name. What it warms is recorded for an engine this API installed, so a
+     * reinstall warms it again; an operator's engine has no entry of ours to record it in.
+     */
+    warmOne(id: string, variant: string | undefined): InstallJob {
+        if (!this.engines.has(id)) throw RhapsodeError.unknownEngine(id, this.engines.ids());
+        this.refuseIfBusy(id);
+        const chosen = variant ?? this.engines.entry(id)?.defaultVariant;
+        if (chosen === undefined) throw new RhapsodeError('bad_request', `"${id}" has no default variant, so name the one to warm`);
+
+        return this.jobs.submit('warm', id, chosen, async context => {
+            context.step('warm');
+            if (!(await this.compiles(id, chosen))) {
+                throw new RhapsodeError('unsupported', `${id} ${chosen} does not compile on its first load, so there is nothing to warm`);
+            }
+            await this.warm(id, chosen, context);
+            const entry = this.managed.entry(id);
+            if (entry !== undefined && this.managed.isManaged(id)) {
+                const warmed = [...new Set([...(entry.warmed ?? []), chosen])];
+                await this.managed.record(id, { ...entry, warmed });
+            }
+        });
+    }
+
+    /**
      * Stop an engine, forget it, and delete its virtualenv if this API made it.
      *
      * Synchronous rather than a job, because none of it waits on the network. Weights are left where
