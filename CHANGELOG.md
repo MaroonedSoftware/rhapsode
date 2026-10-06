@@ -2,6 +2,12 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.21
+
+- `POST /engines/{id}/warm` warms a variant that compiles on its first load for an engine no install warmed: one installed before installs warmed, one installed without `?pull`, or one the operator configured. It loads and unloads the variant through residency as an install's `warm` step does, as a job of kind `warm`, and records it so later reinstalls warm it again. Run it once on an Orpheus installed before installs warmed (`{ "variant": "full" }`), or its reinstall after an upgrade leaves the first request to compile, 35 s against 12. A variant that does not compile fails the job with `unsupported`. The web page names the new job kind.
+- `GET /catalog` says which variants an engine this API installed has warmed, as `warmed`. `pnpm wizard warm <engine> [variant]` warms a variant that compiles on its first load; without a variant it warms every one the engine says compiles that has not been warmed. `pnpm wizard update` and `pnpm wizard reinstall` offer the same for the engines they have just reinstalled, which is what an Orpheus installed before installs warmed needs after an upgrade: its reinstall rebuilds it, but its first request would still compile, 35 s against 12.
+- The Engines page offers to warm a variant that compiles on its first load and has not been warmed: on the card of an engine whose worker is running, and on a reinstall's job panel once it succeeds, which is where an Orpheus installed before installs warmed needs it after an upgrade. It asks first, saying that a warm takes a slot on the card and may evict an idle model, and follows the job like any other. It never starts a worker just to find out.
+
 ## 0.1.20
 
 - An install that pulls a variant whose first load compiles now does that load itself, so the first request does not. A variant declares it with `compiles` in its capability document (`Variant(compiles=True)` in the SDK), and Orpheus's `full` does: vLLM compiling the graph made its first load 35 s and 8.05 GB held, against 12 s and 7.26 GB after. `POST /engines/orpheus/install?pull=full` gains a sixth step, `warm`, which loads it through residency and unloads it again, and a reinstall warms it again after the swap, since an upgrade of vLLM or torch moves the compile cache. A pull still loads nothing. In the server image the cache is on the `/data` volume, so it survives the container being recreated.
