@@ -19,6 +19,13 @@ from .builds import CUE_TAGS, NATIVE_TAGS_EN, NATIVE_TAGS_ZH
 #: voice's clip and transcript. A rule of thumb rather than a measurement of this model.
 SEGMENT_CHARACTERS = 300
 
+#: The first piece of a request that names no voice, per language, which every later piece clones
+#: from. Upstream's plain template has no voice of its own, so without this every piece of one text
+#: would be read by somebody new. About 9 s either way, at roughly 15 English and 4.5 Chinese
+#: characters a second: long enough to be a reference worth cloning, short enough that the first
+#: audio is not held up. Rules of thumb rather than measurements of this model.
+ANCHOR_CHARACTERS: dict[str, int] = {"en": 130, "zh": 40}
+
 #: Anything already written in the model's own syntax. Its event tags in either language, whatever
 #: the language of the request, since a Chinese tag in an English line is the same back door. Its
 #: speaker tag, which upstream's templates write as `[S0]` and a client could use to start a second

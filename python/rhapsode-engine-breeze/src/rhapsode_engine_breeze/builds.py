@@ -164,6 +164,11 @@ FILES: tuple[str, ...] = (
     "tokenizer_config.json",
 )
 
+#: The commit `rhapsode-vendor-breeze` copies upstream's inference code from, reported as the
+#: engine's upstream version because the code is what changes between installs; the weights are
+#: pinned above and do not.
+UPSTREAM_COMMIT = "58ec70ce5fa4cc361bdebf77ec40d1365da00ab2"
+
 #: The one build, named for the release, since BreezeBlue's next model is not a size of this one.
 DEFAULT_VARIANT = "2"
 

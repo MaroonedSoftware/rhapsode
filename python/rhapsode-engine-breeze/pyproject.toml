@@ -11,6 +11,15 @@ license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "rhapsode-worker==0.1.17",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    # Upstream's inference code, which has no packaging of its own, and with it torch, transformers
+    # and qwen-tts at the versions upstream pins. A companion: installed beside this package in one
+    # resolve. protocol.md § 10.
+    "rhapsode-vendor-breeze==0.1.17",
+    "numpy>=2.0",
+    "huggingface_hub>=0.23",
+    # Reads a reference clip in any of the four formats a clone accepts. 0.12 is the first whose
+    # wheels carry a libsndfile that reads MP3.
+    "soundfile>=0.12",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -27,6 +36,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 strict = true
 files = ["src"]
 
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*", "numpy.*", "huggingface_hub", "huggingface_hub.*", "soundfile", "breeze_infer.*", "models.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts fakes where torch and upstream's runtime would be.
+pythonpath = ["tests"]
 timeout = 60
