@@ -88,7 +88,7 @@ class TestLoading:
             {"repo_id": REPOSITORY, "revision": REVISION, "allow_patterns": list(FILES), "token": None}
         ]
         load = next(load for load in breeze.loads if "checkpoint" in load)
-        assert load == {"checkpoint": Path(f"/models/{REPOSITORY}"), "device": "cuda", "attention": "eager"}
+        assert load == {"checkpoint": Path(f"/models/{REPOSITORY}"), "device": "cuda:0", "attention": "eager"}
 
     def test_the_runtime_is_upstreams_eager_path_at_its_own_limits(
         self, breeze: Recorder, tmp_path: Path

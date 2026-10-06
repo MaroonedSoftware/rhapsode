@@ -268,5 +268,11 @@ def _checkpoint() -> Path:
 
 
 def _torch_device(device: Device) -> str:
-    """torch's name for the detected device, which `variants` has already insisted is CUDA."""
-    return "cuda" if device.type == "cuda" else "cpu"
+    """torch's name for the detected device, which `variants` has already insisted is CUDA.
+
+    With an index, because upstream's `load_runtime` passes it to `torch.cuda.set_device`, which
+    refuses a bare "cuda": the first load on real weights failed with "Expected a torch.device with a
+    specified index". The first visible card, which is the one the SDK detected and the one
+    `CUDA_VISIBLE_DEVICES` puts first.
+    """
+    return "cuda:0" if device.type == "cuda" else "cpu"

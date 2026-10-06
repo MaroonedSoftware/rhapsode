@@ -217,6 +217,9 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
     def load_runtime(ckpt_dir: Path, *, device: str, attn_implementation: str) -> tuple[Any, Any, Any]:
         assert isinstance(ckpt_dir, Path), "upstream joins `audio_tokenizer` onto it with /"
+        # Upstream hands it to `torch.cuda.set_device`, which refuses a device with no index.
+        if device.startswith("cuda") and ":" not in device:
+            raise ValueError(f"Expected a torch.device with a specified index, but got:{device}")
         recorder.loads.append({"checkpoint": ckpt_dir, "device": device, "attention": attn_implementation})
         return "tokenizer", types.SimpleNamespace(generation_config={}), "audio tokenizer"
 
