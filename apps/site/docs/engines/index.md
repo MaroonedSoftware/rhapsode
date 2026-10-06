@@ -28,6 +28,11 @@ crash takes down that engine's worker rather than the server.
   first among open weights on the Artificial Analysis speech arena at its release, speaks English
   and Chinese, performs all eight cues, and clones from a clip and its transcript. Its weights are
   for research and non-commercial use only, and it needs an NVIDIA card with about 8 GB free.
+- **For more languages, if you are not selling it, [Fish Audio S2 Pro](fish.md).** Built with Fish
+  Audio, it ranked second among open weights on the Artificial Analysis speech arena at its release.
+  It speaks ten languages, performs three of the eight cues, and clones from a clip and its
+  transcript. Its code and its weights are for research and non-commercial use only, and it needs a
+  card with about 13 GB free.
 - **[Tone](tone.md)** makes a sine wave. It exists to prove the protocol in CI, and it is the
   fixture the conformance suite compares a real engine against.
 

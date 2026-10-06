@@ -25,6 +25,7 @@ export const TARGETS: Target[] = [
     { id: 'orpheus', label: 'Orpheus', tags: { laugh: '<laugh>' } },
     { id: 'dia', label: 'Dia', tags: { 'clear throat': '(clears throat)', laugh: '(laughs)' } },
     { id: 'breeze', label: 'Breeze TTS 2', tags: { 'clear throat': '(clears throat)', laugh: '(laughs)' } },
+    { id: 'fish', label: 'Fish Audio S2 Pro', tags: { 'clear throat': '[clears throat]', laugh: '[laughing]' } },
     { id: 'chatterbox-original', label: 'Chatterbox original', tags: {} },
     { id: 'kokoro', label: 'Kokoro', tags: {} },
 ];
