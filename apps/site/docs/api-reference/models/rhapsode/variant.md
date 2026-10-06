@@ -10,7 +10,7 @@ mdx:
 > tags and discards the dials, while `original` is the other way round.
 
 <details>
-<summary>Attributes (9)</summary>
+<summary>Attributes (10)</summary>
 
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -23,5 +23,6 @@ mdx:
 | `blending` | `Blending` | No | Beside cloning, for the same reason: it needs no model. § 7. |
 | `segmentation` | `Segmentation` | No | Whether long text is split into several generations. § 8. |
 | `dialogue` | `Dialogue` | No | Present only where this build answers /dialogue. § 6. |
+| `compiles` | `boolean` | No | Its first load fills a compile cache later loads read. § 8. |
 
 </details>

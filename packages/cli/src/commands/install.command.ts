@@ -97,6 +97,9 @@ async function install(engine: string, opts: InstallOptions, ctx: CliContext, cl
             if (job.state === 'failed' && job.step === 'weights') {
                 ui.warn(`${entry.displayName} is installed, but its weights did not download. Run this again with --pull to retry.`);
             }
+            if (job.state === 'failed' && job.step === 'warm') {
+                ui.warn(`${entry.displayName} is installed with its weights, but loading it once to compile failed. Its first request tries again.`);
+            }
             return job.state === 'succeeded' ? 0 : 1;
         }
 

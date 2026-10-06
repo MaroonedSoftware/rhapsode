@@ -11,6 +11,15 @@ def test_every_build_claims_the_same_because_every_build_is_the_same_finetune() 
     assert declared["q8"] == declared["q4"]
 
 
+def test_only_full_compiles_because_only_vllm_builds_a_cache_on_first_load() -> None:
+    # An install warms what compiles (protocol.md § 10); llama.cpp has nothing to warm.
+    declared = variants(full=True)
+    assert list(declared) == ["full", "q8", "q4"]
+    assert declared["full"].compiles
+    assert not declared["q8"].compiles and not declared["q4"].compiles
+    assert declared["full"].cues == declared["q8"].cues
+
+
 def test_clear_throat_is_not_claimed() -> None:
     # Orpheus has no tag for it. Claiming it would have the model read "clear throat" out loud, which
     # is the one failure the capability document cannot catch for an adapter.

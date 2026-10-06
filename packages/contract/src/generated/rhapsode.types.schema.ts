@@ -345,6 +345,10 @@ export const Variant = z.looseObject({
     blending: Blending.optional().describe('Beside cloning, for the same reason: it needs no model. § 7.'),
     segmentation: Segmentation.optional().describe('Whether long text is split into several generations. § 8.'),
     dialogue: Dialogue.optional().describe('Present only where this build answers /dialogue. § 6.'),
+    compiles: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .optional()
+        .describe('Its first load fills a compile cache later loads read. § 8.'),
 });
 export type Variant = z.infer<typeof Variant>;
 
@@ -451,7 +455,7 @@ export const InstallJob = z.looseObject({
     kind: z.enum(['install', 'pull', 'reinstall']),
     variant: z.string().optional().describe('What a pull fetches, or an install fetches in step 5.'),
     state: z.enum(['queued', 'running', 'succeeded', 'failed']),
-    step: z.enum(['venv', 'packages', 'verify', 'register', 'weights']).optional(),
+    step: z.enum(['venv', 'packages', 'verify', 'register', 'weights', 'warm']).optional(),
     createdAt: z.string().describe('ISO 8601, UTC.'),
     startedAt: z.string().optional(),
     finishedAt: z.string().optional(),

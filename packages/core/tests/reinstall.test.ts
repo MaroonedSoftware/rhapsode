@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -28,6 +30,26 @@ function recordedIn(dir: string): { engines: Record<string, unknown> } {
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+/** A warm starts a real worker, which needs a unix socket the sandbox may refuse. */
+const canBindUnixSockets = await (async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'rh-probe-'));
+    try {
+        const server = createServer();
+        await new Promise<void>((fulfil, fail) => {
+            server.once('error', fail);
+            server.listen(join(directory, 'p.sock'), fulfil);
+        });
+        await new Promise<void>(fulfil => server.close(() => fulfil()));
+        return true;
+    } catch {
+        return false;
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+})();
+
 /** Where a venv keeps `rhapsode-worker`'s metadata, which is all `workerVersion` reads. § 9. */
 function writeWorkerVersion(venv: string, version: string): void {
     mkdirSync(join(venv, 'lib', 'python3.12', 'site-packages', `rhapsode_worker-${version}.dist-info`), { recursive: true });
@@ -37,7 +59,7 @@ function writeWorkerVersion(venv: string, version: string): void {
  * A runner that builds a venv with `rhapsode-worker` at `options.version` in it, so a test can make
  * an engine that an upgrade left behind and then reinstall it at this core's version.
  */
-function fakeRunner(options: { version: string; failAt?: PlannedCommand['step']; hold?: Promise<void> }) {
+function fakeRunner(options: { version: string; failAt?: PlannedCommand['step']; hold?: Promise<void>; python?: string }) {
     const ran: PlannedCommand[] = [];
     const runner: CommandRunner = async command => {
         ran.push(command);
@@ -47,6 +69,10 @@ function fakeRunner(options: { version: string; failAt?: PlannedCommand['step'];
             const venv = command.args.at(-1)!;
             mkdirSync(join(venv, 'bin'), { recursive: true });
             writeWorkerVersion(venv, options.version);
+            if (options.python !== undefined) {
+                writeFileSync(join(venv, 'bin', 'python'), `#!/bin/sh\nexec '${options.python}' "$@"\n`);
+                chmodSync(join(venv, 'bin', 'python'), 0o755);
+            }
         }
     };
     return { runner, ran };
@@ -121,6 +147,25 @@ describe('reinstalling an engine', () => {
         expect(managedEntry('tone')).toEqual({ venv: join(venvDir, 'tone.alt') });
         expect(existsSync(join(venvDir, 'tone'))).toBe(false);
         expect(await catalogEntry(app, 'tone')).toMatchObject({ installed: 'yes', workerVersion: CORE_VERSION, outdated: false });
+    });
+
+    it.skipIf(!canBindUnixSockets)('warms again what the install warmed, once the new virtualenv is in', { timeout: 60_000 }, async () => {
+        // The SDK's compiling test engine, posing as tone, logging each fetch, load and unload. § 8.
+        const python = join(dir, 'compiling-python');
+        const environment = `PYTHONPATH='${join(REPO, 'python/rhapsode-worker/tests')}' RHAPSODE_TEST_PROGRESS='${join(dir, 'progress')}'`;
+        writeFileSync(python, `#!/bin/sh\nexport ${environment}\nexec '${join(REPO, 'python/.venv/bin/python')}' -m engines.compiling\n`);
+        chmodSync(python, 0o755);
+        const options = { version: '0.0.1', python };
+        const app = await start(fakeRunner(options).runner);
+        await installStale(app, options, 'tone', '?pull=compiled');
+        expect(managedEntry('tone')).toMatchObject({ warmed: ['compiled'] });
+
+        const job = await settled(app, (await post(app, '/engines/tone/reinstall')).json().id);
+
+        expect(job.error).toBeUndefined();
+        expect(job).toMatchObject({ state: 'succeeded', kind: 'reinstall', step: 'warm' });
+        expect(readFileSync(join(dir, 'progress'), 'utf8')).toBe('fetched compiled\nloaded compiled\nunloaded\nloaded compiled\nunloaded\n');
+        expect(managedEntry('tone')).toEqual({ venv: join(venvDir, 'tone.alt'), warmed: ['compiled'] });
     });
 
     it('keeps a keep-alive set through /settings, which what the install recorded does not carry', async () => {

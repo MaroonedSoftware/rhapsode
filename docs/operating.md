@@ -151,9 +151,10 @@ without compiling anything:
 
 - **Linux x86_64, the server image included: vLLM**, and the `full` build on an NVIDIA card. The
   weights are unsloth's ungated copy, 6.6 GB, so no token is needed. vLLM wants 7 GiB of the card
-  free when it loads and holds about 7.3 GB, or 8.1 GB on the first load after an install, which
-  compiles the graph; `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, a fraction of the card,
-  moves that.
+  free when it loads and holds about 7.3 GB. Its first load compiles the graph, 35 s and 8.1 GB
+  held, so install it with `?pull=full` and the install does that load for you (§ 10's `warm`
+  step), as a reinstall does again after an upgrade; the cache it fills is under `/data`.
+  `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, a fraction of the card, moves the 7 GiB.
 - **Anywhere else: llama.cpp**, and the `q8` and `q4` builds. On a Mac pip builds it with Metal,
   which needs the Xcode command line tools (`xcode-select --install`).
 

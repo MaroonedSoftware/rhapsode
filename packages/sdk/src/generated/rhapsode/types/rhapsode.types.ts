@@ -325,6 +325,8 @@ export interface Variant {
     segmentation?: Segmentation;
     /** Present only where this build answers /dialogue. § 6. */
     dialogue?: Dialogue;
+    /** Its first load fills a compile cache later loads read. § 8. */
+    compiles?: boolean;
 }
 
 /**
@@ -419,7 +421,7 @@ export interface InstallJob {
     /** What a pull fetches, or an install fetches in step 5. */
     variant?: string;
     state: 'queued' | 'running' | 'succeeded' | 'failed';
-    step?: 'venv' | 'packages' | 'verify' | 'register' | 'weights';
+    step?: 'venv' | 'packages' | 'verify' | 'register' | 'weights' | 'warm';
     /** ISO 8601, UTC. */
     createdAt: string;
     startedAt?: string;

@@ -419,6 +419,60 @@ describe('the install routes', () => {
         expect(job).toMatchObject({ state: 'succeeded', step: 'weights', variant: 'plain' });
     });
 
+    describe('a variant that compiles on its first load', () => {
+        /**
+         * An interpreter that runs the SDK's compiling test engine whatever module it is asked for,
+         * posing as the catalog engine the core spawned, and logs each fetch, load and unload. § 8.
+         */
+        function compilingPython(mode = 'ok'): string {
+            const script = join(dir, 'compiling-python');
+            const environment = [
+                `PYTHONPATH='${join(REPO, 'python/rhapsode-worker/tests')}'`,
+                `RHAPSODE_TEST_PROGRESS='${join(dir, 'progress')}'`,
+                `RHAPSODE_TEST_MODE='${mode}'`,
+            ].join(' ');
+            writeFileSync(script, `#!/bin/sh\nexport ${environment}\nexec '${join(REPO, 'python/.venv/bin/python')}' -m engines.compiling\n`);
+            chmodSync(script, 0o755);
+            return script;
+        }
+
+        const progress = () => readFileSync(join(dir, 'progress'), 'utf8');
+
+        it.skipIf(!canBindUnixSockets)('is loaded and unloaded once after its weights, and recorded as warmed', { timeout: 60_000 }, async () => {
+            const app = await start(fakeRunner({ python: compilingPython() }).runner);
+
+            const job = await settled(app, (await install(app, 'tone', '?pull=compiled')).json().id);
+
+            expect(job.error).toBeUndefined();
+            expect(job).toMatchObject({ state: 'succeeded', step: 'warm', variant: 'compiled' });
+            expect(progress()).toBe('fetched compiled\nloaded compiled\nunloaded\n');
+            expect(recordedIn(dir).engines.tone).toMatchObject({ warmed: ['compiled'] });
+            const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
+            expect(engines.find((engine: { id: string }) => engine.id === 'tone')).toMatchObject({ model: 'unloaded' });
+        });
+
+        it.skipIf(!canBindUnixSockets)('is not warmed when the install pulled a variant that does not compile', { timeout: 60_000 }, async () => {
+            const app = await start(fakeRunner({ python: compilingPython() }).runner);
+
+            const job = await settled(app, (await install(app, 'tone', '?pull=plain')).json().id);
+
+            expect(job).toMatchObject({ state: 'succeeded', step: 'weights', variant: 'plain' });
+            expect(progress()).toBe('fetched plain\n');
+            expect(recordedIn(dir).engines.tone).not.toHaveProperty('warmed');
+        });
+
+        it.skipIf(!canBindUnixSockets)('fails at warm and leaves the engine installed when the load fails', { timeout: 60_000 }, async () => {
+            const app = await start(fakeRunner({ python: compilingPython('load_fails') }).runner);
+
+            const job = await settled(app, (await install(app, 'tone', '?pull=compiled')).json().id);
+
+            expect(job).toMatchObject({ state: 'failed', step: 'warm', variant: 'compiled' });
+            expect(recordedIn(dir).engines.tone).not.toHaveProperty('warmed');
+            const engines = (await app.inject({ method: 'GET', url: '/engines' })).json();
+            expect(engines.map((engine: { id: string }) => engine.id)).toEqual(['tone']);
+        });
+    });
+
     describe('a weights licence that may not be used commercially', () => {
         // No catalog engine has such weights yet, so one is added for the length of each test.
         beforeEach(() => {

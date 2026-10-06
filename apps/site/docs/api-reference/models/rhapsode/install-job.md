@@ -15,7 +15,7 @@ mdx:
 | `kind` | `'install' \| 'pull' \| 'reinstall'` | Yes |  |
 | `variant` | `string` | No | What a pull fetches, or an install fetches in step 5. |
 | `state` | `'queued' \| 'running' \| 'succeeded' \| 'failed'` | Yes |  |
-| `step` | `'venv' \| 'packages' \| 'verify' \| 'register' \| 'weights'` | No |  |
+| `step` | `'venv' \| 'packages' \| 'verify' \| 'register' \| 'weights' \| 'warm'` | No |  |
 | `createdAt` | `string` | Yes | ISO 8601, UTC. |
 | `startedAt` | `string` | No |  |
 | `finishedAt` | `string` | No |  |

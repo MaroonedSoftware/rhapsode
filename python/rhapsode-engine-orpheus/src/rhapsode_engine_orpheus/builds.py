@@ -11,6 +11,8 @@ The evidence for everything claimed here is upstream's README and `orpheus_tts` 
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from rhapsode_worker import Variant
 
 #: The standard vocabulary, minus `clear throat`, which Orpheus has no tag for. Claiming it anyway is
@@ -92,6 +94,10 @@ def variants(*, gguf: bool = True, full: bool = False) -> dict[str, Variant]:
     that cannot run it is a promise every load of it breaks. protocol.md § 4.
     """
     claimed = Variant(cues=CUES, deliveries=(), dials=dict(DIALS), languages=("en",))
+    # vLLM compiles the graph with Inductor on its first load into a cache later loads read: on an
+    # RTX 4070 Ti SUPER (vLLM 0.31) 35 s and 8.05 GB held, against 12 s and 7.26 GB from the cache.
+    # Declared, so an install pays that and not the first /speak. llama.cpp compiles nothing.
+    compiled = replace(claimed, compiles=True)
     # Unquantised first where it can run, then the larger quantisation: the first is the default.
-    names = (*(("full",) if full else ()), *(GGUF_FILES if gguf else ()))
-    return {name: claimed for name in names}
+    built = {"full": compiled} if full else {}
+    return {**built, **dict.fromkeys(GGUF_FILES if gguf else (), claimed)}

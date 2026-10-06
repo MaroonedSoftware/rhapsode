@@ -82,6 +82,12 @@ export interface RhapsodeConfig {
              * state database for a reinstall to read, and boot ignores it. protocol.md § 10.
              */
             accepted?: string;
+            /**
+             * The variants the install warmed, because each compiles on its first load (§ 8). The
+             * core records it in the state database for a reinstall to warm again, and boot ignores
+             * it. protocol.md § 10.
+             */
+            warmed?: string[];
         }
     >;
 }

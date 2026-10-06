@@ -924,6 +924,16 @@ the archive's bytes, which GitHub does not promise to keep the same. The operato
 it from upstream, after an install that accepted that licence by name (§ 10). The adapter's own
 dependencies are the ones inference imports, found by importing it.
 
+### `compiles`, a variant whose first load builds what later loads reuse
+
+A variant declares `"compiles": true` when its first load on a box compiles kernels into a cache on
+disk that every later load reads instead. Absent means it does not, which is every engine but one.
+Orpheus's `full` is that one: vLLM compiles the graph with Inductor on a cold cache, and on an RTX
+4070 Ti SUPER that first load took 35 seconds against 12 for every load after it, and held 8.05 GB
+until it was unloaded against 7.26 GB. It is declared rather than left to the first `/speak`
+because the core can pay it at install (§ 10), when nobody is waiting on an utterance, and only the
+adapter knows its runtime does this. The SDK spells it `Variant(compiles=True)`.
+
 ### `dialogue`, which is declared rather than discovered
 
 `dialogue(request)` speaks a conversation (§ 6) and yields PCM as `speak` does. An adapter that
@@ -1392,6 +1402,8 @@ An install is four steps, and a job reports which one it is on:
    accepted, and add it to the running registry. No restart: the next `/speak` for it spawns a
    worker.
 5. **`weights`**, only when asked: fetch a variant, exactly as a pull does (below).
+6. **`warm`**, only after step 5, and only for a variant that declares `compiles` (§ 8): load it
+   and unload it, so the compiling is done before anybody asks to be spoken to.
 
 **An install can fetch its weights.** `POST /engines/chatterbox/install?pull=turbo` adds step 5 for
 the variant named; a client that wants the default reads it from the catalog's `defaultVariant`.
@@ -1410,6 +1422,17 @@ The engine is registered before step 5 starts, so **a failed download leaves it 
 job fails at `weights`, and the way on is a pull, not another install. An engine whose worker does
 not implement `fetch` has nothing to do in step 5; the job says so in its output and succeeds, and
 the weights arrive on first load as they would have.
+
+**An install warms what compiles.** Where the variant step 5 fetched declares `compiles`, step 6
+loads it and unloads it again, through residency exactly as a `/speak` would load it: it takes a
+slot, it may evict an idle model to get one, and it waits for one behind models that are speaking,
+for as long as a `/speak` would. Unlike a pull it therefore costs the card for as long as a load
+takes, which is why it happens only for a variant that says it needs it. The model is unloaded
+rather than left resident, because a load that compiled holds what compiling took until it unloads
+(0.8 GB for Orpheus `full`), and the next load, from the cache, holds only what the model needs.
+A load that fails here fails the job at `warm` and leaves the engine installed with its weights: it
+is the load every `/speak` would have tried, and finding out now is the point. The variants an
+install warmed are recorded with the engine as `warmed`, for a reinstall to warm again (below).
 
 `RHAPSODE_PIP_TRUSTED_HOSTS` is honoured from the server's own environment and cannot be set
 through the API. Weakening certificate verification stays a decision made on the box.
@@ -1481,7 +1504,8 @@ the engine from the file would no longer remove it. A setting only tunes somethi
 
 An engine's entry is an engine entry like one in the config, plus one field the core keeps for
 itself: `accepted`, the weights licence the last install or reinstall accepted, as the `accept`
-query named it, and absent when none was needed. Boot ignores it. A reinstall reads it (below).
+query named it, and absent when none was needed. And `warmed`, the variants step 6 of the install
+warmed, absent when it warmed none. Boot ignores both. A reinstall reads both (below).
 
 ### Uninstalling
 
@@ -1503,8 +1527,9 @@ side effect.
 `POST /engines/{id}/reinstall` rebuilds an engine this API installed, from what this core ships, and
 swaps the new virtualenv in once it works. It is how an engine left behind by an upgrade (§ 9)
 catches up, and how a virtualenv somebody broke is mended. It answers `202` with a job whose `kind`
-is `reinstall` and whose steps are an install's first four; there is no `weights` step, because the
-weights are in a cache the old virtualenv never owned and are still there.
+is `reinstall` and whose steps are an install's first four, then `warm` for what the install warmed;
+there is no `weights` step, because the weights are in a cache the old virtualenv never owned and
+are still there.
 
 It is its own route rather than an install over the top because the two refuse opposite things: an
 install refuses an engine that is installed, a reinstall one that is not. Before this route the
@@ -1533,6 +1558,15 @@ Under the lock it records the new slot in the state database, stops the old work
 the engine again, which reads the new `workerVersion` and `outdated`. The database is committed
 first, so a core that dies at any point after it boots on the new virtualenv, and one that dies
 before it boots on the old. The old slot is deleted last.
+
+**Then it warms again what the install warmed.** A reinstall is how an upgrade reaches an engine, and
+an upgrade that moves the compiler or the runtime moves the key the compile cache is filed under, so
+the first load after it would compile from cold. Each variant in the engine's `warmed` that the new
+worker still declares `compiles` for is loaded and unloaded as step 6 of an install does it, after
+`register`. Only those: warming every variant that declares `compiles` would download weights the
+box never pulled, which is the side effect the missing `weights` step exists to avoid. A failure
+here fails the job at `warm` with the new virtualenv already in place, because the swap is done
+and undoing it would put back the engine the upgrade was meant to replace.
 
 What it costs, and what a client should say before asking for it:
 
@@ -1579,6 +1613,8 @@ is `curl`.
 without loading them. The worker process is started if it is not running, which costs tens of
 megabytes, and no model is loaded, so it takes no residency slot and evicts nothing. An engine that
 does not implement `fetch` answers `unsupported`, and its weights arrive on first load as before.
+A pull never warms, even a variant that declares `compiles`: evicting nothing is the promise that
+lets a client pull on a busy box, and only an install's step 6 loads anything.
 
 ### Jobs
 
@@ -1595,7 +1631,8 @@ does not implement `fetch` answers `unsupported`, and its weights arrive on firs
 ```
 
 `kind` is `install`, `pull` or `reinstall`. `variant` is the variant a pull fetches, or an install fetches in
-step 5; an install without it stops at `register`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
+step 5; an install without it stops at `register`. `step` is one of `venv`, `packages`, `verify`,
+`register`, `weights` and `warm`. `state` is `queued`, `running`, `succeeded` or `failed`; a failed job
 carries `error`, an ordinary error envelope body. Its message names the command and the line of
 its output that says why it failed, not the line it printed last: pip ends a failed build with a
 footer naming the package, and an Orpheus install whose error was `╰─> llama-cpp-python` had its

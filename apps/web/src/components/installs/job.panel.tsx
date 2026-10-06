@@ -13,6 +13,7 @@ import { isNothingToFetch, jobBadge } from './job.state';
 type Step = { step: NonNullable<InstallJob['step']>; label: string; hint: string };
 
 const WEIGHTS: Step = { step: 'weights', label: 'Weights', hint: 'Downloaded, not loaded' };
+const WARM: Step = { step: 'warm', label: 'Warm', hint: 'Loaded once so it compiles now, then unloaded' };
 const INSTALL: Step[] = [
     { step: 'venv', label: 'Virtualenv', hint: 'Its own, so its dependencies cannot break another engine' },
     { step: 'packages', label: 'Packages', hint: 'The adapter and what it needs' },
@@ -20,10 +21,16 @@ const INSTALL: Step[] = [
     { step: 'register', label: 'Register', hint: 'Available without a restart' },
 ];
 
-/** An install that names a variant downloads it as a fifth step. protocol.md § 10. */
-function stepsOf(job: InstallJob): Step[] {
+/**
+ * An install that names a variant downloads it as a fifth step, and warms it as a sixth when it
+ * compiles; a reinstall warms after its fourth what the install warmed. Whether a variant compiles
+ * is the worker's to say, so the step is shown once the job reaches it. protocol.md § 10.
+ */
+function stepsOf(job: InstallJob, current: string | undefined): Step[] {
     if (job.kind === 'pull') return [WEIGHTS];
-    return job.variant === undefined ? INSTALL : [...INSTALL, WEIGHTS];
+    const warm = current === 'warm' ? [WARM] : [];
+    if (job.kind === 'reinstall') return [...INSTALL, ...warm];
+    return job.variant === undefined ? INSTALL : [...INSTALL, WEIGHTS, ...warm];
 }
 
 /** A job's name, in the tense its state calls for. */
@@ -51,8 +58,9 @@ export function JobPanel({ jobId }: { jobId: string }) {
     if (job.data === undefined) return <Loader size="sm" />;
 
     const data = job.data;
-    const steps = stepsOf(data);
     const current = feed.progress?.phase ?? data.step;
+    const steps = stepsOf(data, current);
+    const warmed = current === 'warm';
     const index = steps.findIndex(entry => entry.step === current);
     const finished = data.state === 'succeeded' || data.state === 'failed';
     const active = data.state === 'succeeded' ? steps.length : Math.max(0, index);
@@ -87,10 +95,12 @@ export function JobPanel({ jobId }: { jobId: string }) {
                         {data.kind === 'pull'
                             ? `The ${data.variant ?? 'default'} weights are on this machine, so the first request only has to load them.`
                             : data.kind === 'reinstall'
-                              ? `${data.engine} now runs from a virtualenv this server built. Its next request loads the model again.`
+                              ? `${data.engine} now runs from a virtualenv this server built. Its next request loads the model again${warmed ? ', from the compile cache this filled' : ''}.`
                               : data.variant === undefined
                                 ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
-                                : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
+                                : warmed
+                                  ? `${data.engine} is ready, with the ${data.variant} weights on this machine and compiled, so its first request loads them from the cache.`
+                                  : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
                     </Alert>
                 ) : noFetch ? (
                     <Alert color={severityColor.info} title="Nothing to download ahead of time">
@@ -100,7 +110,11 @@ export function JobPanel({ jobId }: { jobId: string }) {
                     <ErrorAlert title={`Failed at ${current ?? 'the start'}`} fallback="The job failed and said nothing.">
                         {data.error?.message}
                         {/* A reinstall swaps only once its new virtualenv works, so a failure left the old one running. § 10. */}
-                        {data.kind === 'reinstall' ? ` ${data.engine} is still running from its previous virtualenv.` : undefined}
+                        {data.kind === 'reinstall' && !warmed ? ` ${data.engine} is still running from its previous virtualenv.` : undefined}
+                        {/* A warm comes after the swap or the download, so all that failed is one load. § 10. */}
+                        {warmed
+                            ? ` ${data.engine} is ${data.kind === 'reinstall' ? 'reinstalled' : 'installed with its weights'}; its first request tries that load again.`
+                            : undefined}
                         {/* The engine was registered before its weights were asked for, so it is installed. § 10. */}
                         {data.kind === 'install' && current === 'weights'
                             ? ` ${data.engine} is installed; download the weights again from its card.`
