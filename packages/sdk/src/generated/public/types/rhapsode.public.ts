@@ -10,7 +10,7 @@ export interface ApiInfo {
 }
 
 /**
- * generated from [SettingsServer](../../../../../../contracts/rhapsode.public.ck#L437)
+ * generated from [SettingsServer](../../../../../../contracts/rhapsode.public.ck#L438)
  */
 export interface SettingsServer {
     port: number;
@@ -19,14 +19,14 @@ export interface SettingsServer {
 }
 
 /**
- * generated from [SettingsLog](../../../../../../contracts/rhapsode.public.ck#L443)
+ * generated from [SettingsLog](../../../../../../contracts/rhapsode.public.ck#L444)
  */
 export interface SettingsLog {
     level: 'error' | 'warn' | 'info' | 'debug' | 'trace';
 }
 
 /**
- * generated from [SettingsResidency](../../../../../../contracts/rhapsode.public.ck#L447)
+ * generated from [SettingsResidency](../../../../../../contracts/rhapsode.public.ck#L448)
  */
 export interface SettingsResidency {
     maxResidentModels: number;
@@ -35,7 +35,7 @@ export interface SettingsResidency {
 }
 
 /**
- * generated from [SettingsWorkers](../../../../../../contracts/rhapsode.public.ck#L453)
+ * generated from [SettingsWorkers](../../../../../../contracts/rhapsode.public.ck#L454)
  */
 export interface SettingsWorkers {
     socketDir: string;
@@ -47,7 +47,7 @@ export interface SettingsWorkers {
 }
 
 /**
- * generated from [SettingsInstall](../../../../../../contracts/rhapsode.public.ck#L462)
+ * generated from [SettingsInstall](../../../../../../contracts/rhapsode.public.ck#L463)
  */
 export interface SettingsInstall {
     venvDir: string;
@@ -57,7 +57,7 @@ export interface SettingsInstall {
 }
 
 /**
- * generated from [SettingsManagement](../../../../../../contracts/rhapsode.public.ck#L468)
+ * generated from [SettingsManagement](../../../../../../contracts/rhapsode.public.ck#L469)
  */
 export interface SettingsManagement {
     /** Never the token itself, which is a root password for the box. */
@@ -66,14 +66,14 @@ export interface SettingsManagement {
 }
 
 /**
- * generated from [SettingsUpdate](../../../../../../contracts/rhapsode.public.ck#L473)
+ * generated from [SettingsUpdate](../../../../../../contracts/rhapsode.public.ck#L474)
  */
 export interface SettingsUpdate {
     check: boolean;
 }
 
 /**
- * generated from [SettingsEngine](../../../../../../contracts/rhapsode.public.ck#L477)
+ * generated from [SettingsEngine](../../../../../../contracts/rhapsode.public.ck#L478)
  */
 export interface SettingsEngine {
     /** Absent when the engine uses residency.keepAliveSeconds. */
@@ -81,7 +81,7 @@ export interface SettingsEngine {
 }
 
 /**
- * generated from [SettingField](../../../../../../contracts/rhapsode.public.ck#L493)
+ * generated from [SettingField](../../../../../../contracts/rhapsode.public.ck#L494)
  */
 export interface SettingField {
     /** Dotted: residency.keepAliveSeconds, engines.kokoro.keepAliveSeconds. */
@@ -98,7 +98,7 @@ export interface SettingField {
  * A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and
  * every member nullable: `null` clears the database's value and the file's, or the default, shows
  * through again. The ranges here are the ones a value is refused outside of; § 10 lists them.
- * generated from [SettingsServerPatch](../../../../../../contracts/rhapsode.public.ck#L508)
+ * generated from [SettingsServerPatch](../../../../../../contracts/rhapsode.public.ck#L509)
  */
 export interface SettingsServerPatch {
     port?: number | null;
@@ -107,14 +107,14 @@ export interface SettingsServerPatch {
 }
 
 /**
- * generated from [SettingsLogPatch](../../../../../../contracts/rhapsode.public.ck#L514)
+ * generated from [SettingsLogPatch](../../../../../../contracts/rhapsode.public.ck#L515)
  */
 export interface SettingsLogPatch {
     level?: 'error' | 'warn' | 'info' | 'debug' | 'trace' | null;
 }
 
 /**
- * generated from [SettingsResidencyPatch](../../../../../../contracts/rhapsode.public.ck#L518)
+ * generated from [SettingsResidencyPatch](../../../../../../contracts/rhapsode.public.ck#L519)
  */
 export interface SettingsResidencyPatch {
     maxResidentModels?: number | null;
@@ -123,7 +123,7 @@ export interface SettingsResidencyPatch {
 }
 
 /**
- * generated from [SettingsWorkersPatch](../../../../../../contracts/rhapsode.public.ck#L524)
+ * generated from [SettingsWorkersPatch](../../../../../../contracts/rhapsode.public.ck#L525)
  */
 export interface SettingsWorkersPatch {
     socketDir?: string | null;
@@ -135,7 +135,7 @@ export interface SettingsWorkersPatch {
 }
 
 /**
- * generated from [SettingsInstallPatch](../../../../../../contracts/rhapsode.public.ck#L533)
+ * generated from [SettingsInstallPatch](../../../../../../contracts/rhapsode.public.ck#L534)
  */
 export interface SettingsInstallPatch {
     venvDir?: string | null;
@@ -144,7 +144,7 @@ export interface SettingsInstallPatch {
 }
 
 /**
- * generated from [SettingsManagementPatch](../../../../../../contracts/rhapsode.public.ck#L539)
+ * generated from [SettingsManagementPatch](../../../../../../contracts/rhapsode.public.ck#L540)
  */
 export interface SettingsManagementPatch {
     /** Empty is no token, even where the file has one. */
@@ -154,14 +154,14 @@ export interface SettingsManagementPatch {
 }
 
 /**
- * generated from [SettingsUpdatePatch](../../../../../../contracts/rhapsode.public.ck#L544)
+ * generated from [SettingsUpdatePatch](../../../../../../contracts/rhapsode.public.ck#L545)
  */
 export interface SettingsUpdatePatch {
     check?: boolean | null;
 }
 
 /**
- * generated from [SettingsEnginePatch](../../../../../../contracts/rhapsode.public.ck#L548)
+ * generated from [SettingsEnginePatch](../../../../../../contracts/rhapsode.public.ck#L549)
  */
 export interface SettingsEnginePatch {
     keepAliveSeconds?: number | null;
@@ -182,7 +182,7 @@ export interface OpenApiDocument {
 
 /**
  * What the running process is using. A setting waiting for a restart shows its old value here.
- * generated from [SettingsValues](../../../../../../contracts/rhapsode.public.ck#L482)
+ * generated from [SettingsValues](../../../../../../contracts/rhapsode.public.ck#L483)
  */
 export interface SettingsValues {
     server: SettingsServer;
@@ -197,7 +197,7 @@ export interface SettingsValues {
 }
 
 /**
- * generated from [SettingsPatch](../../../../../../contracts/rhapsode.public.ck#L552)
+ * generated from [SettingsPatch](../../../../../../contracts/rhapsode.public.ck#L553)
  */
 export interface SettingsPatch {
     server?: SettingsServerPatch;
@@ -211,7 +211,7 @@ export interface SettingsPatch {
 }
 
 /**
- * generated from [Settings](../../../../../../contracts/rhapsode.public.ck#L500)
+ * generated from [Settings](../../../../../../contracts/rhapsode.public.ck#L501)
  */
 export interface Settings {
     values: SettingsValues;

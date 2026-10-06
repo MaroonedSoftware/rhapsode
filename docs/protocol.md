@@ -196,11 +196,19 @@ The worker obeys; the core decides. Default policy, all of it settable, and with
   engine: a model that takes forty seconds to load has earned a longer deadline than one that takes
   two.
 
-An expiry terminates rather than unloads, by rule 3 above: an unload leaves the process, its CUDA
-context and anything outside its Python on the card, and a deadline meant to give the card back
-should give back all of it. This replaces the
+An expiry unloads rather than terminates. Rule 3 keeps the two verbs apart, and what separates them
+was measured on an RTX 4070 Ti SUPER in October 2026: once the SDK collects after an unload (§ 8),
+an unload leaves the worker's CUDA context and nothing else, 250 to 310 MiB for Breeze, Fish,
+Chatterbox and Orpheus's `full` build, whose vLLM engine exits with it. The model comes back in
+seconds where a terminated worker would have to start again first: Breeze reloaded in 1.4 s,
+Chatterbox in 4 s, Orpheus in 13 s. So a deadline that runs every few minutes costs a context per
+idle engine and saves a process start each time. An eviction still terminates, because it needs the
+card back now, and so does `POST /engines/{engine}/unload` by default. This replaces the
 `idleUnloadSeconds` and `idleTerminateSeconds` pair, which was two deadlines for two verbs and is
 one deadline now that there is one verb.
+
+Until then an expiry terminated, on the strength of "an unload leaves roughly 30% behind", which
+rule 3 now corrects.
 
 The default is on, which is a reversal. Off was defensible while an expiry was something an operator
 opted into: it trades a cold start for memory nobody asked for. It stops being defensible as the

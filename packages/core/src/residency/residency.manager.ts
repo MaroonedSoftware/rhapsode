@@ -313,9 +313,10 @@ export class ResidencyManager {
     /**
      * Put a deadline on a model nobody is holding.
      *
-     * Terminate rather than unload, for the reason § 3 measured: an unload leaves the process's
-     * CUDA context, about 300 MiB, and anything outside its Python, and an expiry is for giving the
-     * card back. An expiry is not a promise
+     * Unload rather than terminate, for the reason § 3 measured: an unload gives back everything
+     * but the process's CUDA context, about 300 MiB, and keeps the process, so the next request
+     * reloads in seconds rather than starting a worker as well. An eviction still terminates,
+     * because it needs the card back now. An expiry is not a promise
      * the model survives that long either, since a budget eviction can still take it first.
      */
     private armExpiry(resident: Resident): void {
@@ -332,11 +333,11 @@ export class ResidencyManager {
                 // A timer's view is always stale. Cancelling covers the model that was picked up
                 // again, but not a callback already on its way when that happened, so the deadline
                 // is checked rather than assumed: without this, a model used a millisecond ago is
-                // terminated by a timer armed for the request before it.
+                // unloaded by a timer armed for the request before it.
                 const current = this.residents.get(resident.engineId);
                 if (current !== resident || current.leases > 0) return;
                 if (current.expiresAt === undefined || current.expiresAt > this.clock.now()) return;
-                await this.release(current, 'terminate');
+                await this.release(current, 'unload');
             });
         });
     }

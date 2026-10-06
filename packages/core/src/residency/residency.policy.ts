@@ -7,7 +7,7 @@ import type { ResidencyPolicy } from './residency.manager.js';
  * One keep-alive, from whichever of the three spellings an operator has.
  *
  * `idleUnloadSeconds` and `idleTerminateSeconds` were separate deadlines for the two verbs, and an
- * expiry now always terminates, so both mean the same thing: how long to wait. Neither is an error,
+ * expiry now always unloads, so both mean the same thing: how long to wait. Neither is an error,
  * because a configuration file that stops a server from starting over a renamed key is worse than
  * one that carries on and says so. A `null` counts as absent, which is what the documented sample
  * had in it.
@@ -25,7 +25,7 @@ export const keepAliveFrom = (settings: RhapsodeConfig, logger?: Logger): number
 
     if (deprecated === undefined) return DEFAULTS.keepAliveSeconds;
 
-    logger?.warn('this setting is now residency.keepAliveSeconds, and an expiry terminates rather than unloads', {
+    logger?.warn('this setting is now residency.keepAliveSeconds, and an expiry unloads', {
         setting: deprecated.key,
         keepAliveSeconds: deprecated.seconds,
     });

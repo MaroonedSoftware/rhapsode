@@ -27,7 +27,7 @@ export function useResidency() {
 
 export interface UnloadAsk {
     engine: string;
-    /** `terminate` gets the whole card back; `unload` keeps the process and roughly 30% with it. */
+    /** `terminate` gets the whole card back; `unload` keeps the process and its ~300 MiB CUDA context. */
     mode?: 'terminate' | 'unload';
 }
 
