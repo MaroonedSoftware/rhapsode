@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-breeze"
+version = "0.1.17"
+description = "Breeze TTS 2 for rhapsode: the open-weight model at the top of the speech arena, on research-only weights."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker==0.1.17",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_breeze"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60

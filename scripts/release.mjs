@@ -47,6 +47,7 @@ const PYTHON = [
     'python/rhapsode-engine-kokoro',
     'python/rhapsode-engine-orpheus',
     'python/rhapsode-engine-dia',
+    'python/rhapsode-engine-breeze',
     'python/rhapsode-engine-tone',
 ];
 
