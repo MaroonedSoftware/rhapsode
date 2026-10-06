@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-vendor-breeze"
-version = "0.1.21"
+version = "0.1.22"
 description = "BreezeBlue's Breeze TTS 2 inference code at one commit, packaged so pip can install it."
 readme = "README.md"
 # Upstream's own licence for its code. The weights it loads are not covered by it, and are for
