@@ -17,10 +17,10 @@ requires-python = ">=3.10"
 # set it was tested against. flash-attn is left out as upstream's Dockerfile leaves it out of the
 # requirements: it builds from source for one GPU architecture, and only the fast path wants it.
 dependencies = [
-    "torch==2.13.0",
+    "torch==2.9.1",
     "torchaudio==2.9.1",
     "qwen-tts==0.1.1",
-    "transformers==5.10.1",
+    "transformers==4.57.3",
     "numpy>=2.0",
     "soundfile>=0.13",
 ]
