@@ -64,6 +64,10 @@ class Variant:
     dials: dict[str, tuple[float, float, float]] = field(default_factory=dict)
     languages: tuple[str, ...] = ("en",)
     max_characters: int | None = None
+    #: Its first load compiles kernels into a cache on disk that later loads read instead, so an
+    #: install that pulls it loads it once to fill that cache. protocol.md § 8: vLLM's Inductor
+    #: compile made Orpheus `full` 35 s and 8.05 GB on its first load, against 12 s and 7.26 GB after.
+    compiles: bool = False
 
     def document(self) -> dict[str, Any]:
         return {
@@ -75,6 +79,7 @@ class Variant:
             },
             "languages": list(self.languages),
             **({} if self.max_characters is None else {"maxCharacters": self.max_characters}),
+            **({"compiles": True} if self.compiles else {}),
         }
 
 

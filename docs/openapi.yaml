@@ -909,6 +909,9 @@ components:
                 dialogue:
                     $ref: "#/components/schemas/Dialogue"
                     description: Present only where this build answers /dialogue. § 6.
+                compiles:
+                    type: boolean
+                    description: Its first load fills a compile cache later loads read. § 8.
             required:
                 - cues
                 - deliveries
@@ -1524,6 +1527,7 @@ components:
                         - verify
                         - register
                         - weights
+                        - warm
                 createdAt:
                     type: string
                     description: ISO 8601, UTC.

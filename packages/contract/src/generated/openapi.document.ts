@@ -1460,6 +1460,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "dialogue": {
                         "$ref": "#/components/schemas/Dialogue",
                         "description": "Present only where this build answers /dialogue. § 6."
+                    },
+                    "compiles": {
+                        "type": "boolean",
+                        "description": "Its first load fills a compile cache later loads read. § 8."
                     }
                 },
                 "required": [
@@ -2294,7 +2298,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                             "packages",
                             "verify",
                             "register",
-                            "weights"
+                            "weights",
+                            "warm"
                         ]
                     },
                     "createdAt": {

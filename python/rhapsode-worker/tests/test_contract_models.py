@@ -80,3 +80,14 @@ def test_capabilities_uses_the_wire_name_for_the_contract_major() -> None:
     )
     assert capabilities.contract == 1
     assert capabilities.current is None
+
+
+def test_a_variant_says_it_compiles_only_when_it_does() -> None:
+    # Absent means no, so a variant that does not compile, which is nearly every one, sends nothing
+    # and a core reading an older worker reads it the same way. protocol.md § 8.
+    from rhapsode_worker import Variant as Declared
+
+    assert "compiles" not in Declared().document()
+    document = Declared(compiles=True).document()
+    assert document["compiles"] is True
+    assert Variant.model_validate(document).compiles is True

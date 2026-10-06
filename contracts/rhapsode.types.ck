@@ -31,6 +31,7 @@ contract mode(loose) Variant: {
     blending?: Blending                 # Beside cloning, for the same reason: it needs no model. § 7.
     segmentation?: Segmentation         # Whether long text is split into several generations. § 8.
     dialogue?: Dialogue                 # Present only where this build answers /dialogue. § 6.
+    compiles?: boolean                  # Its first load fills a compile cache later loads read. § 8.
 }
 
 # A build that speaks a conversation in one pass. protocol.md § 6.
@@ -311,7 +312,7 @@ contract mode(loose) InstallJob: {
     kind: enum(install, pull, reinstall)
     variant?: string                            # What a pull fetches, or an install fetches in step 5.
     state: enum(queued, running, succeeded, failed)
-    step?: enum(venv, packages, verify, register, weights)
+    step?: enum(venv, packages, verify, register, weights, warm)
     createdAt: string                           # ISO 8601, UTC.
     startedAt?: string
     finishedAt?: string

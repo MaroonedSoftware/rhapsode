@@ -244,6 +244,8 @@ class Variant(BaseModel):
     segmentation: Segmentation | None = None
     # Present only where this build answers /dialogue. § 6.
     dialogue: Dialogue | None = None
+    # Its first load fills a compile cache later loads read. § 8.
+    compiles: bool | None = None
 
 class EngineSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -318,7 +320,7 @@ class InstallJob(BaseModel):
     # What a pull fetches, or an install fetches in step 5.
     variant: str | None = None
     state: Literal["queued", "running", "succeeded", "failed"]
-    step: Literal["venv", "packages", "verify", "register", "weights"] | None = None
+    step: Literal["venv", "packages", "verify", "register", "weights", "warm"] | None = None
     # ISO 8601, UTC.
     created_at: str = Field(alias="createdAt")
     started_at: str | None = Field(alias="startedAt", default=None)
