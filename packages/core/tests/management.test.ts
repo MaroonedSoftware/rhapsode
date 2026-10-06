@@ -227,7 +227,7 @@ describe('GET /catalog', () => {
         const { app } = await start();
         const catalog = (await app.inject({ method: 'GET', url: '/catalog' })).json();
 
-        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['breeze', 'chatterbox', 'dia', 'kokoro', 'orpheus', 'tone']);
+        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['breeze', 'chatterbox', 'dia', 'fish', 'kokoro', 'orpheus', 'tone']);
         for (const entry of catalog) CatalogEntry.parse(entry);
         expect(catalog.find((entry: CatalogEntry) => entry.id === 'chatterbox')).toMatchObject({
             package: 'rhapsode-engine-chatterbox',
@@ -257,6 +257,12 @@ describe('GET /catalog', () => {
             package: 'rhapsode-engine-breeze',
             defaultVariant: '2',
             license: { code: 'Apache-2.0', weights: 'BreezeBlue-Research-Non-Commercial', weightsCommercialUse: false },
+        });
+        // Code and weights under one research licence: the worker runs upstream's fish-speech.
+        expect(catalog.find((entry: CatalogEntry) => entry.id === 'fish')).toMatchObject({
+            package: 'rhapsode-engine-fish',
+            defaultVariant: 's2-pro',
+            license: { code: 'Fish-Audio-Research-License', weights: 'Fish-Audio-Research-License', weightsCommercialUse: false },
         });
     });
 

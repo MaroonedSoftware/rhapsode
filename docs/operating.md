@@ -137,7 +137,9 @@ Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokor
 `~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points. Orpheus's are in
 `~/.cache/huggingface` too: 3.5 GB for `q8`, 2.1 GB for `q4`, 6.6 GB for `full`, and 80 MB for
 the codec they share. Dia's are there as well, 6.4 GB for the model and 0.3 GB for its codec, and
-so are Breeze's, 7.0 GB for the model and 0.7 GB for its audio tokenizer.
+so are Breeze's, 7.0 GB for the model and 0.7 GB for its audio tokenizer, and Fish's, 9.1 GB for
+the model and 1.9 GB for its codec. Fish's inference code is in `~/.cache/rhapsode/fish-speech`, or
+wherever `RHAPSODE_FISH_SOURCE` points.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
@@ -212,6 +214,27 @@ of it at one commit, in the same pip resolve as the adapter. It pins torch 2.9.1
 A seed reproduces the words and not the waveform: two seeded requests make the same speech, with
 differences of a fraction of a percent from upstream's codec. A cloned voice needs the clip's
 `transcript`, and a request with no voice keeps its first piece's voice to the end of a long text.
+
+### Fish
+
+**Fish's code and weights are for research and non-commercial use only**, under the Fish Audio
+Research License, and distributing it, or a product that uses it, requires the agreement, a notice,
+and "Built with Fish Audio". An install has to accept it by name: `?accept=Fish-Audio-Research-License`.
+
+rhapsode ships none of Fish Audio's code. The worker runs `fish-speech`, which a pull or the first
+load downloads from upstream at a pinned commit and checks against a digest of its files
+(protocol.md § 8), because its own package cannot be installed here: it depends on `pyaudio`, which
+needs PortAudio's headers and a compiler. It needs Python 3.11 to 3.13, for torch 2.8.0.
+
+Measured on an RTX 4070 Ti SUPER: it loads in 33 s, holds 12.3 GiB while speaking, and speaks at 1.03
+to 1.08 times real time. Upstream asks for a 24 GB card; it fits 16 because the adapter keeps a
+12,288-position context and drops four 1 GiB causal masks the model and codec build and never need,
+but there is no room beside another model of any size. A batch arrives whole, so the first audio of a
+line comes 2.5 to 5.5 s after the request.
+
+A cloned voice needs the clip's `transcript`. A long text is cut into turns of one conversation, so
+one voice holds from the first to the last. A request that is abandoned keeps the model busy until
+its last batch is generated, because upstream's model thread does not wait for the decoder.
 
 ## The web page
 

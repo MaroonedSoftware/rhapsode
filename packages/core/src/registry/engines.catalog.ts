@@ -76,6 +76,25 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'https://github.com/resemble-ai/chatterbox',
         },
     },
+    fish: {
+        displayName: 'Fish Audio S2 Pro',
+        module: 'rhapsode_engine_fish',
+        package: 'rhapsode-engine-fish',
+        // The one build, named as upstream names it.
+        defaultVariant: 's2-pro',
+        // 3.11 for the worker SDK. Below 3.14 for torch 2.8.0, which upstream pins and which has
+        // wheels for nothing newer; on 3.14 pip would find no torch at that version and fail.
+        python: { from: '3.11', below: '3.14' },
+        license: {
+            // The code licence is what the worker runs, and the worker runs fish-speech, which the
+            // adapter fetches from upstream and which is under the same research licence as the
+            // weights. A scanner reading the adapter's MIT would be wrong about both. § 4.
+            code: 'Fish-Audio-Research-License',
+            weights: 'Fish-Audio-Research-License',
+            weightsCommercialUse: false,
+            notes: 'https://huggingface.co/fishaudio/s2-pro/blob/main/LICENSE.md. Research and non-commercial use only; commercial use needs a licence from Fish Audio. Distributing it, or a product that uses it, requires the agreement, a notice, and "Built with Fish Audio". The worker runs fish-speech, downloaded from upstream at a pinned commit. About 12.3 GiB of VRAM while speaking.',
+        },
+    },
     dia: {
         displayName: 'Dia',
         module: 'rhapsode_engine_dia',

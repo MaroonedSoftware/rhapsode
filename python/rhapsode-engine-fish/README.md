@@ -7,6 +7,8 @@ and 400M across its codec's ten codebooks, trained on more than 10M hours in 80-
 the second-ranked open-weight model on the Artificial Analysis speech arena, and the most expressive:
 its tags are free-form directions in brackets rather than a fixed list.
 
+Built with Fish Audio.
+
 **Its weights and its code are for research and non-commercial use only**, under the Fish Audio
 Research License. Commercial use needs a licence from Fish Audio, and distributing it, or a product
 that uses it, requires the agreement, a notice, and "Built with Fish Audio". An install has to accept
