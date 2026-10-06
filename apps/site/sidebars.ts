@@ -17,7 +17,7 @@ const sidebars: SidebarsConfig = {
             label: 'Engines',
             link: { type: 'doc', id: 'engines/index' },
             collapsed: false,
-            items: ['engines/kokoro', 'engines/chatterbox', 'engines/orpheus', 'engines/dia', 'engines/tone'],
+            items: ['engines/kokoro', 'engines/chatterbox', 'engines/orpheus', 'engines/dia', 'engines/breeze', 'engines/tone'],
         },
         'openai',
         'mcp',

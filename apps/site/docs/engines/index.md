@@ -24,6 +24,10 @@ crash takes down that engine's worker rather than the server.
 - **For two people talking, [Dia](dia.md).** It speaks a two-speaker dialogue in one take, performs
   all eight cues, and clones from a clip and the words spoken in it. It wants a real GPU: on a Mac
   it runs at about a tenth of realtime.
+- **For the most natural reading, if you are not selling it, [Breeze TTS 2](breeze.md).** It ranked
+  first among open weights on the Artificial Analysis speech arena at its release, speaks English
+  and Chinese, performs all eight cues, and clones from a clip and its transcript. Its weights are
+  for research and non-commercial use only, and it needs an NVIDIA card with about 8 GB free.
 - **[Tone](tone.md)** makes a sine wave. It exists to prove the protocol in CI, and it is the
   fixture the conformance suite compares a real engine against.
 

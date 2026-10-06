@@ -34,6 +34,7 @@ export const pages = [
     { source: 'CONTRIBUTING.md', doc: 'develop/contributing.md', label: 'Contributing' },
     { source: 'python/rhapsode-worker/README.md', doc: 'develop/worker-sdk.md', label: 'The worker SDK' },
     { source: 'python/conformance/README.md', doc: 'develop/conformance.md', label: 'Conformance' },
+    { source: 'python/rhapsode-engine-breeze/README.md', doc: 'engines/breeze.md', label: 'Breeze TTS 2' },
     { source: 'python/rhapsode-engine-chatterbox/README.md', doc: 'engines/chatterbox.md', label: 'Chatterbox' },
     { source: 'python/rhapsode-engine-dia/README.md', doc: 'engines/dia.md', label: 'Dia' },
     { source: 'python/rhapsode-engine-kokoro/README.md', doc: 'engines/kokoro.md', label: 'Kokoro' },
