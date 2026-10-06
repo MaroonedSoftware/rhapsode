@@ -56,8 +56,18 @@ busy until its last batch is generated.
 
 ## Memory
 
-Upstream sets up a key/value cache for the checkpoint's whole 32,768-position context: 4.8 GB, beside
-about 9 GB of model and 1.9 GB of codec, which is why it asks for a 24 GB card. This adapter runs the
-model thread itself and sets the context to 12,288, a 1.8 GB cache, which still holds the longest
-request: 4,096 characters is about 4.5 minutes of audio, under 8,000 positions with its text and a
-20 s reference.
+Measured on an RTX 4070 Ti SUPER: the model is 9.56 GiB in bfloat16, 4.56B parameters. Upstream then
+sets up a key/value cache for the checkpoint's whole 32,768-position context, 4.8 GB, which with the
+codec is why it asks for a 24 GB card. This adapter runs the model thread itself and sets the context
+to 12,288, where the cache measured 1.69 GiB. That still holds the longest request: 4,096 characters
+is about 4.5 minutes of audio, under 8,000 positions with its text and a 20 s reference.
+
+Two more things upstream sizes for 24 GB, and the adapter does not:
+
+- **The causal mask** is built at the checkpoint's length when the model is, 32,768 squared booleans,
+  1 GiB, the largest buffer on the card. Nothing indexes it past the context, so it is cut to 144 MiB.
+- **The codec** is loaded on the CPU and moved, because upstream's loader reads all of `codec.pth`
+  onto the device before keeping the half it uses. Loaded on the card beside the model, it went past
+  14 GiB and ran out.
+
+Whether the whole of it fits a 16 GB card while speaking has not been measured yet.

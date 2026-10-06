@@ -23,8 +23,9 @@ from . import upstream
 #: the reference's codes and transcript, every piece of text, and every piece's audio so far.
 #:
 #: Upstream sets up the checkpoint's whole 32,768. That cache is 36 layers x 2 x 8 heads x 128 x 32,768
-#: x 2 bytes, 4.8 GB, beside about 9 GB of model and 1.9 GB of codec, which is more than a 16 GB card
-#: holds and is why upstream asks for 24 GB. 12,288 is 1.8 GB. It still fits the longest request: 4,096
+#: x 2 bytes, 4.8 GB, beside 9.56 GiB of model measured on an RTX 4070 Ti SUPER, which is more than a
+#: 16 GB card holds and is why upstream asks for 24 GB. At 12,288 it measured 1.69 GiB. It still fits
+#: the longest request: 4,096
 #: characters is about 4.5 minutes, 5,800 codec frames at 21.5 a second, with about 1,500 text tokens
 #: and a 20 s reference's 430 frames, and upstream refuses a prompt within 2,048 of the end.
 CONTEXT = 12_288
@@ -79,9 +80,14 @@ class UpstreamFish:
 
         precision = torch.bfloat16 if device != "cpu" else torch.float32
         self._requests, self._thread = _launch(checkpoint, device, precision)
+        # Loaded on the CPU and moved, rather than loaded onto the card. Upstream's `load_model` reads
+        # the whole of codec.pth with `map_location=device` and only then keeps the generator's half,
+        # so the card holds both at once: on an RTX 4070 Ti SUPER with the model resident (11.25 GiB),
+        # loading it there went past 14 GiB and ran out asking for another 1 GiB. The codec reads its
+        # device from its first parameter, so upstream's engine follows it to the card.
         decoder = load_model(
-            config_name="modded_dac_vq", checkpoint_path=str(checkpoint / "codec.pth"), device=device
-        )
+            config_name="modded_dac_vq", checkpoint_path=str(checkpoint / "codec.pth"), device="cpu"
+        ).to(device)
         self._engine: Any = TTSInferenceEngine(
             llama_queue=self._requests, decoder_model=decoder, precision=precision, compile=False
         )
@@ -142,6 +148,12 @@ def _launch(checkpoint: Path, device: str, precision: Any) -> tuple[queue.Queue[
         try:
             model, decode_one_token = init_model(str(checkpoint), device, precision, compile=False)
             model.config.max_seq_len = CONTEXT
+            # The causal mask is built at the checkpoint's length when the model is: 32,768 squared
+            # booleans, 1 GiB, measured as the largest buffer on the card. Nothing indexes it past
+            # the context, so it is cut to the context, 144 MiB, and the rest given back.
+            model.causal_mask = model.causal_mask[:CONTEXT, :CONTEXT].clone()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             with torch.device(device):
                 model.setup_caches(
                     max_batch_size=1, max_seq_len=CONTEXT, dtype=next(model.parameters()).dtype

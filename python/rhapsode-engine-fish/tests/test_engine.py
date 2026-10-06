@@ -75,7 +75,15 @@ class TestLoading:
     ) -> None:
         # 32,768 positions is 4.8 GB of cache, which does not fit beside the model on a 16 GB card.
         loaded(tmp_path)
-        assert {"cache": CONTEXT, "config": CONTEXT} in fish.loads
+        assert {"cache": CONTEXT, "config": CONTEXT, "mask": (CONTEXT, CONTEXT)} in fish.loads
+
+    def test_the_causal_mask_is_cut_to_the_context_before_the_cache_is_set_up(
+        self, fish: Recorder, tmp_path: Path
+    ) -> None:
+        # Built at 32,768 squared it is 1 GiB, the largest buffer on the card; at the context, 144 MiB.
+        loaded(tmp_path)
+        cache = next(load for load in fish.loads if "cache" in load)
+        assert cache["mask"] == (CONTEXT, CONTEXT)
 
     def test_loads_the_pinned_checkpoint_and_its_codec(self, fish: Recorder, tmp_path: Path) -> None:
         loaded(tmp_path)
@@ -86,8 +94,16 @@ class TestLoading:
         assert codec == {
             "codec": f"/models/{REPOSITORY}/codec.pth",
             "config_name": "modded_dac_vq",
-            "device": "cuda",
+            "device": "cpu",
         }
+
+    def test_the_codec_is_loaded_on_the_cpu_then_moved(self, fish: Recorder, tmp_path: Path) -> None:
+        # Upstream's loader reads the whole checkpoint onto the device it is given before keeping
+        # half of it, which ran a 16 GB card out of memory with the model resident.
+        built = loaded(tmp_path)
+        assert {"codec moved": "cuda"} in fish.loads
+        engine_ = built._generator._engine  # type: ignore[union-attr]
+        assert engine_.decoder_model.device.type == "cuda"
 
     def test_upstreams_tree_is_put_first_on_the_path(self, fish: Recorder, tmp_path: Path) -> None:
         import sys

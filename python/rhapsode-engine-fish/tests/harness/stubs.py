@@ -128,15 +128,33 @@ class Config:
     max_seq_len: int = 32_768
 
 
+class Mask:
+    """Enough of the causal mask for a 2-D slice and `.clone()`: only its shape is ever read."""
+
+    def __init__(self, rows: int, columns: int) -> None:
+        self.shape = (rows, columns)
+
+    def __getitem__(self, index: tuple[slice, slice]) -> Mask:
+        rows, columns = index
+        return Mask(len(range(*rows.indices(self.shape[0]))), len(range(*columns.indices(self.shape[1]))))
+
+    def clone(self) -> Mask:
+        return Mask(*self.shape)
+
+
 class Model:
     def __init__(self, recorder: Recorder) -> None:
         self.recorder = recorder
         self.config = Config()
         self.cache: int | None = None
+        # Built at the checkpoint's length, as upstream's is.
+        self.causal_mask = Mask(self.config.max_seq_len, self.config.max_seq_len)
 
     def setup_caches(self, max_batch_size: int, max_seq_len: int, dtype: Any) -> None:
         self.cache = max_seq_len
-        self.recorder.loads.append({"cache": max_seq_len, "config": self.config.max_seq_len})
+        self.recorder.loads.append(
+            {"cache": max_seq_len, "config": self.config.max_seq_len, "mask": self.causal_mask.shape}
+        )
 
     def parameters(self) -> Iterator[Any]:
         yield types.SimpleNamespace(dtype="bfloat16")
@@ -242,9 +260,22 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
     dac = types.ModuleType("fish_speech.models.dac.inference")
 
+    class Codec:
+        """Reads its device from where it was last put, as the real one reads its first parameter's."""
+
+        sample_rate = SAMPLE_RATE
+
+        def __init__(self, device: str) -> None:
+            self.device = types.SimpleNamespace(type=device)
+
+        def to(self, device: str) -> Codec:
+            recorder.loads.append({"codec moved": device})
+            self.device = types.SimpleNamespace(type=device)
+            return self
+
     def load_model(config_name: str, checkpoint_path: str, device: str = "cuda") -> Any:
         recorder.loads.append({"codec": checkpoint_path, "config_name": config_name, "device": device})
-        return types.SimpleNamespace(sample_rate=SAMPLE_RATE, device=types.SimpleNamespace(type=device))
+        return Codec(device)
 
     dac.load_model = load_model  # type: ignore[attr-defined]
 
