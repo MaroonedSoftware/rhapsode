@@ -9,18 +9,19 @@ from rhapsode_engine_fish.prompt import SEGMENT_CHARACTERS, SPEAKER, line, segme
 class TestCues:
     def test_each_claimed_cue_becomes_its_tag(self) -> None:
         assert translate_cues("Right. [laugh] Anyway.") == "Right. [laughing] Anyway."
-        assert translate_cues("[chuckle] [sigh]") == "[chuckle] [sigh]"
+        assert translate_cues("[chuckle] Sure.") == "[chuckle] Sure."
 
-    def test_clear_throat_keeps_its_space(self) -> None:
-        assert translate_cues("[clear throat] Ahem.") == "[clearing throat] Ahem."
+    def test_an_unclaimed_cue_that_reaches_it_is_removed(self) -> None:
+        # The core strips these first; were one to arrive, it is a bracket like any other.
+        assert translate_cues("[sigh] Fine. [clear throat] Right.") == "Fine. Right."
 
     def test_every_claimed_cue_has_a_tag(self) -> None:
         for cue in CUES:
             assert translate_cues(f"[{cue}]").startswith("[")
 
     def test_a_cue_spelled_like_the_models_own_tag_survives(self) -> None:
-        # `[sigh]` is both, so a strip that ran before translation would have removed it.
-        assert translate_cues("[sigh]") == "[sigh]"
+        # `[chuckle]` is both, so a strip that ran before translation would have removed it.
+        assert translate_cues("[chuckle]") == "[chuckle]"
 
     def test_the_models_own_directions_are_not_a_back_door(self) -> None:
         # A client that could write [whisper in small voice] here would be tied to this engine. § 5.
@@ -54,8 +55,8 @@ class TestSegments:
         assert all(piece.endswith(".") for piece in pieces)
 
     def test_a_translated_cue_is_not_split(self) -> None:
-        text = translate_cues(("word " * 37) + "[clear throat] " + ("word " * 20))
-        assert any("[clearing throat]" in piece for piece in segments(text))
+        text = translate_cues(("word " * 37) + "[laugh] " + ("word " * 20))
+        assert any("[laughing]" in piece for piece in segments(text))
 
 
 class TestLine:

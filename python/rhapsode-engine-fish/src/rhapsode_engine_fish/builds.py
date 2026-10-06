@@ -17,19 +17,18 @@ from __future__ import annotations
 
 from rhapsode_worker import Variant
 
-#: Four of the eight standard cues: the ones the card's list of common tags has a word for. The card
-#: says the model takes any description in brackets, so `[gasp]` or `[cough]` may well perform, but
-#: "may" is what the real-weights check is for, and a cue that is read out loud breaks the one
-#: guarantee § 5 makes.
-CUES: tuple[str, ...] = ("laugh", "chuckle", "sigh", "clear throat")
+#: Two of the eight standard cues, each heard performed on real weights (an RTX 4070 Ti SUPER,
+#: October 2026). The card's list of common tags has words for four, and a listener heard no sigh where
+#: `[sigh]` was written and no throat cleared where `[clearing throat]` was, so those two are not
+#: claimed and the core strips them before they get here (§ 5). The card says the model takes any
+#: description in brackets, so other spellings may perform, but a cue is claimed only once it is heard.
+CUES: tuple[str, ...] = ("laugh", "chuckle")
 
 #: How each cue is written for this model, each spelled as the card's list spells it. Tags are English
 #: words whatever the language spoken; the card gives them no other spelling.
 CUE_TAGS: dict[str, str] = {
     "laugh": "[laughing]",
     "chuckle": "[chuckle]",
-    "sigh": "[sigh]",
-    "clear throat": "[clearing throat]",
 }
 
 #: (min, max, default), every one upstream's own: the bounds `ServeTTSRequest` validates and the

@@ -1,8 +1,8 @@
 """The adapter against the suite an engine author is asked to run.
 
 Everything under test is the real adapter and the real SDK, served over a socket. Only torch, the
-hub and upstream's `fish_speech` are fakes. No stub can say whether `[sigh]` is performed; what this says is
-that the adapter's protocol surface is right, which is the half this repository can get wrong.
+hub and upstream's `fish_speech` are fakes. No stub can say whether `[laughing]` is performed; what this says
+is that the adapter's protocol surface is right, which is the half this repository can get wrong.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def test_every_cue_it_claims_changes_the_audio(stubbed: str) -> None:
         report = run(worker)
 
     cue_checks = [result for result in report.results if result.name.startswith("cue ")]
-    assert len(cue_checks) == 4
+    assert len(cue_checks) == 2
     assert all(result.passed for result in cue_checks)
     # Every one decided, which only a seed that reproduces the audio allows.
     seeded = [result for result in report.results if result.name.startswith("a seed reproduces the audio")]

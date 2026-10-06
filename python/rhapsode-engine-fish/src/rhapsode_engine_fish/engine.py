@@ -153,7 +153,7 @@ class FishEngine(Engine):
         text = translate_cues(request.text)
         if not text:
             raise BadRequest(
-                "nothing is left to say once Fish's own tags are removed; cues are written [sigh]"
+                "nothing is left to say once Fish's own tags are removed; cues are written [laugh]"
             )
         dials = self.dials_for(request)
         sampling = Sampling(

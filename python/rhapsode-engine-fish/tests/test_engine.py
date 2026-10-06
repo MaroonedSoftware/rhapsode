@@ -246,11 +246,11 @@ class TestVoices:
         self, fish: Recorder, tmp_path: Path
     ) -> None:
         built = loaded(tmp_path)
-        cloned(built, transcript="The words [sigh] in the clip.")
+        cloned(built, transcript="The words [chuckle] in the clip.")
         spoken(built, LONG, voice="narrator")
         clip_bytes = (tmp_path / "voices" / "narrator.wav").read_bytes()
         for batch in fish.batches:
-            assert batch.prompt_texts == ["The words [sigh] in the clip."]
+            assert batch.prompt_texts == ["The words [chuckle] in the clip."]
             assert batch.prompt_audio == [clip_bytes]
 
     def test_a_clone_needs_its_transcript(self, fish: Recorder, tmp_path: Path) -> None:

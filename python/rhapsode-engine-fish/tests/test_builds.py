@@ -18,7 +18,13 @@ def test_one_build_named_as_upstream_names_it() -> None:
 
 
 def test_only_the_cues_the_cards_common_tags_cover_are_claimed() -> None:
-    assert set(CUES) == {"laugh", "chuckle", "sigh", "clear throat"}
+    assert set(CUES) == {"laugh", "chuckle"}
+
+
+def test_sigh_and_clear_throat_are_not_claimed_because_they_were_not_performed() -> None:
+    # A listener heard neither [sigh] nor [clearing throat] performed on real weights. § 5.
+    assert not {"sigh", "clear throat"} & set(CUES)
+    assert not {"sigh", "clear throat"} & set(CUE_TAGS)
     assert set(CUE_TAGS) == set(CUES)
     for variant in variants().values():
         assert set(variant.cues) == set(CUES)

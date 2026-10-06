@@ -25,8 +25,9 @@ depends on what that code imports, and on nothing it does not.
 
 ## What it can do
 
-- **Cues:** `laugh`, `chuckle`, `sigh` and `clear throat`, the four the card's list of common tags
-  covers: `[laugh]` becomes `[laughing]`. Every other bracket a client writes is removed, prose
+- **Cues:** `laugh` and `chuckle`, each heard performed on real weights: `[laugh]` becomes
+  `[laughing]`. Not `sigh` or `clear throat`, though the card lists `[sigh]` and `[clearing throat]`:
+  neither was heard performed, so the core strips them before they get here. Every other bracket a client writes is removed, prose
   included, because this model performs any bracketed description rather than reading it.
 - **Deliveries:** none yet. `[whisper]` is on the card's list and is how `hushed` would be
   performed, once it is heard to hold for a whole line.
@@ -82,6 +83,6 @@ Measured on that card: everything loaded comes to 11.97 GiB, the worker reports 
 On an RTX 4070 Ti SUPER, through the worker: it loads in 33 s from a warm cache, holds 12.3 GiB while
 speaking, and speaks at 1.03 to 1.08 times real time. A batch arrives whole, so the first audio of a
 line comes 2.5 to 5.5 s after the request, and of a 32 s text of seven sentences 7.3 s after it.
-`rhapsode-conform` passes 41 of its 42 checks, all four cue checks among them; the 42nd is blending,
+`rhapsode-conform` passes 41 of its 42 checks, the cue checks among them; the 42nd is blending,
 which Fish has no voices to do. Whether a seed reproduces the audio varied between runs: the suite
 found it did, and two seeded requests in an earlier trial did not.

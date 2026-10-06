@@ -42,7 +42,7 @@ def _bracket(match: re.Match[str]) -> str:
 def translate_cues(text: str) -> str:
     """The standard vocabulary in Fish's syntax, every other bracket removed, whitespace collapsed.
 
-    One pass rather than strip-then-translate, because both syntaxes are square brackets: `[sigh]` is
+    One pass rather than strip-then-translate, because both syntaxes are square brackets: `[chuckle]` is
     a cue and the model's own tag at once, and a strip that ran first would take it.
     """
     text = _SPECIAL.sub(" ", text)
