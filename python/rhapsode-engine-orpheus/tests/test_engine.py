@@ -11,6 +11,7 @@ from harness.stubs import Recorder
 from rhapsode_worker import Log, SpeakRequest, UnknownVoice, Unsupported
 from rhapsode_worker.engine import Device
 
+from rhapsode_engine_orpheus.backends import KV_CACHE_BYTES
 from rhapsode_engine_orpheus.builds import (
     FULL_FILES,
     FULL_REPOSITORY,
@@ -23,7 +24,7 @@ from rhapsode_engine_orpheus.builds import (
     VOICES,
 )
 from rhapsode_engine_orpheus.codes import SAMPLES_PER_FRAME
-from rhapsode_engine_orpheus.engine import OrpheusEngine, memory_fraction
+from rhapsode_engine_orpheus.engine import OrpheusEngine, kv_cache_bytes, memory_fraction
 from rhapsode_engine_orpheus.prompt import MAX_TOKENS, SEGMENT_CHARACTERS
 
 
@@ -326,3 +327,11 @@ class TestMemoryFraction:
     def test_the_operator_overrides_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("RHAPSODE_ORPHEUS_GPU_MEMORY", "0.55")
         assert memory_fraction(Device("cuda", "4090", vram_bytes=24 * 2**30)) == 0.55
+
+    def test_the_kv_cache_is_one_sequence_unless_the_operator_gave_a_fraction(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("RHAPSODE_ORPHEUS_GPU_MEMORY", raising=False)
+        assert kv_cache_bytes() == KV_CACHE_BYTES
+        monkeypatch.setenv("RHAPSODE_ORPHEUS_GPU_MEMORY", "0.55")
+        assert kv_cache_bytes() is None

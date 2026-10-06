@@ -20,14 +20,15 @@ dependencies = [
     # there, and the server image has no C++ compiler to build it with (measured: "CMAKE_CXX_COMPILER
     # not set"). Everywhere else llama.cpp, for the GGUF builds, which pip builds with Metal on a Mac.
     # A Linux box without an NVIDIA card asks for the other one: `[llama]`.
-    "vllm>=0.10; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    # 0.10.2 for `kv_cache_memory_bytes`, which the `full` build sets.
+    "vllm>=0.10.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "transformers>=4.45; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "llama-cpp-python>=0.3.16; sys_platform != 'linux' or platform_machine != 'x86_64'",
 ]
 
 [project.optional-dependencies]
 llama = ["llama-cpp-python>=0.3.16"]
-vllm = ["vllm>=0.10", "transformers>=4.45"]
+vllm = ["vllm>=0.10.2", "transformers>=4.45"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rhapsode_engine_orpheus"]

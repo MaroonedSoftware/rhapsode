@@ -19,6 +19,23 @@ from .prompt import END_OF_SPEECH, MAX_TOKENS, framed
 #: the weights.
 CONTEXT_TOKENS = 2048
 
+#: Tokens to a block of vLLM's KV cache. Its default on FlashAttention, pinned because the budget
+#: below counts in blocks, and every attention backend vLLM offers a CUDA card supports it.
+KV_BLOCK_TOKENS = 16
+
+#: The KV cache the `full` build gives vLLM: one `CONTEXT_TOKENS` sequence, keys and values, for the
+#: finetune's 28 layers of 8 KV heads of 128 in bfloat16, and one block more, because vLLM keeps a
+#: block back as its null block: exactly 2048 tokens' worth refused to load with "the estimated
+#: maximum model length is 2032". That is 0.22 GiB, and with one sequence at a time there is nothing
+#: more cache could hold. Left to infer it, vLLM gives the KV cache whatever its budget minus its
+#: profiled peak leaves, and on a cold compile cache that peak counts Inductor compiling the graph as
+#: activations: on an RTX 4070 Ti SUPER (vLLM 0.31) the peak rose 0.92 GiB cold against 0.14 warm,
+#: the card was 9.06 GiB free after profiling either way, and the cold figure left -0.41 GiB for
+#: cache. Every first load failed "No available memory for the cache blocks", and only the SDK's
+#: retry, on the cache the failure had just filled, came up: 50 s, where one load that compiles
+#: takes 35.
+KV_CACHE_BYTES = (CONTEXT_TOKENS + KV_BLOCK_TOKENS) * 28 * 2 * 8 * 128 * 2
+
 
 @dataclass(frozen=True)
 class Sampling:
@@ -106,7 +123,7 @@ class VllmSource:
     reason llama.cpp's are.
     """
 
-    def __init__(self, model_dir: str, *, memory_fraction: float) -> None:
+    def __init__(self, model_dir: str, *, memory_fraction: float, kv_cache_bytes: int | None) -> None:
         import asyncio
         import os
         import threading
@@ -129,10 +146,14 @@ class VllmSource:
             model=model_dir,
             dtype="bfloat16",
             max_model_len=CONTEXT_TOKENS,
-            # vLLM claims this fraction of the whole card up front, 0.9 unless told otherwise, and
-            # fills what the weights leave with KV cache. The residency manager expects engines to
-            # share a card, so the engine asks for its budget rather than accepting the default.
+            # vLLM checks this fraction of the whole card is free up front, 0.9 unless told
+            # otherwise, and without `kv_cache_memory_bytes` fills what the weights leave of it with
+            # KV cache. The residency manager expects engines to share a card, so the engine asks
+            # for its budget rather than accepting the default.
             gpu_memory_utilization=memory_fraction,
+            # None is vLLM's own sizing from the fraction, for an operator who set one.
+            kv_cache_memory_bytes=kv_cache_bytes,
+            block_size=KV_BLOCK_TOKENS,
             # One utterance at a time, as the SDK serves it. vLLM's default of several hundred sizes
             # its memory profile for that many sequences, and at this model's 156,940-token vocabulary
             # their logits alone ran a 16 GB card shared with another engine out of memory.
