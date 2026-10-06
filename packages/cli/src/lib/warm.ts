@@ -32,3 +32,32 @@ export async function warmEach(api: ManagementClient, ui: Ui, entry: Pick<Catalo
     }
     return failed === 0 ? 0 : 1;
 }
+
+/**
+ * After a reinstall, offer to warm what the engine says compiles and the core never recorded as
+ * warmed. A reinstall warms only what was recorded, and an engine installed before installs warmed
+ * has no record, so an upgrade's reinstall left Orpheus `full` to compile on its first request,
+ * 35 s against 12. Asked only of engines just reinstalled: asking another engine starts its worker,
+ * which can take seconds where it imports torch, for an answer that has not changed. § 10.
+ */
+export async function offerWarm(api: ManagementClient, ui: Ui, engines: string[]): Promise<number> {
+    if (engines.length === 0) return 0;
+    const catalog = await api.catalog();
+    const left: { entry: CatalogEntry; variants: string[] }[] = [];
+    for (const id of engines) {
+        const entry = catalog.find(candidate => candidate.id === id);
+        if (entry === undefined || !entry.managed) continue;
+        const variants = unwarmed(entry, await api.capabilities(id));
+        if (variants.length > 0) left.push({ entry, variants });
+    }
+    if (left.length === 0) return 0;
+
+    const named = left.map(({ entry, variants }) => `${entry.displayName} ${variants.join(', ')}`).join('; ');
+    if (!(await ui.confirm(`${named} compiles on its first load and has not been warmed. Warm it now? For each, ${WARM_COST}.`, true))) {
+        ui.info(`Run ${left.map(({ entry }) => `\`pnpm wizard warm ${entry.id}\``).join(' and ')} when you are ready.`);
+        return 0;
+    }
+    let failed = 0;
+    for (const { entry, variants } of left) failed += await warmEach(api, ui, entry, variants);
+    return failed === 0 ? 0 : 1;
+}
