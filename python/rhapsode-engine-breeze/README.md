@@ -68,9 +68,14 @@ codec frames, 75 of them, and three different waveforms: the same length, identi
 streaming codec. It is not cuDNN's algorithm choice, and it is not an op PyTorch knows to be
 nondeterministic: `use_deterministic_algorithms` flagged none and changed nothing but the speed, which
 it halved. § 6 allows a seed that does not reproduce, and `rhapsode-conform` then reports the cue
-checks as undecided rather than passed, so whether each is performed is a question for a listener. Of
-the 36 checks it could decide, 35 passed; the other was a reload that ran out of memory because two
-other processes had taken 7.4 GiB of the card during the run.
+checks as undecided rather than passed, so whether each is performed is a question for a listener. On a
+card with nothing else on it, it passes all 36 of the checks it can decide. A first run passed 35: the
+36th was a reload that ran out of memory because two other processes had taken 7.4 GiB of the card.
+
+An unload gives the card back. Three cycles of load, speak and unload each returned it to 307 MiB, the
+CUDA context the worker process keeps, and each reload took 1.4 to 1.5 s from a warm cache. Breeze
+holds no model in a reference cycle: its own unload, before any collection, left 0.00 GiB of the
+7.18 it loaded.
 
 The install is one pip resolve, on Python 3.12: torch 2.9.1 with CUDA 12.8, transformers 4.57.3 and
 qwen-tts 0.1.1. qwen-tts prints that SoX is missing and flash-attn is not installed when it is
