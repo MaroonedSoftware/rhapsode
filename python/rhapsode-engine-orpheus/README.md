@@ -58,7 +58,11 @@ seconds, and held 7.5 GB. vLLM checks for 7 GiB of the card free up front and gi
 one 2048-token sequence, 0.22 GiB. On a 4070 Ti SUPER with vLLM 0.31 a cold first load, compiling
 the graph, takes 35 s and holds 8.05 GB until it unloads; every load after takes 12 s and holds
 7.26 GB. `RHAPSODE_ORPHEUS_GPU_MEMORY` in the engine's `env`, as a fraction of the card, overrides
-the 7 GiB and lets vLLM fill what the weights leave of it with cache.
+the 7 GiB and lets vLLM fill what the weights leave of it with cache. `full` declares that it compiles, so
+an install that pulls it (`?pull=full`) loads it once and unloads it, and pays the 35 s there
+rather than on the first request; a reinstall does it again, because an upgrade of vLLM or torch
+moves the cache. The cache is vLLM's, under `~/.cache/vllm`, which in the server image is the
+`/data` volume: a load after the container was recreated, with `/tmp` empty, still took 12.4 s.
 
 On an Apple M5 Pro, `q8` ran at about a quarter of real time: fine for `stream: false`, too slow
 to feed a live stream.

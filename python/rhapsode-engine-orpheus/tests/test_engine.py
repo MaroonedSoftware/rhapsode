@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -295,7 +296,9 @@ class TestFull:
 
     def test_it_claims_what_the_ggufs_claim(self, orpheus: Recorder, tmp_path: Path) -> None:
         declared = engine(tmp_path, "cuda").variants()
-        assert declared["full"] == declared["q8"]
+        # Everything but `compiles`, which is vLLM's and not the finetune's. protocol.md § 8.
+        assert declared["full"].compiles
+        assert replace(declared["full"], compiles=False) == declared["q8"]
 
     def test_it_loads_canopys_weights_file_by_file_and_never_the_training_state(
         self, orpheus: Recorder, tmp_path: Path
