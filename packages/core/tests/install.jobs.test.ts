@@ -48,6 +48,20 @@ describe('install job progress', () => {
         expect(progress.at(-1)).toMatchObject({ phase: 'warm', index: 6, total: 6, status: 'done' });
     });
 
+    it('reports a step once, however many times the work names it', async () => {
+        const { feed, progress } = recordingFeed();
+        const jobs = new InstallJobs(feed, new RhapsodeJsonLogger('error', () => {}));
+
+        const job = jobs.submit('warm', 'orpheus', 'full', async context => {
+            context.step('warm');
+            context.step('warm');
+        });
+        await settle(jobs, job.id);
+
+        expect(progress.map(event => event.status)).toEqual(['running', 'done']);
+        expect(progress.at(-1)).toMatchObject({ phase: 'warm', index: 1, total: 1 });
+    });
+
     it('counts warm after a reinstall’s four steps', async () => {
         const { feed, progress } = recordingFeed();
         const jobs = new InstallJobs(feed, new RhapsodeJsonLogger('error', () => {}));
