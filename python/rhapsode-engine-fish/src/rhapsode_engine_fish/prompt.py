@@ -15,11 +15,12 @@ from .builds import CUE_TAGS
 #: tags and adds one to a prompt that has none, so a line is given one rather than left to guess.
 SPEAKER = "<|speaker:0|>"
 
-#: How much text one generation is given: upstream's own server default, `chunk_length` 200. Upstream
-#: counts it in UTF-8 bytes and this in characters, which is the same in English and three times
-#: upstream's figure in Chinese or Japanese. A rule of thumb from upstream rather than a measurement
-#: of this model.
-SEGMENT_CHARACTERS = 200
+#: How much text one generation is given: upstream's own server default, `chunk_length` 200 bytes,
+#: less the speaker tag every piece carries, which upstream counts against it. So an English piece is
+#: one batch, where at 200 characters a full one came to 207 bytes. Upstream counts UTF-8 bytes and
+#: this counts characters, which is the same in English and three times upstream's figure in Chinese
+#: or Japanese. A rule of thumb from upstream rather than a measurement of this model.
+SEGMENT_CHARACTERS = 200 - len("<|speaker:0|>")
 
 #: Anything in square brackets. For most engines a bracket that is not a cue is prose and stays, but
 #: this model reads any bracketed description as a direction (the card says 15,000 of them and counting),
@@ -62,3 +63,13 @@ def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
 def line(segment: str) -> str:
     """One voice's segment as the model is given it."""
     return f"{SPEAKER}{segment}"
+
+
+def script(text: str, limit: int = SEGMENT_CHARACTERS) -> str:
+    """A whole request as upstream is given it: each piece under the first speaker's tag.
+
+    Upstream splits a text into batches only at speaker tags, so an untagged text is one generation
+    however long it is. Tagged piece by piece, each is a turn of one conversation that carries every
+    earlier turn's audio, so the voice holds from the first piece to the last.
+    """
+    return "".join(line(piece) for piece in segments(text, limit))
