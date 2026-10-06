@@ -83,6 +83,12 @@ class TestSegments:
         assert all(len(piece) <= SEGMENT_CHARACTERS for piece in pieces)
         assert all(piece.endswith(".") for piece in pieces)
 
+    def test_chinese_is_broken_at_its_own_full_stops(self) -> None:
+        pieces = segments("今天天气很好。" * 60)
+        assert len(pieces) > 1
+        assert all(len(piece) <= SEGMENT_CHARACTERS for piece in pieces)
+        assert "".join(pieces) == "今天天气很好。" * 60
+
     def test_a_translated_cue_is_not_split(self) -> None:
         text = translate_cues(("word " * 59) + "[clear throat] " + ("word " * 20))
         assert any("(clears throat)" in piece for piece in segments(text))

@@ -1,6 +1,6 @@
 {
     "name": "@maroonedsoftware/rhapsode-sdk",
-    "version": "0.1.17",
+    "version": "0.1.18",
     "description": "A typed client for the rhapsode public API, generated from contracts/.",
     "type": "module",
     "main": "./dist/index.js",
@@ -35,7 +35,7 @@
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "@rhapsode/core": "workspace:*",
-        "vitest": "^5.0.0"
+        "vitest": "^5.0.2"
     },
     "publishConfig": {
         "access": "public"

@@ -875,7 +875,14 @@ SDK, and it is the single largest thing left that every adapter still pays for i
 
 - **The algorithm is fixed and shared.** Sentences, then clauses, then words, packed back greedily.
   A single word longer than the limit stays whole, because splitting it has the model read two
-  halves of a word.
+  halves of a word. A cue is one character to the splitter, so `[clear throat]` is never torn.
+- **Chinese and Japanese break without spaces.** `。！？` end a sentence and `，、；：` a clause with
+  nothing after them, a closing `」` stays with the stop before it, and an ellipsis breaks before a
+  CJK character. Two CJK pieces packed together are joined with nothing, which is what was between
+  them. Before this the splitter broke only at whitespace, and 420 characters of `今天天气很好。`
+  reached a 300-character engine as one piece of 420. A run of Han or kana with no punctuation at
+  all is cut at the limit: there a word can end at any character, and the alternative is a piece of
+  any length. Korean spaces its words and is split like Latin script.
 - **The size is the adapter's.** 180 characters for Orpheus, 250 for Dia, 200 for Kokoro, 300 for
   Chatterbox. The number is a fact about the model's attention and its generation budget; the
   splitting is not. An adapter that declares no size receives the whole text.

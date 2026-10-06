@@ -54,8 +54,7 @@ def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
     """Text in pieces of at most `limit` characters, broken where a reader would pause.
 
     The SDK's splitter, run after translation so a cue is already in the model's spelling. It breaks
-    only at whitespace, so Chinese or Japanese written without spaces reaches the model whole; that is
-    a gap in the shared splitter rather than in this engine. protocol.md § 8.
+    Chinese and Japanese at their own full stops, which carry no space after them. protocol.md § 8.
     """
     return text_segments(text, limit)
 

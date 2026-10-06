@@ -1,7 +1,7 @@
 import type { JsonValue } from '../../sdk-options.js';
 
 /**
- * generated from [ApiInfo](../../../../../../contracts/rhapsode.public.ck#L79)
+ * generated from [ApiInfo](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface ApiInfo {
     title: string;
@@ -10,7 +10,7 @@ export interface ApiInfo {
 }
 
 /**
- * generated from [SettingsServer](../../../../../../contracts/rhapsode.public.ck#L438)
+ * generated from [SettingsServer](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsServer {
     port: number;
@@ -19,14 +19,14 @@ export interface SettingsServer {
 }
 
 /**
- * generated from [SettingsLog](../../../../../../contracts/rhapsode.public.ck#L444)
+ * generated from [SettingsLog](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsLog {
     level: 'error' | 'warn' | 'info' | 'debug' | 'trace';
 }
 
 /**
- * generated from [SettingsResidency](../../../../../../contracts/rhapsode.public.ck#L448)
+ * generated from [SettingsResidency](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsResidency {
     maxResidentModels: number;
@@ -35,7 +35,7 @@ export interface SettingsResidency {
 }
 
 /**
- * generated from [SettingsWorkers](../../../../../../contracts/rhapsode.public.ck#L454)
+ * generated from [SettingsWorkers](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsWorkers {
     socketDir: string;
@@ -47,7 +47,7 @@ export interface SettingsWorkers {
 }
 
 /**
- * generated from [SettingsInstall](../../../../../../contracts/rhapsode.public.ck#L463)
+ * generated from [SettingsInstall](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsInstall {
     venvDir: string;
@@ -57,7 +57,7 @@ export interface SettingsInstall {
 }
 
 /**
- * generated from [SettingsManagement](../../../../../../contracts/rhapsode.public.ck#L469)
+ * generated from [SettingsManagement](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsManagement {
     /** Never the token itself, which is a root password for the box. */
@@ -66,14 +66,14 @@ export interface SettingsManagement {
 }
 
 /**
- * generated from [SettingsUpdate](../../../../../../contracts/rhapsode.public.ck#L474)
+ * generated from [SettingsUpdate](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsUpdate {
     check: boolean;
 }
 
 /**
- * generated from [SettingsEngine](../../../../../../contracts/rhapsode.public.ck#L478)
+ * generated from [SettingsEngine](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsEngine {
     /** Absent when the engine uses residency.keepAliveSeconds. */
@@ -81,7 +81,7 @@ export interface SettingsEngine {
 }
 
 /**
- * generated from [SettingField](../../../../../../contracts/rhapsode.public.ck#L494)
+ * generated from [SettingField](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingField {
     /** Dotted: residency.keepAliveSeconds, engines.kokoro.keepAliveSeconds. */
@@ -98,7 +98,7 @@ export interface SettingField {
  * A change to some settings. Strict, so a misspelt key is refused rather than saved and ignored, and
  * every member nullable: `null` clears the database's value and the file's, or the default, shows
  * through again. The ranges here are the ones a value is refused outside of; § 10 lists them.
- * generated from [SettingsServerPatch](../../../../../../contracts/rhapsode.public.ck#L509)
+ * generated from [SettingsServerPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsServerPatch {
     port?: number | null;
@@ -107,14 +107,14 @@ export interface SettingsServerPatch {
 }
 
 /**
- * generated from [SettingsLogPatch](../../../../../../contracts/rhapsode.public.ck#L515)
+ * generated from [SettingsLogPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsLogPatch {
     level?: 'error' | 'warn' | 'info' | 'debug' | 'trace' | null;
 }
 
 /**
- * generated from [SettingsResidencyPatch](../../../../../../contracts/rhapsode.public.ck#L519)
+ * generated from [SettingsResidencyPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsResidencyPatch {
     maxResidentModels?: number | null;
@@ -123,7 +123,7 @@ export interface SettingsResidencyPatch {
 }
 
 /**
- * generated from [SettingsWorkersPatch](../../../../../../contracts/rhapsode.public.ck#L525)
+ * generated from [SettingsWorkersPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsWorkersPatch {
     socketDir?: string | null;
@@ -135,7 +135,7 @@ export interface SettingsWorkersPatch {
 }
 
 /**
- * generated from [SettingsInstallPatch](../../../../../../contracts/rhapsode.public.ck#L534)
+ * generated from [SettingsInstallPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsInstallPatch {
     venvDir?: string | null;
@@ -144,7 +144,7 @@ export interface SettingsInstallPatch {
 }
 
 /**
- * generated from [SettingsManagementPatch](../../../../../../contracts/rhapsode.public.ck#L540)
+ * generated from [SettingsManagementPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsManagementPatch {
     /** Empty is no token, even where the file has one. */
@@ -154,14 +154,14 @@ export interface SettingsManagementPatch {
 }
 
 /**
- * generated from [SettingsUpdatePatch](../../../../../../contracts/rhapsode.public.ck#L545)
+ * generated from [SettingsUpdatePatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsUpdatePatch {
     check?: boolean | null;
 }
 
 /**
- * generated from [SettingsEnginePatch](../../../../../../contracts/rhapsode.public.ck#L549)
+ * generated from [SettingsEnginePatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsEnginePatch {
     keepAliveSeconds?: number | null;
@@ -171,7 +171,7 @@ export interface SettingsEnginePatch {
  * This file, `rhapsode.types.ck` and `rhapsode.openai.ck` as OpenAPI 3.1. protocol.md § 9. Only the
  * top of the document is declared: the rest is OpenAPI's own shape, and a client that wants it typed
  * already has a library that types it.
- * generated from [OpenApiDocument](../../../../../../contracts/rhapsode.public.ck#L72)
+ * generated from [OpenApiDocument](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface OpenApiDocument {
     openapi: string;
@@ -182,7 +182,7 @@ export interface OpenApiDocument {
 
 /**
  * What the running process is using. A setting waiting for a restart shows its old value here.
- * generated from [SettingsValues](../../../../../../contracts/rhapsode.public.ck#L483)
+ * generated from [SettingsValues](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsValues {
     server: SettingsServer;
@@ -197,7 +197,7 @@ export interface SettingsValues {
 }
 
 /**
- * generated from [SettingsPatch](../../../../../../contracts/rhapsode.public.ck#L553)
+ * generated from [SettingsPatch](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface SettingsPatch {
     server?: SettingsServerPatch;
@@ -211,7 +211,7 @@ export interface SettingsPatch {
 }
 
 /**
- * generated from [Settings](../../../../../../contracts/rhapsode.public.ck#L501)
+ * generated from [Settings](../../../../../../contracts/rhapsode.public.ck)
  */
 export interface Settings {
     values: SettingsValues;

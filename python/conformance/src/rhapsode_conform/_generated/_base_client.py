@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import httpx
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel
@@ -15,16 +16,33 @@ def _wire_values(values: Mapping[str, Any] | BaseModel | None) -> dict[str, Any]
     A model (a `query:` or `headers:` declared as a model ref) is dumped by contract name with the
     flags a request body uses. A mapping (the TypedDict of an inline block) holds Python values,
     which httpx would str(): a datetime into "2026-01-02 03:04:00+00:00", which no ISO 8601 parser
-    accepts, and None into an empty string.
+    accepts, and None into an empty string. A Decimal would become "1E-8" for 0.00000001, which the
+    server's decimal pattern rejects, so it is written in plain digits first.
     """
     if values is None:
         return {}
     if isinstance(values, BaseModel):
         data = values.model_dump(mode="json", by_alias=True, exclude_unset=True)
     else:
-        data = to_jsonable_python(dict(values))
+        data = to_jsonable_python({key: _plain_decimals(value) for key, value in values.items()})
     # Neither a query string nor a header can say null, so a None is sent as nothing at all.
     return {key: value for key, value in data.items() if value is not None}
+
+
+def _plain_decimals(value: Any) -> Any:
+    """A Decimal, or a list of them, in plain digits rather than str()'s exponent form."""
+    if isinstance(value, Decimal):
+        return format(value, "f")
+    if isinstance(value, list):
+        return [_plain_decimals(item) for item in value]
+    return value
+
+
+def _path_text(value: Any) -> str:
+    """A path parameter as text, before percent-encoding: a Decimal in plain digits, not "1E-8"."""
+    if isinstance(value, Decimal):
+        return format(value, "f")
+    return str(value)
 
 
 def _header_text(value: Any) -> str:

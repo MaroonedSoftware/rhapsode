@@ -63,8 +63,7 @@ def segments(text: str, limit: int = SEGMENT_CHARACTERS) -> list[str]:
     """Text in pieces of at most `limit` characters, broken where a reader would pause.
 
     The SDK's splitter, run after translation so a cue is already in the model's spelling. It breaks
-    only at whitespace, so Chinese written without spaces is one word to it and reaches the model
-    whole: 420 characters of `今天天气很好。` came back as one piece of 420. That is a gap in the shared
-    splitter rather than in this engine, and is fixed there. protocol.md § 8.
+    Chinese at its own full stops, which carry no space after them: 420 characters of `今天天气很好。`
+    come back as pieces of 294 and 126. protocol.md § 8.
     """
     return text_segments(text, limit)

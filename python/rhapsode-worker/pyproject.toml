@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-worker"
-version = "0.1.17"
+version = "0.1.18"
 description = "The SDK an engine author subclasses: one class, and the worker protocol is handled."
 readme = "README.md"
 license = "MIT"
@@ -42,6 +42,13 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+# The splitter breaks after `，` and `！` because they are not `,` and `!`. Ambiguous-unicode is the
+# rule that cannot tell a confusable from the character the code is about: it raised 50 findings on
+# those two files and every one of them was the CJK punctuation they exist to handle.
+[tool.ruff.lint.per-file-ignores]
+"src/rhapsode_worker/text.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_segments.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 strict = true
