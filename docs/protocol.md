@@ -1334,7 +1334,11 @@ An install is four steps, and a job reports which one it is on:
    installed from there, whatever version the directory holds; otherwise it is installed by name
    from the package index, pinned to the core's own version (§ 9). The first is how a checkout and
    the server image work, and the second is how an installed core works once adapters are
-   published.
+   published. An engine whose upstream has no packaging names **companions** in its catalog
+   record: distributions found the same way and installed in the same resolve as the SDK and the
+   adapter. Breeze TTS 2's inference code is a repository with no pyproject, which pip cannot
+   install, so `rhapsode-vendor-breeze` is a copy of it at one commit with a pyproject added, and
+   the Breeze adapter depends on it by name like any other package.
 3. **`verify`**: import the engine's module with the new interpreter. That is the command the core
    will spawn, minus serving, and it is the check that a virtualenv pip abandoned halfway fails,
    although its `bin/python` runs perfectly well.

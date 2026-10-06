@@ -15,6 +15,13 @@ export type CatalogRecord = Pick<EngineEntry, 'displayName' | 'license' | 'modul
      * against. protocol.md § 10.
      */
     python?: PythonRange;
+    /**
+     * Python distributions the adapter depends on that no index has, installed in the same resolve
+     * from beside it. An upstream whose code has no packaging of its own is copied into one of these,
+     * because pip cannot install a repository with no pyproject, and resolving it as a name would go
+     * to an index that does not have it. protocol.md § 10.
+     */
+    companions?: string[];
 };
 
 /** At least `from`, and below `below`. Both `major.minor`. */
