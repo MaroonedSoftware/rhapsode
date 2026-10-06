@@ -62,6 +62,16 @@ export const ENGINES: Engine[] = [
         license: { code: 'Apache-2.0', weights: 'Apache-2.0' },
     },
     {
+        id: 'breeze',
+        name: 'Breeze TTS 2',
+        summary: 'English and Chinese from the model that ranked first among open weights on the Artificial Analysis arena at its release. Non-commercial use only.',
+        runsOn: 'NVIDIA GPU',
+        weights: '2, 7.7 GB',
+        cues: 8,
+        voices: 'Clones from a clip and its transcript',
+        license: { code: 'Apache-2.0', weights: 'BreezeBlue-Research-Non-Commercial' },
+    },
+    {
         id: 'tone',
         name: 'Tone',
         summary: 'No weights and no speech: a sine wave that proves the protocol in CI on every commit.',

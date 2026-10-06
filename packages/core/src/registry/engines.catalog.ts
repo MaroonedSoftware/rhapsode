@@ -39,6 +39,28 @@ export interface PythonRange {
  * and reports the code licence, and is wrong in the way that matters.
  */
 export const CATALOG: Record<string, CatalogRecord> = {
+    breeze: {
+        displayName: 'Breeze TTS 2',
+        module: 'rhapsode_engine_breeze',
+        package: 'rhapsode-engine-breeze',
+        // Upstream's inference code has no pyproject, so it is copied at one commit into a package of
+        // its own and installed beside the adapter. protocol.md § 10.
+        companions: ['rhapsode-vendor-breeze'],
+        // The one build, named for the release.
+        defaultVariant: '2',
+        // 3.11 for the worker SDK. Below 3.15 for onnxruntime, which qwen-tts depends on unpinned and
+        // whose 1.30 has wheels for 3.11 to 3.14; past that pip would quietly resolve an older one.
+        // Measured on 3.12, on an RTX 4070 Ti SUPER.
+        python: { from: '3.11', below: '3.15' },
+        license: {
+            code: 'Apache-2.0',
+            weights: 'BreezeBlue-Research-Non-Commercial',
+            weightsCommercialUse: false,
+            // The licence reaches past the weights, to what is made with them on your own hardware,
+            // and the card is NVIDIA-only. Both decide an install, so both are read before one.
+            notes: 'https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE. Research and non-commercial use only, including derivative models and audio generated on your own hardware. Needs an NVIDIA card with CUDA and about 8 GB of VRAM.',
+        },
+    },
     chatterbox: {
         displayName: 'Chatterbox',
         module: 'rhapsode_engine_chatterbox',

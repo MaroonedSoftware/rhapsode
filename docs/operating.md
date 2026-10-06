@@ -136,7 +136,8 @@ Uninstalling removes the virtualenv and leaves downloaded weights where the engi
 Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokoro's are in
 `~/.cache/rhapsode/kokoro`, or wherever `RHAPSODE_KOKORO_WEIGHTS` points. Orpheus's are in
 `~/.cache/huggingface` too: 3.5 GB for `q8`, 2.1 GB for `q4`, 6.6 GB for `full`, and 80 MB for
-the codec they share. Dia's are there as well, 6.4 GB for the model and 0.3 GB for its codec.
+the codec they share. Dia's are there as well, 6.4 GB for the model and 0.3 GB for its codec, and
+so are Breeze's, 7.0 GB for the model and 0.7 GB for its audio tokenizer.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
@@ -189,6 +190,28 @@ and they come back sounding like two people.
 It has no voices of its own. A request that names none is read in whichever voice the model picks,
 which a `seed` holds fixed; a long one keeps its first piece's voice to the end. A cloned voice needs
 the clip's `transcript` (protocol.md § 7), and clones best from 5 to 10 seconds of it.
+
+### Breeze
+
+**Breeze's weights are for research and non-commercial use only**, and BreezeBlue's licence covers
+what you make with them on your own hardware too. The code is Apache-2.0, which is what a licence
+scanner will report. An install has to accept the weights licence by name (protocol.md § 10): the
+page and the wizard show it and ask, and a script sends `?accept=BreezeBlue-Research-Non-Commercial`.
+
+It needs an NVIDIA card. Upstream's runtime runs on CUDA and nothing else, so on a Mac, a CPU box or
+an AMD card the worker refuses to start, saying which card it needs.
+Measured on an RTX 4070 Ti SUPER: it loads in 8.5 s, holds 7.6 GiB and about 8.0 GiB while speaking,
+and streams at 1.02 to 1.05 times real time, the first audio 0.22 s after a request once warm. That
+is enough to keep up with playback, with little to spare. It needs the room: on that 16 GB card, a
+reload beside two other models holding 7.4 GiB between them ran out of memory.
+
+Its inference code has no packaging upstream, so the install brings `rhapsode-vendor-breeze`, a copy
+of it at one commit, in the same pip resolve as the adapter. It pins torch 2.9.1 and transformers
+4.57.3, which upstream tested against.
+
+A seed reproduces the words and not the waveform: two seeded requests make the same speech, with
+differences of a fraction of a percent from upstream's codec. A cloned voice needs the clip's
+`transcript`, and a request with no voice keeps its first piece's voice to the end of a long text.
 
 ## The web page
 

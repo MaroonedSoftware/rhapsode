@@ -227,7 +227,7 @@ describe('GET /catalog', () => {
         const { app } = await start();
         const catalog = (await app.inject({ method: 'GET', url: '/catalog' })).json();
 
-        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['chatterbox', 'dia', 'kokoro', 'orpheus', 'tone']);
+        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['breeze', 'chatterbox', 'dia', 'kokoro', 'orpheus', 'tone']);
         for (const entry of catalog) CatalogEntry.parse(entry);
         expect(catalog.find((entry: CatalogEntry) => entry.id === 'chatterbox')).toMatchObject({
             package: 'rhapsode-engine-chatterbox',
@@ -250,6 +250,13 @@ describe('GET /catalog', () => {
             package: 'rhapsode-engine-dia',
             defaultVariant: '1.6b',
             license: { code: 'Apache-2.0', weights: 'Apache-2.0', weightsCommercialUse: true },
+        });
+        // § 4's case exactly: Apache-2.0 code over weights that may not be used commercially, which
+        // an install has to accept by name (§ 10).
+        expect(catalog.find((entry: CatalogEntry) => entry.id === 'breeze')).toMatchObject({
+            package: 'rhapsode-engine-breeze',
+            defaultVariant: '2',
+            license: { code: 'Apache-2.0', weights: 'BreezeBlue-Research-Non-Commercial', weightsCommercialUse: false },
         });
     });
 
