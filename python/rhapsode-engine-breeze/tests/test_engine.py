@@ -118,6 +118,32 @@ class TestLoading:
             spoken(built)
 
 
+class TestFetching:
+    def test_fetches_exactly_what_the_load_resolves(self, breeze: Recorder, tmp_path: Path) -> None:
+        engine(tmp_path).fetch("2")
+        loaded(tmp_path)
+        first, second = breeze.downloads
+        assert (
+            first
+            == second
+            == {
+                "repo_id": REPOSITORY,
+                "revision": REVISION,
+                "allow_patterns": list(FILES),
+                "token": None,
+            }
+        )
+
+    def test_fetching_does_not_load(self, breeze: Recorder, tmp_path: Path) -> None:
+        engine(tmp_path).fetch("2")
+        assert breeze.loads == []
+
+    def test_a_build_this_engine_does_not_have_is_not_fetched(self, breeze: Recorder, tmp_path: Path) -> None:
+        with pytest.raises(Unsupported, match="no build"):
+            engine(tmp_path).fetch("multilingual")
+        assert breeze.downloads == []
+
+
 class TestSpeaking:
     def test_a_short_line_is_one_plain_generation(self, breeze: Recorder, tmp_path: Path) -> None:
         audio = spoken(loaded(tmp_path), "Right. [laugh] Anyway.")

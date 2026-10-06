@@ -99,6 +99,15 @@ class BreezeEngine(Engine):
         self._check(variant)
         self._generator = EagerBreeze(_checkpoint(), _torch_device(self.device))
 
+    def fetch(self, variant: str) -> None:
+        """Download the checkpoint into the Hugging Face cache, where the load finds it.
+
+        The same repository, revision and files the load resolves, so the load that follows is a cache
+        hit. They are 7.7 GB, which a first `/speak` caller could not tell from a hang. protocol.md § 8.
+        """
+        self._check(variant)
+        _checkpoint()
+
     def unload(self) -> None:
         """Drop the model, then ask the runtime for the memory back, which it will not all give."""
         if self._generator is not None:

@@ -41,7 +41,7 @@ Then in `rhapsode.config.json`:
 - **Voices:** none of its own. Cloning takes a clip and its exact `transcript`, 5 to 10 seconds of
   clean speech and at most 20.
 - **Variants:** `2`, the August 2026 release. 7.0 GB of weights and 0.7 GB of audio tokenizer,
-  fetched from a pinned revision.
+  fetched from a pinned revision, by a pull ahead of the first load or by that load.
 - **Languages:** English and Chinese.
 
 ## How it reads a long text
