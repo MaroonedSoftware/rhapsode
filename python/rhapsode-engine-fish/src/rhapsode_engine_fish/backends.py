@@ -80,14 +80,19 @@ class UpstreamFish:
 
         precision = torch.bfloat16 if device != "cpu" else torch.float32
         self._requests, self._thread = _launch(checkpoint, device, precision)
-        # Loaded on the CPU and moved, rather than loaded onto the card. Upstream's `load_model` reads
-        # the whole of codec.pth with `map_location=device` and only then keeps the generator's half,
-        # so the card holds both at once: on an RTX 4070 Ti SUPER with the model resident (11.25 GiB),
-        # loading it there went past 14 GiB and ran out asking for another 1 GiB. The codec reads its
-        # device from its first parameter, so upstream's engine follows it to the card.
+        # Loaded on the CPU, trimmed, then moved. Upstream's `load_model` reads the whole of codec.pth
+        # onto the device it is given before keeping the generator's part. And the codec brought 4.58
+        # GiB to an RTX 4070 Ti SUPER where its weights are 1.46: its three windowed transformers each
+        # carry a 32,768-square causal mask, 1 GiB, which they never read, since they build a windowed
+        # mask of their own on every call. With them, a 16 GB card loaded the model and then ran out on
+        # every request. Each is replaced by an empty tensor, so a read would fail loudly rather than
+        # mask wrongly. The codec reads its device from its first parameter, so upstream's engine
+        # follows it to the card.
         decoder = load_model(
             config_name="modded_dac_vq", checkpoint_path=str(checkpoint / "codec.pth"), device="cpu"
-        ).to(device)
+        )
+        _drop_unread_masks(decoder)
+        decoder = decoder.to(device)
         self._engine: Any = TTSInferenceEngine(
             llama_queue=self._requests, decoder_model=decoder, precision=precision, compile=False
         )
@@ -125,6 +130,16 @@ class UpstreamFish:
         self._requests.put(None)
         self._thread.join(timeout=60)
         self._engine = None
+
+
+def _drop_unread_masks(codec: Any) -> None:
+    """Replace the causal mask of each of the codec's windowed transformers with an empty tensor."""
+    import torch
+    from fish_speech.models.dac.modded_dac import WindowLimitedTransformer
+
+    for module in codec.modules():
+        if isinstance(module, WindowLimitedTransformer):
+            module.causal_mask = torch.zeros(0, 0, dtype=torch.bool)
 
 
 def _launch(checkpoint: Path, device: str, precision: Any) -> tuple[queue.Queue[Any], threading.Thread]:

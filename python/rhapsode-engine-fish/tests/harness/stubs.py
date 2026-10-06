@@ -202,6 +202,8 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
     torch = types.ModuleType("torch")
     torch.bfloat16 = "bfloat16"  # type: ignore[attr-defined]
     torch.float32 = "float32"  # type: ignore[attr-defined]
+    torch.bool = "bool"  # type: ignore[attr-defined]
+    torch.zeros = lambda *shape, dtype=None: Mask(*shape)  # type: ignore[attr-defined]
     torch.device = lambda name: contextlib.nullcontext()  # type: ignore[attr-defined]
     torch.cuda = types.SimpleNamespace(is_available=lambda: False, empty_cache=lambda: None)  # type: ignore[attr-defined]
     torch.mps = types.SimpleNamespace(empty_cache=lambda: None)  # type: ignore[attr-defined]
@@ -260,6 +262,12 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
     dac = types.ModuleType("fish_speech.models.dac.inference")
 
+    class WindowLimitedTransformer:
+        """Each of the codec's three carries a mask at 32,768 squared, as upstream's do."""
+
+        def __init__(self) -> None:
+            self.causal_mask = Mask(32_768, 32_768)
+
     class Codec:
         """Reads its device from where it was last put, as the real one reads its first parameter's."""
 
@@ -267,9 +275,15 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
 
         def __init__(self, device: str) -> None:
             self.device = types.SimpleNamespace(type=device)
+            self.transformers = [WindowLimitedTransformer() for _ in range(3)]
+
+        def modules(self) -> Iterator[Any]:
+            yield self
+            yield from self.transformers
 
         def to(self, device: str) -> Codec:
-            recorder.loads.append({"codec moved": device})
+            masks = [transformer.causal_mask.shape for transformer in self.transformers]
+            recorder.loads.append({"codec moved": device, "masks": masks})
             self.device = types.SimpleNamespace(type=device)
             return self
 
@@ -278,6 +292,9 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
         return Codec(device)
 
     dac.load_model = load_model  # type: ignore[attr-defined]
+
+    modded_dac = types.ModuleType("fish_speech.models.dac.modded_dac")
+    modded_dac.WindowLimitedTransformer = WindowLimitedTransformer  # type: ignore[attr-defined]
 
     engine_module = types.ModuleType("fish_speech.inference_engine")
 
@@ -363,6 +380,7 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
         **packages,
         "fish_speech.models.text2semantic.inference": t2s,
         "fish_speech.models.dac.inference": dac,
+        "fish_speech.models.dac.modded_dac": modded_dac,
         "fish_speech.inference_engine": engine_module,
         "fish_speech.utils.schema": schema,
         "huggingface_hub": hub,

@@ -77,6 +77,15 @@ class TestLoading:
         loaded(tmp_path)
         assert {"cache": CONTEXT, "config": CONTEXT, "mask": (CONTEXT, CONTEXT)} in fish.loads
 
+    def test_the_codecs_unread_masks_are_dropped_before_it_reaches_the_card(
+        self, fish: Recorder, tmp_path: Path
+    ) -> None:
+        # Three 1 GiB masks its windowed transformers never read: with them a 16 GB card loaded the
+        # model and ran out on every request.
+        loaded(tmp_path)
+        moved = next(load for load in fish.loads if "codec moved" in load)
+        assert moved["masks"] == [(0, 0)] * 3
+
     def test_the_causal_mask_is_cut_to_the_context_before_the_cache_is_set_up(
         self, fish: Recorder, tmp_path: Path
     ) -> None:
@@ -101,7 +110,7 @@ class TestLoading:
         # Upstream's loader reads the whole checkpoint onto the device it is given before keeping
         # half of it, which ran a 16 GB card out of memory with the model resident.
         built = loaded(tmp_path)
-        assert {"codec moved": "cuda"} in fish.loads
+        assert any(load.get("codec moved") == "cuda" for load in fish.loads)
         engine_ = built._generator._engine  # type: ignore[union-attr]
         assert engine_.decoder_model.device.type == "cuda"
 
