@@ -113,6 +113,38 @@ class TestLoading:
             spoken(built)
 
 
+class TestFetching:
+    def test_fetches_upstreams_code_and_exactly_the_checkpoint_the_load_resolves(
+        self, fish: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ensured: list[Path] = []
+        real = upstream.ensure
+        monkeypatch.setattr(upstream, "ensure", lambda: ensured.append(real()) or ensured[-1])
+        engine(tmp_path).fetch("s2-pro")
+        assert ensured == [upstream.source_dir()]
+        loaded(tmp_path)
+        first, second = fish.downloads
+        assert (
+            first
+            == second
+            == {
+                "repo_id": REPOSITORY,
+                "revision": REVISION,
+                "allow_patterns": list(FILES),
+                "token": None,
+            }
+        )
+
+    def test_fetching_does_not_load(self, fish: Recorder, tmp_path: Path) -> None:
+        engine(tmp_path).fetch("s2-pro")
+        assert fish.loads == []
+
+    def test_a_build_this_engine_does_not_have_is_not_fetched(self, fish: Recorder, tmp_path: Path) -> None:
+        with pytest.raises(Unsupported, match="no build"):
+            engine(tmp_path).fetch("s2-mini")
+        assert fish.downloads == []
+
+
 class TestSpeaking:
     def test_a_line_is_one_turn_of_the_first_speaker(self, fish: Recorder, tmp_path: Path) -> None:
         audio = spoken(loaded(tmp_path), "Right. [laugh] Anyway.")

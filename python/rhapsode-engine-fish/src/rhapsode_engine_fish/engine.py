@@ -85,6 +85,17 @@ class FishEngine(Engine):
         self._check(variant)
         self._generator = UpstreamFish(upstream.ensure(), _checkpoint(), _torch_device(self.device))
 
+    def fetch(self, variant: str) -> None:
+        """Download upstream's code and the checkpoint, where the load finds them.
+
+        The same tree and the same repository, revision and files the load resolves, so the load that
+        follows downloads nothing. They are 6.8 MB of code and 11 GB of weights, which a first `/speak`
+        caller could not tell from a hang. protocol.md § 8.
+        """
+        self._check(variant)
+        upstream.ensure()
+        _checkpoint()
+
     def unload(self) -> None:
         """Stop the model thread, then ask the runtime for the memory back, which it will not all give."""
         if self._generator is not None:

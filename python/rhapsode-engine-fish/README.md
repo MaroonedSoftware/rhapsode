@@ -35,7 +35,8 @@ depends on what that code imports, and on nothing it does not.
 - **Voices:** none of its own. A request that names none is read in whichever voice the model picks,
   which a `seed` fixes. Cloning takes a clip and its exact `transcript`, 5 to 10 seconds of it and at
   most 20.
-- **Variants:** `s2-pro`. 9.1 GB of model and 1.9 GB of codec, fetched from a pinned revision.
+- **Variants:** `s2-pro`. 9.1 GB of model and 1.9 GB of codec, fetched from a pinned revision, with
+  upstream's code, by a pull ahead of the first load or by that load.
 - **Languages:** the card's first two tiers: English, Chinese, Japanese, Korean, Spanish,
   Portuguese, Arabic, Russian, French and German.
 - **Devices:** CUDA, Metal or the CPU, as upstream's own server allows. bfloat16 on a card, float32
