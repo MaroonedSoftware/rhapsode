@@ -276,6 +276,13 @@ export class EngineInstaller {
         if (current !== undefined && current !== next && inside(current, this.settings.venvDir)) {
             await rm(current, { recursive: true, force: true });
         }
+
+        // An upgrade that moves the compiler or the runtime moves the key its compile cache is filed
+        // under, so what the install warmed would compile from cold on its first load. Only what was
+        // warmed: any other variant that compiles may have weights this box never pulled. § 10.
+        for (const variant of configured.warmed ?? []) {
+            if (await this.compiles(id, variant)) await this.warm(id, variant, context);
+        }
     }
 
     /** Steps 1 to 3 into `venv`: create it, install the SDK and the adapter, and import the engine. */
