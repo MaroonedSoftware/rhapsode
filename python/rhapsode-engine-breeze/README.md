@@ -53,3 +53,25 @@ cloned voice is the prompt for every piece instead. Pieces are at most 300 chara
 
 The model streams: each piece's audio is passed on in upstream's own chunks of 160 ms as it is made,
 rather than when the piece is whole.
+
+## Measured
+
+On an RTX 4070 Ti SUPER, eager, through the worker: the model loads in 8.5 s from a warm cache and
+holds 7.6 GiB (`modelBytes` 7.75 GB), about 8.0 GiB on the card while speaking. It speaks at 1.02 to
+1.05 times real time, so a stream keeps up with playback with little to spare. The first audio of a
+request arrives in 0.22 s once the model is warm, and 1.4 s on the first request after a load. A
+35 s text of seven sentences, three generations cloning the first, took 34.6 s.
+
+**A seed reproduces the tokens and not the audio.** Three seeded runs of one line made identical
+codec frames, 75 of them, and three different waveforms: the same length, identical for the first
+7,680 samples, then apart by at most 0.03 at a correlation of 0.998. The difference is upstream's
+streaming codec. It is not cuDNN's algorithm choice, and it is not an op PyTorch knows to be
+nondeterministic: `use_deterministic_algorithms` flagged none and changed nothing but the speed, which
+it halved. § 6 allows a seed that does not reproduce, and `rhapsode-conform` then reports the four cue
+checks as undecided rather than passed, so whether each is performed is a question for a listener. Of
+the 36 checks it could decide, 35 passed; the other was a reload that ran out of memory because two
+other processes had taken 7.4 GiB of the card during the run.
+
+The install is one pip resolve, on Python 3.12: torch 2.9.1 with CUDA 12.8, transformers 4.57.3 and
+qwen-tts 0.1.1. qwen-tts prints that SoX is missing and flash-attn is not installed when it is
+imported; the eager path needs neither.
