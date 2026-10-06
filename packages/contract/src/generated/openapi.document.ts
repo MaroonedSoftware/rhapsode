@@ -2318,6 +2318,13 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "outdated": {
                         "type": "boolean",
                         "description": "As on EngineSummary. § 9."
+                    },
+                    "warmed": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The variants warmed, for an engine this API installed. § 10."
                     }
                 },
                 "required": [

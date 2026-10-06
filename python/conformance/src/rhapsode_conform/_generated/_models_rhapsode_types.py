@@ -289,6 +289,8 @@ class CatalogEntry(BaseModel):
     worker_version: str | None = Field(alias="workerVersion", default=None)
     # As on EngineSummary. § 9.
     outdated: bool | None = None
+    # The variants warmed, for an engine this API installed. § 10.
+    warmed: list[str] | None = None
 
 # The public shape, which the worker's `/speak` does not share: `keepAliveSeconds` is core policy
 # and a worker has no opinion about how long anything stays resident. protocol.md § 3.

@@ -34,8 +34,11 @@ export async function reinstallOne(api: ManagementClient, client: Client, ui: Ui
     return finished.state === 'succeeded' ? 0 : 1;
 }
 
-/** Reinstall everything behind this core, one job after another, and name what was skipped. */
-export async function reinstallAll(api: ManagementClient, ui: Ui): Promise<number> {
+/**
+ * Reinstall everything behind this core, one job after another, and name what was skipped.
+ * `reinstalled` hears each engine whose reinstall succeeded, for what to offer next.
+ */
+export async function reinstallAll(api: ManagementClient, ui: Ui, reinstalled: (engine: string) => void = () => {}): Promise<number> {
     const answer = await api.reinstallOutdated();
     for (const skipped of answer.skipped) ui.warn(skipReason(skipped));
     if (answer.jobs.length === 0 && answer.skipped.length === 0) {
@@ -46,7 +49,8 @@ export async function reinstallAll(api: ManagementClient, ui: Ui): Promise<numbe
     let failed = 0;
     for (const job of answer.jobs) {
         const finished = await follow(api, job, `Reinstalling ${job.engine}`, ui);
-        if (finished.state !== 'succeeded') failed += 1;
+        if (finished.state === 'succeeded') reinstalled(job.engine);
+        else failed += 1;
     }
     return failed === 0 ? 0 : 1;
 }

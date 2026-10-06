@@ -1371,7 +1371,8 @@ therefore remove it; an engine the operator configured by hand is `installed: ye
 `GET /engines` is unchanged and still lists only what is configured: the catalog is what exists,
 and `/engines` is what this box has. An installed engine's entry also carries `workerVersion` and
 `outdated` as its engine summary does (§ 9), so a page listing the catalog can say which engines an
-upgrade left behind without a second request.
+upgrade left behind without a second request. An engine this API installed carries `warmed` as
+well, the variants recorded as warmed (below), absent when none has been.
 
 ### Installing
 
@@ -1640,6 +1641,15 @@ for that by name.
   reinstall refuses that engine anyway.
 - **The refusals before a job are a pull's**: an engine that is not installed is `unknown_engine`,
   and one with a job queued or running is `conflict`.
+
+**What is left to warm is the variants that compile, less what was warmed.** A client reads the
+first from the engine's capability document, the variants that declare `compiles`, and the second
+from the engine's catalog entry, `warmed`. The core does not answer it for them in the catalog,
+because only the worker knows which variants compile and the catalog is read on every page load: a
+listing that started a worker for each installed engine to ask would cost tens of megabytes apiece
+for an answer that changes only at an install. Where the two disagree only because nothing was
+recorded, as for an engine the operator configured, the client is told nothing it can act on, and
+should not keep offering a warm it cannot see the end of.
 
 ### Jobs
 

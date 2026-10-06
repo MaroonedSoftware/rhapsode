@@ -47,6 +47,7 @@ pnpm wizard unload kokoro           # give that model's memory back now
 pnpm wizard settings                # every setting and where it came from; `settings <key> <value>` changes one
 pnpm wizard update                  # is a newer rhapsode out, is any engine behind; offers the reinstall
 pnpm wizard reinstall --all         # rebuild every engine an upgrade left behind, beside the old venv
+pnpm wizard warm orpheus            # compile now what an install did not warm, so its first request does not
 node scripts/docker.smoke.mjs       # build the image, install through it, and replace the container on its volumes
 pnpm release version 0.2.0          # every published package to one version, changesets into CHANGELOG.md
 pnpm --filter @rhapsode/site start  # the website on :8082, which `pnpm dev` does not start

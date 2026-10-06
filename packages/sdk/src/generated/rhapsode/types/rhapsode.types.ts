@@ -382,6 +382,8 @@ export interface CatalogEntry {
     workerVersion?: string;
     /** As on EngineSummary. § 9. */
     outdated?: boolean;
+    /** The variants warmed, for an engine this API installed. § 10. */
+    warmed?: string[];
 }
 
 /**

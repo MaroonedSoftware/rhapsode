@@ -142,6 +142,13 @@ describe('ManagementClient against a real core', () => {
         expect(refused).toMatchObject({ code: 'unknown_engine', status: 404 });
     });
 
+    it('asks the warm route, and turns its refusal into the protocol’s code', async () => {
+        const client = new ManagementClient(await start());
+        const refused = await client.warm('chatterbox', 'turbo').catch((error: unknown) => error);
+
+        expect(refused).toMatchObject({ code: 'unknown_engine', status: 404 });
+    });
+
     it('reads what is resident, on a server holding nothing', async () => {
         const client = new ManagementClient(await start());
 

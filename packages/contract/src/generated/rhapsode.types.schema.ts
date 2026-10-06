@@ -407,6 +407,7 @@ export const CatalogEntry = z.looseObject({
         .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
         .optional()
         .describe('As on EngineSummary. § 9.'),
+    warmed: z.array(z.string()).optional().describe('The variants warmed, for an engine this API installed. § 10.'),
 });
 export type CatalogEntry = z.infer<typeof CatalogEntry>;
 

@@ -3,6 +3,7 @@ import { wizard, type CliContext, type CommandModule } from '@maroonedsoftware/j
 import { interactiveUi, plainUi, reportFailure, type Ui } from '../lib/job.ui.js';
 import { REINSTALL_COST, reinstallAll, reinstallOne } from '../lib/reinstall.js';
 import { serverApi } from '../lib/server.api.js';
+import { offerWarm } from '../lib/warm.js';
 
 type Client = typeof import('../lib/management.client.js');
 
@@ -55,7 +56,11 @@ const command: CommandModule<ReinstallOptions> = {
 async function reinstall(engine: string | undefined, opts: ReinstallOptions, ctx: CliContext, client: Client, ui: Ui): Promise<number> {
     const api = await serverApi(ctx, opts, client);
     try {
-        if (engine === undefined) return await reinstallAll(api, ui);
+        if (engine === undefined) {
+            const reinstalled: string[] = [];
+            const outcome = await reinstallAll(api, ui, id => reinstalled.push(id));
+            return Math.max(outcome, await offerWarm(api, ui, reinstalled));
+        }
 
         const catalog = await api.catalog();
         const entry = catalog.find(candidate => candidate.id === engine);
@@ -78,7 +83,8 @@ async function reinstall(engine: string | undefined, opts: ReinstallOptions, ctx
             ui.warn('Not reinstalled.');
             return 1;
         }
-        return await reinstallOne(api, client, ui, entry);
+        const outcome = await reinstallOne(api, client, ui, entry);
+        return outcome === 0 ? await offerWarm(api, ui, [entry.id]) : outcome;
     } catch (error) {
         reportFailure(error, client, ui);
         return 1;

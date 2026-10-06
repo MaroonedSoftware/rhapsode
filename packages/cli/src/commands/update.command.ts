@@ -3,6 +3,7 @@ import type { UpdateStatus } from '@rhapsode/contract';
 
 import { interactiveUi, plainUi, reportFailure, type Ui } from '../lib/job.ui.js';
 import { REINSTALL_COST, reinstallAll } from '../lib/reinstall.js';
+import { offerWarm } from '../lib/warm.js';
 import { serverApi } from '../lib/server.api.js';
 
 type Client = typeof import('../lib/management.client.js');
@@ -68,7 +69,9 @@ async function update(opts: UpdateOptions, ctx: CliContext, client: Client, ui: 
             ui.info('Run `pnpm wizard reinstall --all` when you are ready.');
             return 0;
         }
-        return await reinstallAll(api, ui);
+        const reinstalled: string[] = [];
+        const outcome = await reinstallAll(api, ui, engine => reinstalled.push(engine));
+        return Math.max(outcome, await offerWarm(api, ui, reinstalled));
     } catch (error) {
         reportFailure(error, client, ui);
         return 1;
