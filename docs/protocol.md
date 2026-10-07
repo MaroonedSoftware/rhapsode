@@ -646,6 +646,89 @@ engine with no voices of its own. A voice the engine does not have is `unknown_v
 - **Everything about the response is `/speak`'s**: the formats, the 256-byte floor, aborting rather
   than closing when a stream fails after its headers, the duration header or trailer, and the errors.
 
+### Speaking as the text arrives
+
+```http
+GET /speak/stream
+Upgrade: websocket
+```
+
+A language model writes its answer a few characters at a time, and a caller that waits for the whole
+answer before `/speak` makes its listener wait for both. This route takes the text as it is written
+and speaks each sentence once it is complete, so the first audio follows the first full stop rather
+than the last. Measured with Chatterbox turbo on an M-series Mac, on a 218-character paragraph
+written at 30 tokens a second: the first audio 1.2 s after the first token, before the model had
+finished, against 8.9 s through `/speak` once it had.
+
+```text
+// client → server, text frames
+{ "type": "start", "engine": "kokoro", "voice": "af_bella", "seed": 7 }
+{ "type": "text", "text": "The quick brown fox jum" }
+{ "type": "text", "text": "ps over the lazy dog. And then" }
+{ "type": "flush" }
+{ "type": "end" }
+
+// server → client
+{ "type": "ready", "engine": "kokoro", "variant": "fp16" }
+{ "type": "format", "contentType": "audio/L16; rate=24000; channels=1" }
+<binary frames: PCM>
+{ "type": "spoken", "index": 0, "characters": 44, "durationMs": 2810 }
+<binary frames: PCM>
+{ "type": "spoken", "index": 1, "characters": 8, "durationMs": 640 }
+{ "type": "done" }
+```
+
+**It is `/speak`, one piece at a time, and not a second implementation of it.** Each piece goes to the
+worker's ordinary `POST /speak`, so the worker protocol does not change and an engine needs nothing to
+take part. Each piece passes through everything `/speak` applies: the ceiling, the cue and
+decoration stripping of § 5, the dial check and the floor. So nothing that is true of `/speak` can
+stop being true here.
+
+- **`start` is `/speak`'s fields without `text` and `stream`**: `engine`, `voice`, `variant`, `format`,
+  `language`, `delivery`, `params`, `seed` and `keepAliveSeconds`. A field it does not know is
+  `bad_request`, as it is at `/speak`. Nothing else may come first.
+- **`format` is `pcm` or absent.** PCM pieces join into one stream by concatenation. A WAV, an Ogg or a
+  FLAC per piece would be a header in the middle of the audio, and making one file of them is audio
+  work the core does not do. The rate arrives once, in a `format` frame before the first audio,
+  carrying the worker's `Content-Type` verbatim. It is not in `ready`, because the core holds no
+  format table and knows the rate only once a worker has answered.
+- **The core cuts at sentence ends, by the SDK's own rule** (§ 8): `.`, `!`, `?` or `…` followed by
+  whitespace, or a CJK stop. A full stop at the very end of what has arrived is not yet a sentence
+  end, because `3.` may be about to become `3.5`; the next character, a `flush` or the `end` decides.
+- **The first piece is the first sentence, and later ones are everything complete since.** Pieces are
+  spoken one after another, and while one is being spoken the text keeps arriving. Whatever sentences
+  are complete when the worker is free go together, up to the variant's `segmentCharacters` (or
+  `maxCharacters` where it declares no split), so the latency is one sentence and the rest is spoken
+  in pieces the engine reads as prose rather than as a list of lines.
+- **Text with no sentence end is not held forever.** Past the same limit with no sentence end, the
+  core cuts at the last clause or word boundary within it, as the SDK would.
+- **`flush` speaks what has arrived, finished or not.** It is how a caller says the model has stopped
+  writing for now. `end` is a `flush` that also closes the session once everything is spoken.
+- **`seed` is the first piece's, and piece `n` gets `seed + n`**, the rule the SDK applies to the
+  pieces it cuts (§ 8). A seeded session reproduces itself when its text is cut the same way, which is
+  only when it arrives in the same frames.
+- **`spoken` follows each piece's audio**, with its index, how many characters it was, and its
+  duration from the worker's trailer, so a caller can follow along without counting samples.
+- **The residency lease is held for the whole session**, from `start` to the socket closing, so the
+  model is not evicted between two sentences of one answer. A session that sends nothing for 60
+  seconds while nothing is being spoken is closed as `bad_request`, because a client that vanished
+  without closing the socket would otherwise hold the lease for good.
+- **Every error ends the session.** It arrives as `{ "type": "error", "error": { code, message,
+  retryable } }`, the envelope of § 6, and the server closes the socket after it. Audio already sent
+  stays sent; a client that needs all or nothing wants `/speak`. An unknown voice, for instance, is
+  found by the first piece, after `ready`.
+- **Closing the socket stops the piece being spoken**, as closing `/speak`'s connection does.
+
+**It answers the callers `/speak` answers, except a web page from elsewhere.** A browser does not ask
+a server whether a page may open a WebSocket to it, as it asks before a cross-site `POST` of JSON, so
+without a check any page the operator visits could use this route to drive the engines on their
+machine and hear the result. So a request carrying an `Origin` is refused as `forbidden` unless the
+origin is this machine's own or is listed in `management.origins`, the rule `/mcp` applies (§ 12).
+
+It is not in `GET /openapi.json` (§ 9): OpenAPI describes requests and responses, and this is a
+conversation. The OpenAI shim and the MCP server do not offer it, because neither has a request shape
+for text that has not been written yet.
+
 ---
 
 ## 7. Voices
@@ -1909,6 +1992,8 @@ Named so that nobody has to guess whether they were forgotten.
 - **Word timestamps.** Wanted, cheap enough as an optional sidecar response, and not worth blocking
   v1. Leave room: a `X-Rhapsode-Timings-Url` header or a `timings` field in a multipart response.
 - **Batching.** Adapters declare `concurrency` and that is the whole of it for now.
+- **Any format but `pcm` from `/speak/stream`.** § 6 says why: one file from many pieces is audio
+  work. An encoder that streams across pieces is the way in, and it waits for a client that needs one.
 - **Engines inside the core.** Every engine is a worker, ONNX ones included. § 8 says why.
 - **A UI in the core.** The gap this project fills is that everything else has one, and has put
   its API behind it. A web page for installing engines is a client of § 10 like any other, and gets
