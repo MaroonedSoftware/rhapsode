@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
             collapsed: false,
             items: ['engines/kokoro', 'engines/chatterbox', 'engines/orpheus', 'engines/dia', 'engines/breeze', 'engines/fish', 'engines/tone'],
         },
+        'streaming',
         'openai',
         'mcp',
         'help',

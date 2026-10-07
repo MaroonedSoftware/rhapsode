@@ -1,12 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildServer, loadSettings, RhapsodeJsonLogger } from '@rhapsode/core';
 
-import { RhapsodeSdk, SdkError } from '../src/index.js';
+import { RhapsodeSdk, SdkError, speakStream, type SpeakStreamEvent } from '../src/index.js';
 
 /**
  * The generated client against a real core, because a client generated from the contract and a
@@ -75,4 +77,74 @@ describe('RhapsodeSdk against a real core', () => {
             globalThis.fetch = original;
         }
     });
+});
+
+/**
+ * `speakStream` against a real core speaking through the tone engine, for the reason above: the
+ * client and the route agreeing is the claim, and only the real route can confirm it. Skipped where
+ * Unix sockets cannot be bound, which is where a worker cannot run either.
+ */
+const canBindUnixSockets = await (async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'rh-probe-'));
+    try {
+        const server = createServer();
+        await new Promise<void>((fulfil, fail) => {
+            server.once('error', fail);
+            server.listen(join(directory, 'p.sock'), fulfil);
+        });
+        await new Promise<void>(fulfil => server.close(() => fulfil()));
+        return true;
+    } catch {
+        return false;
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+})();
+
+(canBindUnixSockets ? describe : describe.skip)('speakStream against a real core', () => {
+    const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+    let dir: string;
+    let running: Awaited<ReturnType<typeof buildServer>> | undefined;
+
+    beforeEach(() => {
+        dir = mkdtempSync(join(tmpdir(), 'rh-sdk-'));
+    });
+
+    afterEach(async () => {
+        await running?.app.close();
+        running = undefined;
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    async function base(): Promise<string> {
+        running = await buildServer(
+            { workers: { socketDir: dir, startupTimeoutSeconds: 30 }, engines: { tone: { venv: join(REPO, 'python/.venv') } } },
+            new RhapsodeJsonLogger('error', () => {}),
+        );
+        return running.app.listen({ host: '127.0.0.1', port: 0 });
+    }
+
+    it('speaks text pushed in pieces, and ends when it is done', async () => {
+        const stream = speakStream(await base(), { engine: 'tone', seed: 1 });
+        for (const piece of ['Here is one sent', 'ence. And here ', 'is another.']) stream.push(piece);
+        stream.end();
+
+        const events: SpeakStreamEvent[] = [];
+        for await (const event of stream.events) events.push(event);
+
+        expect(events[0]).toEqual({ type: 'ready', engine: 'tone', variant: 'plain' });
+        expect(events[1]).toEqual({ type: 'format', contentType: 'audio/L16; rate=24000; channels=1' });
+        expect(events.filter(event => event.type === 'spoken').map(event => event.index)).toEqual([0, 1]);
+        const audio = events.flatMap(event => (event.type === 'audio' ? [event.data.length] : [])).reduce((sum, length) => sum + length, 0);
+        expect(audio).toBeGreaterThan(0);
+    }, 60_000);
+
+    it('throws the protocol’s error from the events', async () => {
+        const stream = speakStream(await base(), { engine: 'nope' });
+        stream.end();
+        const reading = (async () => {
+            for await (const _ of stream.events) void _;
+        })();
+        await expect(reading).rejects.toMatchObject({ name: 'SpeakStreamError', code: 'unknown_engine', retryable: false });
+    }, 60_000);
 });
