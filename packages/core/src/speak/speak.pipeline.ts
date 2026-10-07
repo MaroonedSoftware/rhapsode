@@ -20,7 +20,7 @@ import { DURATION_HEADER, type SpokenResponse, type WorkerClient } from '../work
 import { WorkerRegistry } from '../workers/worker.registry.js';
 import { audioFloor, ShortAudioError } from './audio.floor.js';
 
-const DEFAULT_MAX_CHARACTERS = 4096;
+export const DEFAULT_MAX_CHARACTERS = 4096;
 
 /** A native speak request, already read off whichever body it arrived in. § 6. */
 export interface NativeSpeak {
@@ -84,7 +84,7 @@ export async function speakThrough(
     // An unknown engine before empty text, so a request wrong in both ways hears the first thing to fix.
     if (!engines.has(native.engine)) throw RhapsodeError.unknownEngine(native.engine, engines.ids());
     if (native.text.length === 0) throw new RhapsodeError('bad_request', '`text` is required and must be a non-empty string');
-    const { engineId, client, variant, claims, logger } = await resolve(request, native.engine, native.variant);
+    const { engineId, client, variant, claims, logger } = await resolve(servicesOf(request), native.engine, native.variant);
 
     options.refine?.(claims, variant);
     assertWithinCeiling(native.text, claims, DEFAULT_MAX_CHARACTERS);
@@ -125,7 +125,7 @@ export async function speakThrough(
  * `deliver`'s, so they cannot come to disagree with `/speak`'s.
  */
 export async function dialogueThrough(request: FastifyRequest, reply: FastifyReply, native: NativeDialogue): Promise<FastifyReply> {
-    const { engineId, client, variant, claims, logger } = await resolve(request, native.engine, native.variant);
+    const { engineId, client, variant, claims, logger } = await resolve(servicesOf(request), native.engine, native.variant);
     const ready = performableDialogue({ turns: native.turns, params: native.params }, claims, variant, DEFAULT_MAX_CHARACTERS);
 
     if (ready.dropped.cues.length > 0) {
@@ -149,14 +149,30 @@ export async function dialogueThrough(request: FastifyRequest, reply: FastifyRep
     );
 }
 
-/** The engine, its worker, and the variant this request is about, before anything is committed. */
-async function resolve(request: FastifyRequest, engineId: string, requested: string | undefined) {
-    const engines = request.container.get(EngineRegistry);
-    const workers = request.container.get(WorkerRegistry);
-    // Resolved before streaming, because ServerKit disposes the request scope when reply.raw
-    // closes, not on onResponse. A container.get() inside a stream callback throws.
-    const logger = request.container.get(Logger);
+/** What speaking needs from the request scope, taken while there is one. */
+export interface SpeakServices {
+    engines: EngineRegistry;
+    workers: WorkerRegistry;
+    residency: ResidencyManager;
+    logger: Logger;
+}
 
+/**
+ * Resolved up front, because ServerKit disposes the request scope when reply.raw closes, not on
+ * onResponse, and a WebSocket's request has no reply at all once it is upgraded. A container.get()
+ * inside a stream callback throws.
+ */
+export function servicesOf(request: FastifyRequest): SpeakServices {
+    return {
+        engines: request.container.get(EngineRegistry),
+        workers: request.container.get(WorkerRegistry),
+        residency: request.container.get(ResidencyManager),
+        logger: request.container.get(Logger),
+    };
+}
+
+/** The engine, its worker, and the variant this request is about, before anything is committed. */
+export async function resolve({ engines, workers, logger }: SpeakServices, engineId: string, requested: string | undefined) {
     if (!engines.has(engineId)) throw RhapsodeError.unknownEngine(engineId, engines.ids());
 
     // Bringing the process up is cheap and tells us what this engine can do. Loading a model is

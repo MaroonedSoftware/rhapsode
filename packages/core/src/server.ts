@@ -1,8 +1,10 @@
+import fastifyWebsocket from '@fastify/websocket';
 import { AppConfig } from '@maroonedsoftware/appconfig';
 import {
     authenticationPlugin,
     bodyParserPlugin,
     serverKitContextPlugin,
+    serverKitPlugin,
     ServerKitServerBuilder,
     type ServerKitModule,
     type ServerKitRouteMount,
@@ -30,6 +32,7 @@ import { openaiRoutes } from './openai/openai.routes.js';
 import { apiReferenceRoutes } from './reference/api.reference.routes.js';
 import { dialogueRoutes } from './speak/dialogue.routes.js';
 import { speakRoutes } from './speak/speak.routes.js';
+import { speakStreamRoutes } from './speak/speak.stream.routes.js';
 import { settingsModule } from './settings/settings.module.js';
 import { settingsRoutes } from './settings/settings.routes.js';
 import { stateModule } from './state/state.module.js';
@@ -96,6 +99,10 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         // from every request whether or not it is used, so no log line ever carries it. § 10.
         authenticationPlugin(),
         bodyParserPlugin(),
+        // Upgrades for `/speak/stream`, on the root instance so the route plugin below can use them. § 6.
+        serverKitPlugin('websocket', async app => {
+            await app.register(fastifyWebsocket);
+        }),
     ]);
 
     const routes: ServerKitRouteMount[] = [
@@ -106,6 +113,8 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
         { plugin: engineDetailRoutes },
         { plugin: residencyRoutes },
         { plugin: speakRoutes },
+        // Text in as a model writes it, through the route above a sentence at a time. § 6.
+        { plugin: speakStreamRoutes },
         { plugin: dialogueRoutes },
         // OpenAI's speech route, translated into the one above. § 11.
         { plugin: openaiRoutes },

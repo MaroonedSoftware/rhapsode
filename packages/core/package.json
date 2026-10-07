@@ -28,6 +28,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@fastify/websocket": "^11.3.3",
         "@maroonedsoftware/appconfig": "^2.6.1",
         "@maroonedsoftware/authentication": "^6.2.0",
         "@maroonedsoftware/errors": "^1.9.1",
