@@ -152,3 +152,18 @@ def test_korean_still_breaks_at_its_spaces():
 
 def test_a_latin_ellipsis_with_no_space_still_does_not_break():
     assert segments("Well…I suppose so.", 14) == ["Well…I suppose", "so."]
+
+
+def test_the_core_splits_as_the_sdk_does():
+    """`packages/contract/src/sentences.ts` is this module's twin, for the one place the core finds
+    sentence ends itself (`/speak/stream`, protocol.md § 6). Both suites read the same cases, so a
+    change to either splitter fails the other's until it is made to both."""
+    import json
+    from pathlib import Path
+
+    from rhapsode_worker.text import SENTENCE_END
+
+    fixture = Path(__file__).resolve().parents[3] / "contracts" / "fixtures" / "segments.json"
+    for case in json.loads(fixture.read_text())["cases"]:
+        assert [part for part in SENTENCE_END.split(case["text"].strip()) if part] == case["sentences"]
+        assert segments(case["text"], case["limit"]) == case["segments"]
