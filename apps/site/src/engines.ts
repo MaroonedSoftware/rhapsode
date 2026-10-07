@@ -84,6 +84,16 @@ export const ENGINES: Engine[] = [
         license: { code: 'Fish-Audio-Research-License', weights: 'Fish-Audio-Research-License' },
     },
     {
+        id: 'styletts2',
+        name: 'StyleTTS 2',
+        summary: 'Clones a voice from a few seconds of audio and nothing else, small enough to run well on a CPU. English only.',
+        runsOn: 'CPU or GPU',
+        weights: 'libritts, 0.9 GB',
+        cues: 0,
+        voices: 'Clones from a clip, no transcript',
+        license: { code: 'GPL-3.0-or-later', weights: 'MIT' },
+    },
+    {
         id: 'tone',
         name: 'Tone',
         summary: 'No weights and no speech: a sine wave that proves the protocol in CI on every commit.',

@@ -65,5 +65,6 @@ apps/site/docs/engines/breeze.md
 apps/site/docs/engines/fish.md
 apps/site/docs/engines/kokoro.md
 apps/site/docs/engines/orpheus.md
+apps/site/docs/engines/styletts2.md
 apps/site/docs/engines/tone.md
 apps/site/static/openapi.yaml

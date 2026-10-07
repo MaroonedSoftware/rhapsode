@@ -144,6 +144,22 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'https://huggingface.co/canopylabs/orpheus-3b-0.1-ft, a finetune of Llama 3.2 3B, run from unsloth GGUF conversions',
         },
     },
+    styletts2: {
+        displayName: 'StyleTTS 2',
+        module: 'rhapsode_engine_styletts2',
+        package: 'rhapsode-engine-styletts2',
+        // The one build, named for the corpus it was trained on, so an LJSpeech build can sit beside it.
+        defaultVariant: 'libritts',
+        license: {
+            // What the worker process runs: StyleTTS 2 is MIT and phonemizes through GPL code. § 4.
+            code: 'GPL-3.0-or-later',
+            weights: 'MIT',
+            weightsCommercialUse: true,
+            // Upstream's README attaches a condition to the pretrained weights, in a section it calls
+            // a licence. It decides what a clone may be used for, so it is read before install.
+            notes: 'GPL through phonemizer and eSpeak NG; StyleTTS 2 itself is MIT, downloaded from yl4579/StyleTTS2 at a pinned commit. Weights: yl4579/StyleTTS2-LibriTTS. Upstream asks that listeners be told the speech is synthesised, unless the speaker whose voice is cloned has given permission; its own LibriTTS speakers are exempt. English only.',
+        },
+    },
     tone: {
         displayName: 'Tone',
         module: 'rhapsode_engine_tone',

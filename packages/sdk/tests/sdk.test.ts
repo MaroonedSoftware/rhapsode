@@ -40,7 +40,7 @@ describe('RhapsodeSdk against a real core', () => {
         const client = await sdk();
 
         const catalog = await client.public.catalog();
-        expect(catalog.map(entry => entry.id).sort()).toEqual(['breeze', 'chatterbox', 'dia', 'fish', 'kokoro', 'orpheus', 'tone']);
+        expect(catalog.map(entry => entry.id).sort()).toEqual(['breeze', 'chatterbox', 'dia', 'fish', 'kokoro', 'orpheus', 'styletts2', 'tone']);
         expect((await client.public.health()).status).toBe('ok');
     });
 

@@ -139,7 +139,9 @@ Chatterbox's are in `~/.cache/huggingface`, 9.7 GB for all three variants. Kokor
 the codec they share. Dia's are there as well, 6.4 GB for the model and 0.3 GB for its codec, and
 so are Breeze's, 7.0 GB for the model and 0.7 GB for its audio tokenizer, and Fish's, 9.1 GB for
 the model and 1.9 GB for its codec. Fish's inference code is in `~/.cache/rhapsode/fish-speech`, or
-wherever `RHAPSODE_FISH_SOURCE` points.
+wherever `RHAPSODE_FISH_SOURCE` points. StyleTTS 2's weights are in `~/.cache/huggingface`, 774 MB,
+and its code and the three checkpoints that come with it, 141 MB, are in
+`~/.cache/rhapsode/styletts2`, or wherever `RHAPSODE_STYLETTS2_SOURCE` points.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
@@ -237,6 +239,26 @@ line comes 2.5 to 5.5 s after the request.
 A cloned voice needs the clip's `transcript`. A long text is cut into turns of one conversation, so
 one voice holds from the first to the last. A request that is abandoned keeps the model busy until
 its last batch is generated, because upstream's model thread does not wait for the decoder.
+
+### StyleTTS 2
+
+StyleTTS 2 needs no GPU to be useful: 191M parameters, 1.2 GiB resident, several times realtime on an
+M-series Mac's CPU and faster on its GPU. It speaks English only and performs no cues, and clones
+from three seconds or more of audio with no transcript.
+
+rhapsode ships none of upstream's code. A pull or the first load downloads it from upstream at a
+pinned commit and checks it against a digest of its files, because upstream has no packaging, and
+three of the checkpoints the model is built from are in that repository rather than on the Hub. The
+weights are checked against pinned SHA-256s too: upstream's checkpoints are pickles that torch
+refuses to load as untrusted, and the adapter tells it to trust only files whose bytes are pinned.
+
+Its weights are MIT, and upstream's README asks that listeners be told the speech is synthesised
+unless the person whose voice is cloned has given permission. The six stock voices are speakers from
+the corpus it was trained on, which the condition does not reach.
+
+eSpeak NG, which it phonemizes with, exits the process when its data is at a path of 160 characters
+or more, as it does for Kokoro, so a virtualenv under a long home directory fails to load with a
+message saying so. Set `install.venvDir` somewhere shorter.
 
 ## The web page
 

@@ -40,6 +40,7 @@ export const pages = [
     { source: 'python/rhapsode-engine-fish/README.md', doc: 'engines/fish.md', label: 'Fish Audio S2 Pro' },
     { source: 'python/rhapsode-engine-kokoro/README.md', doc: 'engines/kokoro.md', label: 'Kokoro' },
     { source: 'python/rhapsode-engine-orpheus/README.md', doc: 'engines/orpheus.md', label: 'Orpheus' },
+    { source: 'python/rhapsode-engine-styletts2/README.md', doc: 'engines/styletts2.md', label: 'StyleTTS 2' },
     { source: 'python/rhapsode-engine-tone/README.md', doc: 'engines/tone.md', label: 'Tone' },
 ];
 

@@ -219,6 +219,12 @@ its install has to accept by name. rhapsode ships none of its code: the engine d
 inference code beside the weights. On an RTX 4070 Ti SUPER it holds 12.3 GiB and speaks at about real
 time. Its weights are 11 GB.
 
+[`rhapsode-engine-styletts2`](python/rhapsode-engine-styletts2/) is StyleTTS 2, which clones a voice
+from three seconds of audio and no transcript, in English. It is small enough not to need a GPU: 191M
+parameters in 1.2 GiB, several times realtime on a laptop's CPU and faster on its GPU. It performs no
+cues. Its code is MIT and phonemizes through GPL code, and upstream asks that listeners be told the
+speech is synthesised unless the person cloned has agreed. Its weights are 0.9 GB.
+
 ## Contributing an engine
 
 An engine is a Python package that subclasses one class and is registered in the catalog. You write
