@@ -208,6 +208,23 @@ describeWithSockets('speaking', () => {
         expect(stripped.rawPayload.length).toBeLessThan(kept.rawPayload.length);
     }, 60_000);
 
+    it('strips emoji and markdown emphasis, before the worker ever sees them', async () => {
+        // Chatterbox turbo voiced the decoration, half as long again as the clean sentence. The tone
+        // engine's audio grows with its text, so equal lengths say the worker got the same words.
+        const builder = await start();
+        const clean = await speak(builder, { engine: 'tone', text: 'I really like Jon.', variant: 'plain', format: 'pcm', stream: false });
+        const decorated = await speak(builder, {
+            engine: 'tone',
+            text: 'I *really* like **Jon** 😀.',
+            variant: 'plain',
+            format: 'pcm',
+            stream: false,
+        });
+
+        expect(decorated.statusCode).toBe(200);
+        expect(decorated.rawPayload.length).toBe(clean.rawPayload.length);
+    }, 60_000);
+
     it('refuses an unknown dial and names it', async () => {
         const builder = await start();
         const response = await speak(builder, { engine: 'tone', text: 'x', variant: 'dialled', params: { nope: 1 } });

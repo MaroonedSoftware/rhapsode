@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CUES, cuesIn, DELIVERIES, withoutCues } from '../src/vocabulary.js';
+import { CUES, cuesIn, DELIVERIES, withoutCues, withoutDecoration } from '../src/vocabulary.js';
 
 describe('the standard vocabulary', () => {
     it('is the eight cues and the two deliveries', () => {
@@ -55,6 +55,52 @@ describe('withoutCues', () => {
         // A `g` flag carries lastIndex between calls, which is why the matcher is built fresh.
         const text = 'a [laugh] b';
         expect(withoutCues(text)).toBe(withoutCues(text));
+    });
+});
+
+describe('withoutDecoration', () => {
+    it('removes emphasis and keeps the words it wrapped', () => {
+        // Chatterbox turbo spoke this sentence for 4.33 s with the markup against 2.65 s without.
+        expect(withoutDecoration('I *really* like **Jon**, and this is __great__.')).toBe('I really like Jon, and this is great.');
+        expect(withoutDecoration('***both*** and _one_ and ___three___')).toBe('both and one and three');
+    });
+
+    it('removes emoji, including joined and modified ones and flags', () => {
+        expect(withoutDecoration('great 😀 news 🎉👍.')).toBe('great news.');
+        expect(withoutDecoration('the family 👨‍👩‍👧 waved 👋🏽')).toBe('the family waved');
+        expect(withoutDecoration('from 🇬🇧 with ❤️')).toBe('from with');
+        expect(withoutDecoration('press 1️⃣ now')).toBe('press 1 now');
+    });
+
+    it('keeps the symbols that are read as words', () => {
+        expect(withoutDecoration('Acme™ and © 2026, ® too')).toBe('Acme™ and © 2026, ® too');
+    });
+
+    it('leaves asterisks and underscores that are not emphasis', () => {
+        expect(withoutDecoration('call snake_case_name')).toBe('call snake_case_name');
+        expect(withoutDecoration('2 * 3 * 4 and 2*3*4')).toBe('2 * 3 * 4 and 2*3*4');
+        expect(withoutDecoration('a lone * here')).toBe('a lone * here');
+        expect(withoutDecoration('* not closed')).toBe('* not closed');
+        expect(withoutDecoration('** spaced **')).toBe('** spaced **');
+        expect(withoutDecoration('mis**matched*')).toBe('mis**matched*');
+    });
+
+    it('does not reach across a line', () => {
+        expect(withoutDecoration('a *b\nc* d')).toBe('a *b\nc* d');
+    });
+
+    it('never touches brackets, where cues and engine tags live', () => {
+        expect(withoutDecoration('[laugh] <laugh> (laughs) [S1]')).toBe('[laugh] <laugh> (laughs) [S1]');
+        expect(withoutDecoration('a *[sigh]* b')).toBe('a [sigh] b');
+    });
+
+    it('scans text of nothing but openers in linear time', () => {
+        // A lazy `.+?` read to the end of the text from every opener.
+        for (const text of ['*a '.repeat(20_000), '_a '.repeat(20_000), '**'.repeat(20_000), '😀'.repeat(20_000)]) {
+            const started = performance.now();
+            withoutDecoration(text);
+            expect(performance.now() - started).toBeLessThan(500);
+        }
     });
 });
 
