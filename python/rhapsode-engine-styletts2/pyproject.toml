@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-styletts2"
+version = "0.1.22"
+description = "StyleTTS 2 for rhapsode: zero-shot cloning from a few seconds of audio, with no transcript."
+readme = "README.md"
+# This package's own code. What the worker process runs is GPL-3.0-or-later, through phonemizer and
+# eSpeak NG, and the capability document says so: protocol.md § 4.
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker==0.1.22",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "numpy>=1.26",
+    "huggingface_hub>=0.23",
+    # What upstream's inference path imports, found by importing models.py, text_utils.py and
+    # Utils/PLBERT in a clean virtualenv on Python 3.14 with torch 2.14 and transformers 5.19. Its
+    # requirements.txt also lists accelerate, matplotlib, pydub and monotonic_align, which only
+    # training imports. Upstream's code itself is fetched beside the weights (upstream.py).
+    "torch>=2.6",
+    "torchaudio>=2.6",
+    "transformers>=4.36",
+    "librosa>=0.10",
+    "munch>=4.0",
+    "pyyaml>=6.0",
+    "scipy>=1.10",
+    "einops>=0.7",
+    "einops-exts>=0.0.4",
+    "typing_extensions>=4.9",
+    "tqdm",
+    # The phonemes the model was trained on are eSpeak NG's, through phonemizer, and espeakng-loader
+    # brings eSpeak NG itself so the box needs no system package.
+    "phonemizer>=3.2",
+    "espeakng-loader>=0.2.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_styletts2"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = [
+    "torch",
+    "torch.*",
+    "torchaudio",
+    "torchaudio.*",
+    "numpy.*",
+    "librosa",
+    "yaml",
+    "munch",
+    "huggingface_hub",
+    "huggingface_hub.*",
+    "phonemizer",
+    "phonemizer.*",
+    "espeakng_loader",
+    "models",
+    "text_utils",
+    "Modules.*",
+    "Utils.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that stands in for the model.
+pythonpath = ["tests"]
+timeout = 60

@@ -30,6 +30,7 @@ const ADAPTERS = [
     'rhapsode-engine-dia',
     'rhapsode-engine-breeze',
     'rhapsode-engine-fish',
+    'rhapsode-engine-styletts2',
 ];
 const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'pytest-timeout>=2.3', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11', 'numpy>=1.26'];
 

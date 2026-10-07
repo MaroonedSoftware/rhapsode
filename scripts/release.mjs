@@ -50,6 +50,7 @@ const PYTHON = [
     'python/rhapsode-engine-breeze',
     'python/rhapsode-vendor-breeze',
     'python/rhapsode-engine-fish',
+    'python/rhapsode-engine-styletts2',
     'python/rhapsode-engine-tone',
 ];
 
