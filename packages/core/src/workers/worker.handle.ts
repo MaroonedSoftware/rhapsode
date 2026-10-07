@@ -126,6 +126,9 @@ export class LocalWorkerHandle implements WorkerHandle {
         this.onState({ process: 'starting', restarts: this.restarts });
 
         const socketPath = await this.allocateSocket();
+        // A stop that arrived while the socket was being allocated found no child to signal and
+        // returned. Spawning now would start a process nobody is going to stop.
+        if (!this.wanted) throw new RhapsodeError('model_unavailable', `engine "${this.id}" was stopped while it was starting`);
         const { command, args } = resolveCommand(this.entry);
 
         const child = spawn(command, args, {
@@ -321,7 +324,9 @@ export class LocalWorkerHandle implements WorkerHandle {
         this.wanted = false;
         const child = this.child;
 
-        if (child === undefined || child.exitCode !== null) {
+        // `exitCode` stays null for a child a signal killed, and `exit` has already fired for it,
+        // so waiting on it would never end: closing a core whose worker was SIGKILLed hung.
+        if (child === undefined || child.exitCode !== null || child.signalCode !== null) {
             await this.client?.close();
             this.client = undefined;
             await this.cleanupSocket();

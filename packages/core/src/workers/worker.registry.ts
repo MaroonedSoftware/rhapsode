@@ -15,6 +15,7 @@ import type { WorkerClient } from './worker.client.js';
 @Injectable()
 export class WorkerRegistry {
     private readonly handles = new Map<string, WorkerHandle>();
+    private stopping?: Promise<void>;
 
     constructor(
         private readonly engines: EngineRegistry,
@@ -56,8 +57,21 @@ export class WorkerRegistry {
         await handle.stop('uninstall');
     }
 
+    /**
+     * Stop every worker, once, however many callers ask.
+     *
+     * Closing the app and ServerKit's shutdown both arrive here in the same tick. Two passes would
+     * signal every worker twice and arm two SIGKILL timers each, and the second caller returning
+     * before the first had finished would let the process exit with workers still draining.
+     */
     async stopAll(): Promise<void> {
-        await Promise.allSettled([...this.handles.values()].map(handle => handle.stop('shutdown')));
-        this.handles.clear();
+        this.stopping ??= (async () => {
+            const handles = [...this.handles.values()];
+            this.handles.clear();
+            await Promise.allSettled(handles.map(handle => handle.stop('shutdown')));
+        })().finally(() => {
+            this.stopping = undefined;
+        });
+        return this.stopping;
     }
 }

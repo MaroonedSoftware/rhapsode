@@ -30,12 +30,16 @@ afterEach(async () => {
     rmSync(dir, { recursive: true, force: true });
 });
 
-/** A runner that waits for a release, prints a line per command, and makes the venv directory. */
+/**
+ * A runner that waits for a release, prints a line per command, and makes the venv directory.
+ * Closing the app aborts it, as it aborts a real pip, or the close waits on a release never coming.
+ */
 function heldRunner() {
     let release!: () => void;
     const held = new Promise<void>(fulfil => (release = fulfil));
-    const runner: CommandRunner = async (command, onLine) => {
-        await held;
+    const runner: CommandRunner = async (command, onLine, signal) => {
+        signal.throwIfAborted();
+        await Promise.race([held, new Promise<never>((_, fail) => signal.addEventListener('abort', () => fail(signal.reason), { once: true }))]);
         onLine(`ran ${command.step}`, 'stdout');
         if (command.step === 'venv') mkdirSync(command.args.at(-1)!, { recursive: true });
     };

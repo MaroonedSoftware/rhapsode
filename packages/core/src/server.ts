@@ -36,6 +36,8 @@ import { stateModule } from './state/state.module.js';
 import { updateModule } from './update/update.module.js';
 import { updateRoutes } from './update/update.routes.js';
 import { workerModule } from './workers/worker.module.js';
+import { WorkerRegistry } from './workers/worker.registry.js';
+import { InstallJobs } from './install/install.jobs.js';
 import { DEFAULTS, type RhapsodeConfig } from './config.js';
 
 /**
@@ -87,6 +89,19 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
     ];
 
     const container = await builder.setup(config, log, modules);
+
+    // The children are stopped when the app closes, not only when `start()` shuts it down. ServerKit
+    // runs module `shutdown` hooks off the listening socket's `close` event, so a core that was
+    // built and closed without ever listening (every test here, and anything embedding the core
+    // through `inject`) never ran them: by 2026-10-07 the tests had left 1,010 tone workers on one
+    // Mac, about 9.5 GB. Under `start()` this fires in the same tick as the socket's `close` event
+    // and so alongside ServerKit's own pass (measured on Fastify 5.12), which is why both halves are
+    // safe to call twice: the second caller waits on the first rather than signalling again. Pip
+    // first, then workers, as the modules order it.
+    builder.app.addHook('onClose', async () => {
+        await container.get(InstallJobs).stop();
+        await container.get(WorkerRegistry).stopAll();
+    });
 
     builder.setupPlugins(() => [
         // First, so that a request failing anywhere later still produces the protocol's envelope.
