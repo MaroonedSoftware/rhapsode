@@ -64,8 +64,14 @@ class Log:
 
         stream = sys.__stderr__ or sys.stderr
         with self._lock:
-            stream.write(line + "\n")
-            stream.flush()
+            # The reader is the core, and a worker whose core has died has nobody left reading. A
+            # line that cannot be delivered is lost either way; raising here would turn a log call
+            # in the middle of draining into the thing that stopped the drain.
+            try:
+                stream.write(line + "\n")
+                stream.flush()
+            except BrokenPipeError:
+                pass
 
     def error(self, message: str, /, **fields: Any) -> None:
         self._emit("error", message, **fields)
