@@ -28,6 +28,7 @@ from .errors import (
     WorkerError,
 )
 from .log import Log
+from .references import ReferenceCache
 from .serve import serve
 from .text import segments
 
@@ -49,6 +50,7 @@ __all__ = [
     "NativeFormat",
     "OutOfMemory",
     "Overloaded",
+    "ReferenceCache",
     "SpeakRequest",
     "UnknownVoice",
     "Unsupported",
