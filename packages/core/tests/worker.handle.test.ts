@@ -31,6 +31,7 @@ const asClient = (client: FakeClient) => client as unknown as WorkerClient;
 
 class FakeChild extends EventEmitter {
     exitCode: number | null = null;
+    signalCode: NodeJS.Signals | null = null;
     readonly signals: NodeJS.Signals[] = [];
     /** A worker wedged past answering, to prove the SIGKILL backstop still lands. */
     ignoreTerm = false;

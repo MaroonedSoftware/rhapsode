@@ -7,6 +7,8 @@ import os
 import signal
 import socket
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,14 @@ from .engine import Engine, detect_device
 from .listen import StartupError, announce, bind, negotiate_contract, parse_listen, seal_stdout
 from .log import Log
 from .worker import Worker
+
+#: How often a worker asks whether the core that spawned it is still there. One `getppid()` a
+#: second costs nothing, and a dead core's worker holding a model for one more second costs little.
+PARENT_POLL_SECONDS = 1.0
+
+#: How long a worker whose core is gone drains before it leaves anyway. The core's own default
+#: `drainGraceMs`, because that is the SIGKILL a living core would have sent, and nobody is left to.
+ORPHAN_GRACE_SECONDS = 10.0
 
 
 def serve(engine: Engine, *, argv: list[str] | None = None) -> None:
@@ -49,6 +59,7 @@ def serve(engine: Engine, *, argv: list[str] | None = None) -> None:
     # POST /terminate is the same drain a signal asks for, reached over HTTP. The worker holds a
     # callback rather than the server, so nothing below the transport layer knows what uvicorn is.
     worker.stop = lambda: setattr(server, "should_exit", True)
+    _watch_parent(server, worker, log)
 
     announce(engine=engine.id, contract=contract, listen=listen)
     seal_stdout(log)
@@ -149,6 +160,44 @@ def _install_signal_handlers(server: Any, worker: Worker, log: Log) -> None:
 
     signal.signal(signal.SIGTERM, drain)
     signal.signal(signal.SIGINT, drain)
+
+
+def _watch_parent(server: Any, worker: Worker, log: Log) -> None:
+    """Drain when the core that spawned this process is gone, and leave if the drain does not.
+
+    A core that dies without stopping its workers (a crash, the OOM killer, a test runner that never
+    closed it) leaves them reparented to init, each holding its model, and no signal is coming:
+    1,010 tone workers had piled up on one Mac by 2026-10-07, about 9.5 GB resident. A changed
+    parent pid is the portable sign; Linux's PR_SET_PDEATHSIG is not available on a Mac, and
+    reading stdin to EOF would end every worker started by hand from a terminal or with stdin on
+    /dev/null. § 2.
+
+    The parent is whoever it is when this runs, so a core that died while the adapter was still
+    importing is missed: by then the parent is already init. A parent of 1 cannot be read as
+    orphaned, because a core run as PID 1 without an init (the image uses tini, an operator's own
+    may not) is a real parent. The window is the adapter's imports, which is seconds.
+
+    The parent has to be the core. An engine `command` that wraps the interpreter in something that
+    stays alive (a shell without `exec`, `uv run`) makes the wrapper the parent, and the watch
+    follows the wrapper rather than the core.
+    """
+    parent = os.getppid()
+
+    def watch() -> None:
+        while os.getppid() == parent:
+            time.sleep(PARENT_POLL_SECONDS)
+        # Drain first, then say so: the stderr pipe went with the core, and a write to it can fail.
+        worker.draining = True
+        server.should_exit = True
+        log.warn("the core that started this worker is gone; draining", parent=parent)
+        # A living core ends a drain that hangs with SIGKILL. This is that, for a worker that has
+        # nobody left to send it.
+        time.sleep(ORPHAN_GRACE_SECONDS)
+        log.error("the drain did not finish after the core went; leaving anyway")
+        os._exit(1)
+
+    # A daemon, so a worker that drains and returns from serve() is not held open by its own watch.
+    threading.Thread(target=watch, name="rhapsode-parent-watch", daemon=True).start()
 
 
 def _cleanup(sock: socket.socket, socket_path: str | None, log: Log) -> None:

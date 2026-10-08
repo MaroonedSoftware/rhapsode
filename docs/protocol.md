@@ -111,6 +111,39 @@ An exit the core did not ask for is a crash, and the core restarts it with backo
 restart count against it. An exit that follows a `SIGTERM` or a `/terminate` is not, however it is
 timed: a worker that finishes draining a second after the core stopped waiting has done its job.
 
+**A core stops what it spawned however it is itself stopped.** Closing the server is a shutdown
+whether or not it ever listened: an embedder or a test that builds the core, answers through it in
+process and closes it has started workers exactly as a listening core does, and they are stopped
+by the same sequence. The core's tests built and closed it without listening, the workers were
+never stopped, and by 2026-10-07 one Mac held 1,010 tone workers dating back three weeks, about
+9.5 GB resident.
+
+### When the core is gone
+
+**A worker whose core has died drains as if it had been sent `SIGTERM`, and leaves on its own if
+the drain has not finished within a grace period.** A core can die without stopping anything: a
+crash, the OOM killer, `SIGKILL` from an operator, a test runner torn down mid-run. Its local
+workers are reparented to init, each holding its model, and no signal is ever coming, so the
+worker has to notice for itself. The grace period is the core's default drain grace, ten seconds,
+because the `SIGKILL` that ends a hung drain is the core's and there is no core left to send it.
+The exit after that grace is non-zero, since it is not the clean drain this section otherwise
+promises.
+
+A worker detects this by its parent process changing, which is portable and needs nothing from the
+core: polling `getppid()` once a second costs nothing. Linux's `PR_SET_PDEATHSIG` would be
+immediate, but a Mac has no equivalent. Reading stdin to end of file would also work for a core
+that held a pipe open, and would end every worker started by hand from a terminal or with stdin on
+`/dev/null`, so stdin stays unused and § 2's three environment variables stay the whole of the
+spawn contract.
+
+Two consequences follow. The worker's parent must be the core, so an engine `command` that wraps
+the interpreter has to `exec` it: a shell or `uv run` that stays alive becomes the parent, and the
+worker watches it instead. And a parent of PID 1 is not read as orphaned, because a core run as PID
+1 without an init in front of it is a real parent; the image runs tini, and an operator's own may
+not. A core that dies before its worker has started watching is missed, which is a window of the
+adapter's imports. A remote worker is unaffected: it was never the core's child, and the section above already
+says its process is somebody else's supervisor's business.
+
 ---
 
 ## 3. Process residency and model residency are different things

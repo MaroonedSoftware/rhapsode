@@ -41,6 +41,16 @@ const describeWithSockets = canBindUnixSockets ? describe : describe.skip;
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
 
+/** Signal 0 delivers nothing and fails with ESRCH when there is no such process. */
+function alive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 let running: Awaited<ReturnType<typeof buildServer>> | undefined;
 let socketDir: string | undefined;
 
@@ -156,6 +166,34 @@ describeWithSockets('supervising a real worker', () => {
         expect(response.statusCode).toBe(503);
         expect(response.json().error).toMatchObject({ code: 'model_unavailable', retryable: true });
         expect(response.json().error.message).toContain('SIGKILL');
+    }, 60_000);
+
+    it('stops its workers when the app is closed, which is the only way an embedder or a test stops it', async () => {
+        // ServerKit runs module `shutdown` hooks only from `start()`, off the listening socket's
+        // `close` event. A core built and closed without listening never ran them, and every test
+        // in this package that spawned the tone engine left it running: 1,010 orphans on one Mac
+        // by 2026-10-07, about 9.5 GB resident.
+        const lines: string[] = [];
+        socketDir = mkdtempSync(join(tmpdir(), 'rh-'));
+        const builder = await buildServer(
+            { workers: { socketDir, startupTimeoutSeconds: 30 }, engines: { tone: { venv: VENV } } },
+            new RhapsodeJsonLogger('info', line => lines.push(line)),
+        );
+        running = builder;
+        await builder.app.ready();
+        expect((await builder.app.inject({ method: 'GET', url: '/engines/tone/capabilities' })).statusCode).toBe(200);
+
+        const up = lines.map(line => JSON.parse(line) as Record<string, unknown>).find(record => record.message === 'worker up');
+        const pid = Number(up?.pid);
+        expect(pid).toBeGreaterThan(0);
+
+        try {
+            await builder.app.close();
+            running = undefined;
+            expect(alive(pid)).toBe(false);
+        } finally {
+            if (alive(pid)) process.kill(pid, 'SIGKILL');
+        }
     }, 60_000);
 
     it('refuses an engine it was never told about', async () => {
