@@ -1,0 +1,137 @@
+{
+    "about": "Generated from rhapsode_worker.text, which is the source of truth; packages/contract/src/sentences.ts must agree. protocol.md § 8.",
+    "cases": [
+        {
+            "text": "Right, that was The Verve Pipe.",
+            "limit": 200,
+            "sentences": ["Right, that was The Verve Pipe."],
+            "segments": ["Right, that was The Verve Pipe."]
+        },
+        {
+            "text": "One two. Three four. Five six. Seven eight.",
+            "limit": 22,
+            "sentences": ["One two.", "Three four.", "Five six.", "Seven eight."],
+            "segments": ["One two. Three four.", "Five six. Seven eight."]
+        },
+        {
+            "text": "Sentence number 0 says something. Sentence number 1 says something. Sentence number 2 says something. Sentence number 3 says something. Sentence number 4 says something. Sentence number 5 says something. Sentence number 6 says something. Sentence number 7 says something. Sentence number 8 says something. Sentence number 9 says something. Sentence number 10 says something. Sentence number 11 says something.",
+            "limit": 60,
+            "sentences": [
+                "Sentence number 0 says something.",
+                "Sentence number 1 says something.",
+                "Sentence number 2 says something.",
+                "Sentence number 3 says something.",
+                "Sentence number 4 says something.",
+                "Sentence number 5 says something.",
+                "Sentence number 6 says something.",
+                "Sentence number 7 says something.",
+                "Sentence number 8 says something.",
+                "Sentence number 9 says something.",
+                "Sentence number 10 says something.",
+                "Sentence number 11 says something."
+            ],
+            "segments": [
+                "Sentence number 0 says something.",
+                "Sentence number 1 says something.",
+                "Sentence number 2 says something.",
+                "Sentence number 3 says something.",
+                "Sentence number 4 says something.",
+                "Sentence number 5 says something.",
+                "Sentence number 6 says something.",
+                "Sentence number 7 says something.",
+                "Sentence number 8 says something.",
+                "Sentence number 9 says something.",
+                "Sentence number 10 says something.",
+                "Sentence number 11 says something."
+            ]
+        },
+        {
+            "text": "It went on, and on, and on, and on, and on, and on, and then it stopped.",
+            "limit": 30,
+            "sentences": ["It went on, and on, and on, and on, and on, and on, and then it stopped."],
+            "segments": ["It went on, and on, and on,", "and on, and on, and on,", "and then it stopped."]
+        },
+        {
+            "text": "alpha bravo charlie delta echo foxtrot golf hotel india juliett",
+            "limit": 20,
+            "sentences": ["alpha bravo charlie delta echo foxtrot golf hotel india juliett"],
+            "segments": ["alpha bravo charlie", "delta echo foxtrot", "golf hotel india", "juliett"]
+        },
+        {
+            "text": "Supercalifragilisticexpialidocious is long.",
+            "limit": 10,
+            "sentences": ["Supercalifragilisticexpialidocious is long."],
+            "segments": ["Supercalifragilisticexpialidocious", "is long."]
+        },
+        {
+            "text": "Well… I suppose so. Really? Yes! Fine.",
+            "limit": 15,
+            "sentences": ["Well…", "I suppose so.", "Really?", "Yes!", "Fine."],
+            "segments": ["Well…", "I suppose so.", "Really? Yes!", "Fine."]
+        },
+        {
+            "text": "He paused [clear throat] and went on talking for a while longer.",
+            "limit": 20,
+            "sentences": ["He paused [clear throat] and went on talking for a while longer."],
+            "segments": ["He paused", "[clear throat] and", "went on talking for", "a while longer."]
+        },
+        {
+            "text": "今天天气很好。我们去公园吧！你觉得呢？",
+            "limit": 8,
+            "sentences": ["今天天气很好。", "我们去公园吧！", "你觉得呢？"],
+            "segments": ["今天天气很好。", "我们去公园吧！", "你觉得呢？"]
+        },
+        {
+            "text": "他说：「好。」然后走了。",
+            "limit": 6,
+            "sentences": ["他说：「好。」", "然后走了。"],
+            "segments": ["他说：", "「好。」", "然后走了。"]
+        },
+        {
+            "text": "真的吗？！真的。",
+            "limit": 4,
+            "sentences": ["真的吗？！", "真的。"],
+            "segments": ["真的", "吗？！", "真的。"]
+        },
+        {
+            "text": "今天[clear throat]很好，我们走吧。",
+            "limit": 6,
+            "sentences": ["今天[clear throat]很好，我们走吧。"],
+            "segments": ["今天", "[clear throat]", "很好，", "我们走吧。"]
+        },
+        {
+            "text": "今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好",
+            "limit": 25,
+            "sentences": ["今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好今天天气很好"],
+            "segments": [
+                "今天天气很好今天天气很好今天天气很好今天天气很好今",
+                "天天气很好今天天气很好今天天气很好今天天气很好今天",
+                "天气很好今天天气很好"
+            ]
+        },
+        {
+            "text": "Mixed English句子和中文。Then more English.",
+            "limit": 12,
+            "sentences": ["Mixed English句子和中文。", "Then more English."],
+            "segments": ["Mixed", "English句子和中", "文。 Then more", "English."]
+        },
+        {
+            "text": "𠀀𠀁𠀂𠀃𠀄𠀅𠀆𠀇。𠀈𠀉。",
+            "limit": 5,
+            "sentences": ["𠀀𠀁𠀂𠀃𠀄𠀅𠀆𠀇。", "𠀈𠀉。"],
+            "segments": ["𠀀𠀁𠀂𠀃𠀄", "𠀅𠀆𠀇。", "𠀈𠀉。"]
+        },
+        {
+            "text": "오늘은 날씨가 좋습니다. 공원에 갑시다.",
+            "limit": 12,
+            "sentences": ["오늘은 날씨가 좋습니다.", "공원에 갑시다."],
+            "segments": ["오늘은 날씨가", "좋습니다.", "공원에 갑시다."]
+        },
+        {
+            "text": "It costs 3.5 dollars. Dr. Smith agreed.",
+            "limit": 200,
+            "sentences": ["It costs 3.5 dollars.", "Dr.", "Smith agreed."],
+            "segments": ["It costs 3.5 dollars. Dr. Smith agreed."]
+        }
+    ]
+}
