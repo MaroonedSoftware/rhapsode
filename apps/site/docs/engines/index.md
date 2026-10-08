@@ -33,6 +33,11 @@ crash takes down that engine's worker rather than the server.
   It speaks ten languages, performs three of the eight cues, and clones from a clip and its
   transcript. Its code and its weights are for research and non-commercial use only, and it needs a
   card with about 13 GB free.
+- **For a clone from nothing but a short clip, without a GPU, [StyleTTS 2](styletts2.md).** It
+  clones from three seconds of audio with no transcript, runs several times faster than realtime on a
+  laptop's CPU, and holds 1.2 GiB. It speaks English only and performs no cues. Its weights are
+  0.9 GB, and upstream asks that listeners be told the speech is synthesised unless the person cloned
+  has agreed.
 - **[Tone](tone.md)** makes a sine wave. It exists to prove the protocol in CI, and it is the
   fixture the conformance suite compares a real engine against.
 

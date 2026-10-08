@@ -227,7 +227,16 @@ describe('GET /catalog', () => {
         const { app } = await start();
         const catalog = (await app.inject({ method: 'GET', url: '/catalog' })).json();
 
-        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual(['breeze', 'chatterbox', 'dia', 'fish', 'kokoro', 'orpheus', 'tone']);
+        expect(catalog.map((entry: CatalogEntry) => entry.id).sort()).toEqual([
+            'breeze',
+            'chatterbox',
+            'dia',
+            'fish',
+            'kokoro',
+            'orpheus',
+            'styletts2',
+            'tone',
+        ]);
         for (const entry of catalog) CatalogEntry.parse(entry);
         expect(catalog.find((entry: CatalogEntry) => entry.id === 'chatterbox')).toMatchObject({
             package: 'rhapsode-engine-chatterbox',
@@ -263,6 +272,12 @@ describe('GET /catalog', () => {
             package: 'rhapsode-engine-fish',
             defaultVariant: 's2-pro',
             license: { code: 'Fish-Audio-Research-License', weights: 'Fish-Audio-Research-License', weightsCommercialUse: false },
+        });
+        // MIT model, GPL phonemizer, and a condition on the weights that the notes carry.
+        expect(catalog.find((entry: CatalogEntry) => entry.id === 'styletts2')).toMatchObject({
+            package: 'rhapsode-engine-styletts2',
+            defaultVariant: 'libritts',
+            license: { code: 'GPL-3.0-or-later', weights: 'MIT', weightsCommercialUse: true },
         });
     });
 
