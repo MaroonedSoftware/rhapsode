@@ -6,7 +6,7 @@
  */
 
 import type { Dial, Variant } from './generated/rhapsode.types.schema.js';
-import { withoutCues } from './vocabulary.js';
+import { withoutCues, withoutDecoration } from './vocabulary.js';
 
 /** What a variant claims it can do, in the shape the capability document reports it. */
 export interface Claims {
@@ -109,10 +109,11 @@ export interface Performable {
 /**
  * Apply every vocabulary rule, in the order the protocol puts them in.
  *
- * Cues the variant does not claim come out of the text, a delivery it did not claim is dropped, and
- * an unknown dial is refused. The first two are silent by design: the core is making the request
- * performable rather than arguing with a client that asked for something reasonable. The third is
- * not, because an unknown dial is a mistake rather than a capability gap.
+ * Emoji and markdown emphasis come out of the text, then the cues the variant does not claim, a
+ * delivery it did not claim is dropped, and an unknown dial is refused. All but the last are silent
+ * by design: the core is making the request performable rather than arguing with a client that asked
+ * for something reasonable. The last is not, because an unknown dial is a mistake rather than a
+ * capability gap.
  */
 export function performable(
     request: { text: string; delivery?: string; params?: Record<string, number> },
@@ -120,7 +121,7 @@ export function performable(
     variant: string,
 ): Performable {
     const asked = new Set(request.text.match(BRACKETED) ?? []);
-    const text = withoutCues(request.text, claims.cues);
+    const text = withoutCues(withoutDecoration(request.text), claims.cues);
     const kept = new Set(text.match(BRACKETED) ?? []);
 
     const deliveryClaimed = request.delivery !== undefined && claims.deliveries.includes(request.delivery);

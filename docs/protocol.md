@@ -451,6 +451,26 @@ only way to break it, which makes the honesty requirement on adapters exactly on
 A removal closes the space it leaves behind, so `word [laugh] word` does not render with a double
 space that every consumer would have to know to tidy.
 
+### Text a speaker cannot read
+
+**The core removes emoji and markdown emphasis before dispatch, on every request.** Text written by
+a language model arrives decorated, and an engine voices the decoration. Chatterbox turbo read
+`I really like Jon, and this is great.` in 2.65 seconds averaged over three seeds. The same sentence
+with `*really*`, `**Jon**` and `__great__` took 4.33, and with three emoji 4.19: over half as long
+again, spent saying something that was never words. No engine gives either a meaning, so nothing is
+lost by removing them, and every client would otherwise have to know to do it.
+
+- **Emphasis is removed only where it is emphasis.** `*`, `**`, `_` and `__` go when they open
+  against a word and close against one, the way markdown reads them. The text inside stays. So
+  `snake_case`, `2 * 3` and a lone asterisk survive, because none of them is emphasis.
+- **Brackets are never touched.** Square, angle and round brackets are where every engine's tag
+  syntax lives (`[laugh]` here, `<laugh>` for Orpheus, `(laughs)` for Dia), and § 5's cue rule is the
+  only thing that decides what happens to them.
+- **It is silent, as stripping an unclaimed cue is.** It makes the request performable rather than
+  discarding something the client asked for, so it is not reported.
+- **The ceiling counts the text as it arrived.** `maxCharacters` is applied before either removal,
+  as it is for cues, so whether a request fits does not depend on how decorated it was.
+
 ### Deliveries
 
 How a whole line is read. Two, and there is deliberately no word for "ordinary":

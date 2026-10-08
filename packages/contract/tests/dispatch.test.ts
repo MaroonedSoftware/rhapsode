@@ -99,6 +99,32 @@ describe('performable', () => {
     });
 });
 
+describe('performable, on decorated text', () => {
+    it('removes emoji and emphasis before it strips cues', () => {
+        expect(performable({ text: 'I **really** [laugh] did 😀 [groan].' }, turbo, 'turbo').text).toBe('I really [laugh] did.');
+    });
+
+    it('reports only the cues it dropped, not the decoration', () => {
+        // Decoration goes silently, as an unclaimed cue does, but it is not a cue and is not named.
+        expect(performable({ text: '*a* [groan] 😀' }, turbo, 'turbo').dropped.cues).toEqual(['[groan]']);
+    });
+
+    it('cleans each turn of a dialogue', () => {
+        const dialogue = performableDialogue(
+            {
+                turns: [
+                    { speaker: 'a', text: '**hi** 👋' },
+                    { speaker: 'b', text: '_hello_' },
+                ],
+            },
+            { ...turbo, dialogue: { maxSpeakers: 2 } },
+            'turbo',
+            100,
+        );
+        expect(dialogue.turns.map(turn => turn.text)).toEqual(['hi', 'hello']);
+    });
+});
+
 describe('assertWithinCeiling', () => {
     it('uses the variant ceiling when it declares one', () => {
         expect(() => assertWithinCeiling('x'.repeat(11), { ...turbo, maxCharacters: 10 }, 4096)).toThrow(/accepts 10/);

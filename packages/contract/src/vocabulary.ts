@@ -89,14 +89,53 @@ export function cuesIn(text: string): Cue[] {
 export function withoutCues(text: string, keep: Iterable<string> = []): string {
     const kept = new Set<string>([...keep].map(cue => cue.toLowerCase()));
 
+    return tidy(text.replace(cuePattern(), (match, cue: string) => (kept.has(cue.toLowerCase()) ? match : ' ')));
+}
+
+/**
+ * A pictograph, with whatever joins or modifies it into one emoji: a zero-width joiner, a variation
+ * selector, a skin tone, a keycap, or a regional indicator, which is half a flag.
+ *
+ * `©`, `®` and `™` are pictographic by Unicode's reckoning but are read as words, so they stay.
+ */
+const EMOJI = /(?:(?![©®™])\p{Extended_Pictographic}|\p{Regional_Indicator}|[‍️⃣\u{1F3FB}-\u{1F3FF}])+/gu;
+
+/**
+ * Markdown emphasis with one delimiter character: `*x*`, `**x**`, `***x***`, and the same with `_`.
+ *
+ * The delimiter must open against a word and close against one, and must not sit inside a word,
+ * which is what keeps `snake_case`, `2 * 3` and `2*3*4` as they are. The text between may not hold
+ * the delimiter itself, so each opener reads only as far as the next one: a lazy `.+?` scanned to the
+ * end of the text from every opener, which is the shape the bracket scan in `dispatch.ts` was flagged
+ * for.
+ */
+const ASTERISKS = /(?<![\p{L}\p{N}*])(\*{1,3})(?![\s*])([^*\n]+?)(?<![\s*])\1(?![\p{L}\p{N}*])/gu;
+const UNDERSCORES = /(?<![\p{L}\p{N}_])(_{1,3})(?![\s_])([^_\n]+?)(?<![\s_])\1(?![\p{L}\p{N}_])/gu;
+
+/**
+ * The same text without emoji or markdown emphasis. protocol.md § 5, "Text a speaker cannot read".
+ *
+ * An engine voices both. Chatterbox turbo took 2.65 s over a clean sentence, 4.33 s over the same
+ * sentence with three words emphasised and 4.19 s with three emoji, averaged over three seeds. No
+ * engine gives either a meaning, so the core removes them on every request rather than leaving every
+ * client to know to.
+ *
+ * Emphasis keeps the words it wrapped. Brackets of every kind are left alone, because that is where
+ * cues and every engine's own tags live.
+ */
+export function withoutDecoration(text: string): string {
+    return tidy(text.replace(EMOJI, ' ').replace(ASTERISKS, '$2').replace(UNDERSCORES, '$2'));
+}
+
+/** Close the gaps a removal leaves, so no consumer has to tidy a double space it did not create. */
+function tidy(text: string): string {
     return (
         text
-            .replace(cuePattern(), (match, cue: string) => (kept.has(cue.toLowerCase()) ? match : ' '))
             .replace(/[^\S\n]{2,}/g, ' ')
             .replace(/[^\S\n]+([.,!?;:])/g, '$1')
-            // A cue at the end of a line otherwise leaves a trailing space before the newline, which
-            // the punctuation pass above does not reach. Multi-line text is far likelier here than in
-            // a thirty-word radio break: a whole script arrives in one request.
+            // A removal at the end of a line otherwise leaves a trailing space before the newline,
+            // which the punctuation pass above does not reach. Multi-line text is far likelier here
+            // than in a thirty-word radio break: a whole script arrives in one request.
             .replace(/[^\S\n]+\n/g, '\n')
             .trim()
     );
