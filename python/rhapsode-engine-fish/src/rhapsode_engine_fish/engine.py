@@ -12,6 +12,7 @@ from rhapsode_worker import (
     CreateVoiceRequest,
     Engine,
     NativeFormat,
+    ReferenceCache,
     SpeakRequest,
     UnknownVoice,
     Unsupported,
@@ -38,6 +39,11 @@ from .voices import REFERENCE_SECONDS, SAMPLE_RATE, clips, digest, load, remove,
 #: 100 ms. The SDK's queue is bounded in chunks, so this is what "how much audio is in flight" means;
 #: it also decides how promptly a cancelled request stops being encoded.
 CHUNK_SAMPLES = SAMPLE_RATE // 10
+
+#: How many cloned voices keep their encoded clip on the device. Encoding a 6.6 s clip took 1.9 s of a
+#: cloned voice's first request on an M5 Pro with MPS (13.2 s), and each later request, which encoded
+#: nothing, took 9.0 to 9.7 s. An entry is ten codebooks of at most 430 frames, kilobytes.
+REFERENCES_KEPT = 32
 
 
 class FishEngine(Engine):
@@ -73,6 +79,9 @@ class FishEngine(Engine):
     upstream_version = upstream.COMMIT[:7]
 
     _generator: Generator | None = None
+    #: Each cloned voice's clip as the codec encoded it, on the resident model's device, so a load or
+    #: unload starts a fresh one. Only the codes: the transcript is read on every request.
+    _references: ReferenceCache[Any] | None = None
 
     # ------------------------------------------------------------------ what this engine can do
 
@@ -84,6 +93,7 @@ class FishEngine(Engine):
     def load(self, variant: str) -> None:
         self._check(variant)
         self._generator = UpstreamFish(upstream.ensure(), _checkpoint(), _torch_device(self.device))
+        self._references = ReferenceCache(REFERENCES_KEPT)
 
     def fetch(self, variant: str) -> None:
         """Download upstream's code and the checkpoint, where the load finds them.
@@ -101,6 +111,7 @@ class FishEngine(Engine):
         if self._generator is not None:
             self._generator.close()
         self._generator = None
+        self._references = None
         try:
             import torch
 
@@ -124,10 +135,20 @@ class FishEngine(Engine):
 
     def create_voice(self, request: CreateVoiceRequest) -> Voice:
         """Keep the clip at the codec's rate, and the words spoken in it, which Fish needs to clone."""
-        return self._voice(store(self.voice_dir, request))
+        clip = store(self.voice_dir, request)
+        self._forget(request.id)
+        return self._voice(clip)
 
     def delete_voice(self, voice_id: str) -> None:
         remove(self._clip(voice_id))
+        self._forget(voice_id)
+
+    def _forget(self, voice_id: str) -> None:
+        """Drop a voice's encoded clip. The key would miss anyway once the file changes; this is for a
+        re-recording that lands with the same size inside one tick of the file clock, and for a deleted
+        voice, whose codes would otherwise sit on the device until they aged out."""
+        if self._references is not None:
+            self._references.forget(voice_id)
 
     def reference_seconds(self) -> tuple[float, float] | None:
         return REFERENCE_SECONDS
@@ -163,14 +184,20 @@ class FishEngine(Engine):
             # One seed for the request: upstream seeds once and samples every piece from there.
             seed=request.seed,
         )
-        reference = None if request.voice is None else self._reference(request.voice)
+        reference = None if request.voice is None else self._reference(generator, request.voice)
         for audio in generator.stream(script(text), sampling, reference):
             yield from pcm(audio)
 
-    def _reference(self, voice: str) -> Reference:
-        """A cloned voice as upstream takes one, or `unknown_voice` and never a substitute."""
+    def _reference(self, generator: Generator, voice: str) -> Reference:
+        """A cloned voice as upstream takes one, or `unknown_voice` and never a substitute.
+
+        The codes from the cache, the words from disk every time, so a corrected transcript is heard
+        on the next request whether or not the clip changed.
+        """
         stored = load(self._clip(voice))
-        return Reference(audio=stored.clip.read_bytes(), text=translate_cues(stored.transcript))
+        assert self._references is not None, "a model is loaded, so its cache is too"
+        codes = self._references.get(stored.clip, lambda clip: generator.encode(clip.read_bytes()))
+        return Reference(codes=codes, text=translate_cues(stored.transcript))
 
     def _clip(self, voice: str) -> Path:
         """The voice's clip. `path_for` checks the id and the directory, and answers with whichever file

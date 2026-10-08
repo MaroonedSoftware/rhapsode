@@ -55,6 +55,8 @@ class Recorder:
     batches: list[Batch] = field(default_factory=list)
     loads: list[dict[str, Any]] = field(default_factory=list)
     downloads: list[dict[str, Any]] = field(default_factory=list)
+    #: Every reference clip upstream's codec encoded, in order.
+    encodes: list[bytes] = field(default_factory=list)
     #: How many frames each batch speaks. None is "in proportion to the text".
     frames: int | None = None
 
@@ -205,6 +207,7 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
     torch.bool = "bool"  # type: ignore[attr-defined]
     torch.zeros = lambda *shape, dtype=None: Mask(*shape)  # type: ignore[attr-defined]
     torch.device = lambda name: contextlib.nullcontext()  # type: ignore[attr-defined]
+    torch.inference_mode = contextlib.nullcontext  # type: ignore[attr-defined]
     torch.cuda = types.SimpleNamespace(is_available=lambda: False, empty_cache=lambda: None)  # type: ignore[attr-defined]
     torch.mps = types.SimpleNamespace(empty_cache=lambda: None)  # type: ignore[attr-defined]
     torch.backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: False))  # type: ignore[attr-defined]
@@ -305,18 +308,41 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
         error: Exception | None
 
     class TTSInferenceEngine:
-        """Upstream's, as far as the adapter depends on it: references encoded, the seed set, the
-        request sent to the model thread through its queue, and each batch decoded as it arrives."""
+        """Upstream's, as far as the adapter depends on it: references encoded, or found in its cache
+        by the clip's hash, the seed set, the request sent to the model thread through its queue, and
+        each batch decoded as it arrives. The cache keeps the transcript it first saw beside the codes,
+        as upstream's `load_by_hash` does."""
 
         def __init__(
             self, llama_queue: queue.Queue[Any], decoder_model: Any, precision: Any, compile: bool
         ) -> None:
             self.llama_queue = llama_queue
             self.decoder_model = decoder_model
+            self.ref_by_hash: dict[str, tuple[Any, str]] = {}
 
-        def inference(self, req: ServeTTSRequest) -> Iterator[InferenceResult]:
-            if req.seed is not None:
-                set_seed(req.seed)
+        def encode_reference(self, reference_audio: bytes, enable_reference_audio: bool) -> Any:
+            """The clip's codes. These are its bytes, so a test can see which clip reached the model."""
+            assert enable_reference_audio
+            recorder.encodes.append(reference_audio)
+            return reference_audio
+
+        def load_by_hash(self, references: list[Any], use_cache: str) -> tuple[list[Any], list[str]]:
+            tokens, texts = [], []
+            for reference in references:
+                key = hashlib.sha256(reference.audio).hexdigest()
+                if use_cache == "off" or key not in self.ref_by_hash:
+                    self.ref_by_hash[key] = (
+                        self.encode_reference(reference_audio=reference.audio, enable_reference_audio=True),
+                        reference.text,
+                    )
+                cached_tokens, cached_text = self.ref_by_hash[key]
+                tokens.append(cached_tokens)
+                texts.append(cached_text)
+            return tokens, texts
+
+        def send_Llama_request(
+            self, req: ServeTTSRequest, prompt_tokens: list[Any], prompt_texts: list[str]
+        ) -> queue.Queue[Any]:
             response_queue: queue.Queue[Any] = queue.Queue()
             self.llama_queue.put(
                 GenerateRequest(
@@ -329,12 +355,22 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
                         "compile": False,
                         "iterative_prompt": req.chunk_length > 0,
                         "chunk_length": req.chunk_length,
-                        "prompt_tokens": [reference.audio for reference in req.references],
-                        "prompt_text": [reference.text for reference in req.references],
+                        "prompt_tokens": prompt_tokens,
+                        "prompt_text": prompt_texts,
                     },
                     response_queue=response_queue,
                 )
             )
+            return response_queue
+
+        def inference(self, req: ServeTTSRequest) -> Iterator[InferenceResult]:
+            prompt_tokens: list[Any] = []
+            prompt_texts: list[str] = []
+            if req.references:
+                prompt_tokens, prompt_texts = self.load_by_hash(req.references, req.use_memory_cache)
+            if req.seed is not None:
+                set_seed(req.seed)
+            response_queue = self.send_Llama_request(req, prompt_tokens, prompt_texts)
             segments = []
             while True:
                 wrapped = response_queue.get()

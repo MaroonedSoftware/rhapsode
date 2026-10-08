@@ -862,6 +862,13 @@ serve(ChatterboxEngine())
   returns, and until then the model is still on the device. Measured with Dia on Metal: a load that
   started under an abandoned generation killed the process with "failed assertion _status <
   MTLCommandBufferStatusCommitted".
+- **Offers a cache for analysed references**, `ReferenceCache`, which a cloning adapter fills with
+  whatever its model makes of a clip and clears when it loads or unloads. It is offered rather than
+  imposed, because only the adapter knows what the analysis is and which request fields it depends
+  on. Upstream code tends to analyse the clip inside `generate` on every request: Chatterbox turbo on
+  MPS spent 4.9 s on a cloned line against 2.2 s for the stock voice until it kept the analysis. An
+  entry is keyed on the clip's path, modification time and size, so a re-recorded voice is analysed
+  again without the adapter having to notice.
 
 ### Long text, and who splits it
 

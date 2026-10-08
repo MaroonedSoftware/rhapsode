@@ -295,6 +295,91 @@ class TestVoices:
         assert built.voices() == []
 
 
+class TestReferenceCache:
+    def voices(self, tmp_path: Path, *names: str) -> FishEngine:
+        built = loaded(tmp_path)
+        for index, name in enumerate(names):
+            # A clip of its own, so which voice was encoded can be told from its codes.
+            reference = clip(5.0 + index)
+            built.create_voice(
+                CreateVoiceRequest(id=name, reference=reference, transcript=f"The words {name} said.")
+            )
+        return built
+
+    def test_a_voice_is_encoded_once_and_then_reused(self, fish: Recorder, tmp_path: Path) -> None:
+        built = self.voices(tmp_path, "narrator")
+        for _ in range(3):
+            spoken(built, voice="narrator")
+        assert len(fish.encodes) == 1
+        assert [batch.prompt_texts for batch in fish.batches] == [["The words narrator said."]] * 3
+
+    def test_voices_that_alternate_each_speak_as_themselves(self, fish: Recorder, tmp_path: Path) -> None:
+        built = self.voices(tmp_path, "narrator", "host")
+        for voice in ("narrator", "host", "narrator", None, "host"):
+            spoken(built, voice=voice)
+        assert [batch.prompt_texts for batch in fish.batches] == [
+            ["The words narrator said."],
+            ["The words host said."],
+            ["The words narrator said."],
+            [],
+            ["The words host said."],
+        ]
+        assert len(fish.encodes) == 2
+
+    def test_a_corrected_transcript_is_heard_though_the_clip_is_the_same(
+        self, fish: Recorder, tmp_path: Path
+    ) -> None:
+        # Upstream's own cache is keyed by the clip's hash and keeps the transcript it first saw, so
+        # the same audio re-created with its words corrected went on speaking the old words.
+        built = loaded(tmp_path)
+        cloned(built, transcript="The words in the clip, misheard.")
+        spoken(built, voice="narrator")
+        cloned(built, transcript="The words in the clip.")
+        spoken(built, voice="narrator")
+        assert fish.batches[-1].prompt_texts == ["The words in the clip."]
+
+    def test_a_re_recorded_voice_is_encoded_again(self, fish: Recorder, tmp_path: Path) -> None:
+        built = self.voices(tmp_path, "narrator")
+        spoken(built, voice="narrator")
+        built.create_voice(CreateVoiceRequest(id="narrator", reference=clip(7.0), transcript="Other words."))
+        spoken(built, voice="narrator")
+        assert len(fish.encodes) == 2
+        assert fish.batches[-1].prompt_audio == [(tmp_path / "voices" / "narrator.wav").read_bytes()]
+
+    def test_a_voice_changed_on_disk_is_encoded_again(self, fish: Recorder, tmp_path: Path) -> None:
+        built = self.voices(tmp_path, "narrator")
+        spoken(built, voice="narrator")
+        (tmp_path / "voices" / "narrator.wav").write_bytes(clip(8.0))
+        spoken(built, voice="narrator")
+        assert len(fish.encodes) == 2
+
+    def test_another_load_encodes_for_itself(self, fish: Recorder, tmp_path: Path) -> None:
+        # An entry is codes on the device of the codec that made them, which an unload gives back.
+        built = self.voices(tmp_path, "narrator")
+        spoken(built, voice="narrator")
+        built.unload()
+        built.load("s2-pro")
+        spoken(built, voice="narrator")
+        assert len(fish.encodes) == 2
+
+    def test_a_deleted_voice_leaves_nothing_behind(self, fish: Recorder, tmp_path: Path) -> None:
+        built = self.voices(tmp_path, "narrator")
+        spoken(built, voice="narrator")
+        built.delete_voice("narrator")
+        assert built._references is not None and len(built._references) == 0
+
+    def test_the_cache_keeps_the_most_recently_used(
+        self, fish: Recorder, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("rhapsode_engine_fish.engine.REFERENCES_KEPT", 2)
+        built = self.voices(tmp_path, "a", "b", "c")
+        for voice in ("a", "b", "a", "c", "a", "b"):
+            spoken(built, voice=voice)
+        # b was the least recently used when c arrived, so b alone is encoded twice.
+        names = {(tmp_path / "voices" / f"{name}.wav").read_bytes(): name for name in "abc"}
+        assert [names[encoded] for encoded in fish.encodes] == ["a", "b", "c", "b"]
+
+
 class TestPcm:
     def test_out_of_range_samples_are_clipped_not_wrapped(self) -> None:
         (block,) = pcm(np.array([1.5, -1.5], dtype=np.float32))

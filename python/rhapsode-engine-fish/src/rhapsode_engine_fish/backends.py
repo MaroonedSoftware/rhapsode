@@ -8,6 +8,7 @@ model holds, is a decision made here rather than the checkpoint's maximum.
 
 from __future__ import annotations
 
+import functools
 import queue
 import threading
 from collections.abc import Iterator
@@ -49,13 +50,17 @@ class Sampling:
 
 @dataclass(frozen=True)
 class Reference:
-    """A clip, as the bytes of a WAV file, and the exact words spoken in it."""
+    """A clip as the codec encoded it, and the exact words spoken in it."""
 
-    audio: bytes
+    codes: Any
     text: str
 
 
 class Generator(Protocol):
+    def encode(self, audio: bytes) -> Any:
+        """A clip, as the bytes of a WAV file, as the codes the model is prompted with."""
+        ...
+
     def stream(
         self, script: str, sampling: Sampling, reference: Reference | None = None
     ) -> Iterator[np.ndarray]:
@@ -93,20 +98,26 @@ class UpstreamFish:
         )
         _drop_unread_masks(decoder)
         decoder = decoder.to(device)
-        self._engine: Any = TTSInferenceEngine(
+        self._engine: Any = _prompted(TTSInferenceEngine)(
             llama_queue=self._requests, decoder_model=decoder, precision=precision, compile=False
         )
+
+    def encode(self, audio: bytes) -> Any:
+        """Upstream's own encoding of a reference, under the inference mode its `inference` runs in."""
+        import torch
+
+        with torch.inference_mode():
+            return self._engine.encode_reference(reference_audio=audio, enable_reference_audio=True)
 
     def stream(
         self, script: str, sampling: Sampling, reference: Reference | None = None
     ) -> Iterator[np.ndarray]:
-        from fish_speech.utils.schema import ServeReferenceAudio, ServeTTSRequest
+        from fish_speech.utils.schema import ServeTTSRequest
 
         request = ServeTTSRequest(
             text=script,
-            references=[]
-            if reference is None
-            else [ServeReferenceAudio(audio=reference.audio, text=reference.text)],
+            # Empty: the reference arrives already encoded, through `prompt` below.
+            references=[],
             seed=sampling.seed,
             temperature=sampling.temperature,
             top_p=sampling.top_p,
@@ -115,10 +126,9 @@ class UpstreamFish:
             max_new_tokens=MAX_NEW_TOKENS,
             # Each batch's audio as it is decoded, rather than the whole request at the end.
             streaming=True,
-            # A cloned voice's clip is encoded once and kept by its hash, not on every request.
-            use_memory_cache="on",
             format="wav",
         )
+        self._engine.prompt = ([], []) if reference is None else ([reference.codes], [reference.text])
         for result in self._engine.inference(request):
             if result.code == "segment":
                 yield np.asarray(result.audio[1], dtype=np.float32).reshape(-1)
@@ -130,6 +140,27 @@ class UpstreamFish:
         self._requests.put(None)
         self._thread.join(timeout=60)
         self._engine = None
+
+
+@functools.cache
+def _prompted(engine: type) -> type:
+    """Upstream's `TTSInferenceEngine`, prompted with a reference the adapter has already encoded.
+
+    Upstream's own cache, `use_memory_cache="on"`, is keyed by the clip's hash and keeps the
+    transcript it first saw beside the codes. So a voice re-created from the same audio with its words
+    corrected went on speaking the old words, and two voices cloned from one clip both spoke the
+    first's, until the model was unloaded. The adapter keeps the codes itself instead, by the file
+    they came from (engine.py), and reads the words afresh on every request. `inference` hands the
+    model whatever its references resolved to, so the encoded prompt replaces those here.
+    """
+
+    class Prompted(engine):  # type: ignore[misc]
+        prompt: tuple[list[Any], list[str]] = ([], [])
+
+        def send_Llama_request(self, req: Any, prompt_tokens: list[Any], prompt_texts: list[str]) -> Any:
+            return super().send_Llama_request(req, *self.prompt)
+
+    return Prompted
 
 
 def _drop_unread_masks(codec: Any) -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from collections import OrderedDict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, ClassVar
@@ -13,6 +12,7 @@ from rhapsode_worker import (
     CreateVoiceRequest,
     Engine,
     NativeFormat,
+    ReferenceCache,
     SpeakRequest,
     Unsupported,
     Variant,
@@ -95,9 +95,9 @@ class ChatterboxEngine(Engine):
     #: model and a clone overwrites it, so without this copy every request that named no voice after
     #: the first clone spoke as that clone.
     _stock: Any = None
-    #: Each cloned voice's analysed reference, keyed by the file it came from as it is now, so a
-    #: re-recording is a miss. Tensors on the resident model's device, so a load or unload empties it.
-    _conditionals: OrderedDict[tuple[str, int, int], Any]
+    #: Each cloned voice's analysed reference. Tensors on the resident model's device, so a load or
+    #: unload starts a fresh one.
+    _conditionals: ReferenceCache[Any] | None = None
 
     # ------------------------------------------------------------------ what this engine can do
 
@@ -134,7 +134,7 @@ class ChatterboxEngine(Engine):
         # Apple Silicon every build failed to load with "deserialize object on a CUDA device".
         self._model = upstream.from_pretrained(device=self._torch_device(), **options)
         self._stock = getattr(self._model, "conds", None)
-        self._conditionals = OrderedDict()
+        self._conditionals = ReferenceCache(CONDITIONALS_KEPT)
         _float32_loudness(self._model)
 
     def fetch(self, variant: str) -> None:
@@ -161,7 +161,7 @@ class ChatterboxEngine(Engine):
         """
         self._model = None
         self._stock = None
-        self._conditionals = OrderedDict()
+        self._conditionals = None
         try:
             import torch
 
@@ -229,11 +229,8 @@ class ChatterboxEngine(Engine):
     def _forget(self, voice_id: str) -> None:
         """Drop a voice's analysed reference. The key would miss anyway once the file changes; this
         is for a re-recording that lands with the same size inside one tick of the file clock."""
-        cached = getattr(self, "_conditionals", None)
-        if not cached:
-            return
-        for key in [key for key in cached if Path(key[0]).stem == voice_id]:
-            del cached[key]
+        if self._conditionals is not None:
+            self._conditionals.forget(voice_id)
 
     def reference_seconds(self) -> tuple[float, float] | None:
         return REFERENCE_SECONDS
@@ -318,21 +315,13 @@ class ChatterboxEngine(Engine):
         conditionals on each `generate`, so a cached entry cannot carry one request's dials into the
         next.
         """
-        path = self.path_for(voice)
-        status = path.stat()
-        key = (str(path), status.st_mtime_ns, status.st_size)
 
-        cached = self._conditionals.get(key)
-        if cached is not None:
-            self._conditionals.move_to_end(key)
-            return cached
+        def analyse(clip: Path) -> Any:
+            self._model.prepare_conditionals(str(clip), exaggeration=arguments["exaggeration"])
+            return self._model.conds
 
-        self._forget(voice)
-        self._model.prepare_conditionals(str(path), exaggeration=arguments["exaggeration"])
-        self._conditionals[key] = self._model.conds
-        while len(self._conditionals) > CONDITIONALS_KEPT:
-            self._conditionals.popitem(last=False)
-        return self._model.conds
+        assert self._conditionals is not None, "a model is loaded, so its cache is too"
+        return self._conditionals.get(self.path_for(voice), analyse)
 
     def _seed(self, seed: int) -> None:
         """Reproducibility where the engine can manage it, which is every generator it touches."""
