@@ -22,7 +22,7 @@ dependencies = [
     # adds pyaudio, gradio, wandb, datasets and modelscope, is never installed. Pinned where upstream
     # pins: torch 2.8.0, which has wheels up to Python 3.13, and transformers up to 4.57.3. Not its
     # pydantic==2.9.2: its schema works on 2.13 and the SDK needs only 2.0.
-    "torch==2.8.0",
+    "torch==2.13.0",
     "torchaudio==2.8.0",
     "transformers<=4.57.3",
     # fish_speech.utils imports Lightning and Rich at import time, though inference uses neither.
