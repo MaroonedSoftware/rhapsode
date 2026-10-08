@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-engine-styletts2"
-version = "0.1.22"
+version = "0.1.23"
 description = "StyleTTS 2 for rhapsode: zero-shot cloning from a few seconds of audio, with no transcript."
 readme = "README.md"
 # This package's own code. What the worker process runs is GPL-3.0-or-later, through phonemizer and
@@ -12,7 +12,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rhapsode-worker==0.1.22",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "rhapsode-worker==0.1.23",  # Its own version, exactly, and bumped with it. protocol.md § 9.
     "numpy>=1.26",
     "huggingface_hub>=0.23",
     # What upstream's inference path imports, found by importing models.py, text_utils.py and
