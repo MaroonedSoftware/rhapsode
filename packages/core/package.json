@@ -49,8 +49,8 @@
     "devDependencies": {
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
-        "@types/luxon": "^3.7.1",
-        "openai": "^7.23.0",
+        "@types/luxon": "^3.7.6",
+        "openai": "^7.25.0",
         "vitest": "^5.0.2"
     }
 }
