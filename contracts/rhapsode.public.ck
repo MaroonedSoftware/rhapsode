@@ -495,6 +495,7 @@ contract mode(loose) SettingsManagement: {
 
 contract mode(loose) SettingsUpdate: {
     check: boolean
+    reinstallOutdated: boolean                  # Whether a start reinstalls every engine behind this core. § 10.
 }
 
 contract mode(loose) SettingsEngine: {
@@ -566,6 +567,7 @@ contract SettingsManagementPatch: {
 
 contract SettingsUpdatePatch: {
     check?: null | boolean
+    reinstallOutdated?: null | boolean
 }
 
 contract SettingsEnginePatch: {

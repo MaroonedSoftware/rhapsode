@@ -41,6 +41,22 @@ describe('UpdateBanner', () => {
         expect(screen.getByRole('link', { name: 'What changed' })).toHaveAttribute('href', behind.releaseUrl);
     });
 
+    it('gives the exact steps when the core knows the image, pin and all', async () => {
+        updateStatus.mockResolvedValue({
+            ...behind,
+            upgrade: {
+                image: 'maroonedsoftware/rhapsode:0.1',
+                version: '0.2',
+                commands: ['docker compose pull', 'docker compose up -d --wait'],
+            },
+        });
+        render(<UpdateBanner />);
+
+        expect(await screen.findByText('RHAPSODE_VERSION=0.2')).toBeInTheDocument();
+        expect(screen.getByText(/docker compose pull\s+docker compose up -d --wait/)).toBeInTheDocument();
+        expect(screen.queryByText('docker compose pull && docker compose up -d')).not.toBeInTheDocument();
+    });
+
     it('gives a checkout the checkout’s steps instead', async () => {
         updateStatus.mockResolvedValue({ ...behind, distribution: 'source' });
         render(<UpdateBanner />);

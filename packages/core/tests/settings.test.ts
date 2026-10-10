@@ -198,6 +198,16 @@ describe('PATCH /settings', () => {
         expect((await app.inject({ method: 'GET', url: '/update' })).json()).toMatchObject({ check: 'off' });
     });
 
+    it('turns reinstalling at a start on with no restart pending, since the next start is when it is read', async () => {
+        const app = await start();
+        expect(Settings.parse((await app.inject({ method: 'GET', url: '/settings' })).json()).values.update.reinstallOutdated).toBe(false);
+
+        const settings = Settings.parse((await patch(app, { update: { reinstallOutdated: true } })).json());
+
+        expect(settings.values.update.reinstallOutdated).toBe(true);
+        expect(field(settings, 'update.reinstallOutdated')).toEqual({ key: 'update.reinstallOutdated', source: 'database', applies: 'live' });
+    });
+
     it('cannot turn the update check on over RHAPSODE_UPDATE_CHECK=0', async () => {
         // Whoever set the environment decided the box does not phone out. § 9.
         vi.stubEnv('RHAPSODE_UPDATE_CHECK', '0');

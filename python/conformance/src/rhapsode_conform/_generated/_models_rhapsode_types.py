@@ -182,24 +182,14 @@ class ResidentModel(BaseModel):
     # What the worker measured the model taking, where it could.
     size_bytes: int | None = Field(alias="sizeBytes", default=None)
 
-# Whether a newer release exists, asked by the core so that no client orders versions. § 9.
-class UpdateStatus(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    # This core.
-    version: str
-    # off: turned off. pending: no answer yet. failed: the last attempt got none.
-    check: Literal["off", "pending", "ok", "failed"]
-    # The latest release, without its `v`. Present with `ok`.
-    latest: str | None = None
-    # Whether `latest` is newer than this core. Present with `ok`.
-    update_available: bool | None = Field(alias="updateAvailable", default=None)
-    # The release's page, for its notes.
-    release_url: str | None = Field(alias="releaseUrl", default=None)
-    # ISO 8601, UTC. When `latest` was read.
-    checked_at: str | None = Field(alias="checkedAt", default=None)
-    # Which upgrade instructions apply.
-    distribution: Literal["docker", "source"]
+# What upgrading this box takes, worked out by the core from the image compose named. § 9.
+class UpgradeSteps(BaseModel):
+    # The image reference compose.yaml named, tag and all.
+    image: str
+    # Set RHAPSODE_VERSION to this in .env first. Absent when the tag already takes the release.
+    version: str | None = None
+    # Then these, in order, beside compose.yaml.
+    commands: list[str]
 
 # An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
 # reinstall would have to ask somebody about. § 10.
@@ -336,6 +326,27 @@ class InstallJob(BaseModel):
 
 class ResidencyDetail(ResidencySummary):
     models: list[ResidentModel]
+
+# Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+class UpdateStatus(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    # This core.
+    version: str
+    # off: turned off. pending: no answer yet. failed: the last attempt got none.
+    check: Literal["off", "pending", "ok", "failed"]
+    # The latest release, without its `v`. Present with `ok`.
+    latest: str | None = None
+    # Whether `latest` is newer than this core. Present with `ok`.
+    update_available: bool | None = Field(alias="updateAvailable", default=None)
+    # The release's page, for its notes.
+    release_url: str | None = Field(alias="releaseUrl", default=None)
+    # ISO 8601, UTC. When `latest` was read.
+    checked_at: str | None = Field(alias="checkedAt", default=None)
+    # Which upgrade instructions apply.
+    distribution: Literal["docker", "source"]
+    # This box's instructions exactly. With updateAvailable, in the image, when compose named the image. § 9.
+    upgrade: UpgradeSteps | None = None
 
 class FeedEvent(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

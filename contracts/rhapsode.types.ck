@@ -286,6 +286,14 @@ contract mode(loose) UpdateStatus: {
     releaseUrl?: string                         # The release's page, for its notes.
     checkedAt?: string                          # ISO 8601, UTC. When `latest` was read.
     distribution: enum(docker, source)          # Which upgrade instructions apply.
+    upgrade?: UpgradeSteps                      # This box's instructions exactly. With updateAvailable, in the image, when compose named the image. § 9.
+}
+
+# What upgrading this box takes, worked out by the core from the image compose named. § 9.
+contract mode(loose) UpgradeSteps: {
+    image: string                               # The image reference compose.yaml named, tag and all.
+    version?: string                            # Set RHAPSODE_VERSION to this in .env first. Absent when the tag already takes the release.
+    commands: array(string)                     # Then these, in order, beside compose.yaml.
 }
 
 ############################################################################################

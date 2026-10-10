@@ -28,6 +28,8 @@ outputs/
 rhapsode.config.json
 # What the install API wrote on this box: absolute venv paths, like the config. protocol.md § 10.
 rhapsode.engines.json
+# What a core copied of the config directory before an upgrade opened it. protocol.md § 10.
+rhapsode.backups/
 .env
 .env.*
 !.env.example

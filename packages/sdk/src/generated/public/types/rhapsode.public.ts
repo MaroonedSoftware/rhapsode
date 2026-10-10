@@ -70,6 +70,8 @@ export interface SettingsManagement {
  */
 export interface SettingsUpdate {
     check: boolean;
+    /** Whether a start reinstalls every engine behind this core. § 10. */
+    reinstallOutdated: boolean;
 }
 
 /**
@@ -158,6 +160,7 @@ export interface SettingsManagementPatch {
  */
 export interface SettingsUpdatePatch {
     check?: boolean | null;
+    reinstallOutdated?: boolean | null;
 }
 
 /**

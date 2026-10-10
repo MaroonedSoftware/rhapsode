@@ -36,7 +36,7 @@ const document = (): Settings => ({
         },
         install: { venvDir: '/data/venvs', sourceDir: '/app/python', python: '3.12' },
         management: { tokenSet: true, origins: [] },
-        update: { check: true },
+        update: { check: true, reinstallOutdated: false },
         engines: { kokoro: { keepAliveSeconds: 900 } },
     },
     fields: [

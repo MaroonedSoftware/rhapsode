@@ -6,10 +6,11 @@ mdx:
 ---
 
 <details>
-<summary>Attributes (1)</summary>
+<summary>Attributes (2)</summary>
 
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |
 | `check` | `boolean` | Yes |  |
+| `reinstallOutdated` | `boolean` | Yes | Whether a start reinstalls every engine behind this core. § 10. |
 
 </details>

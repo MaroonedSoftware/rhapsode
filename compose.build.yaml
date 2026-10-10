@@ -6,7 +6,11 @@
 # number, and `docker compose pull` cannot replace what you built with what was published.
 services:
     server:
-        image: maroonedsoftware/rhapsode:local
+        image: &image maroonedsoftware/rhapsode:local
+        # compose.yaml tells the server its image for GET /update. `local` gives no upgrade steps,
+        # since a pull is not how this one is replaced.
+        environment:
+            RHAPSODE_IMAGE: *image
         build:
             context: .
             dockerfile: docker/Dockerfile

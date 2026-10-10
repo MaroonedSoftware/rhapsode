@@ -2271,6 +2271,10 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                             "source"
                         ],
                         "description": "Which upgrade instructions apply."
+                    },
+                    "upgrade": {
+                        "$ref": "#/components/schemas/UpgradeSteps",
+                        "description": "This box's instructions exactly. With updateAvailable, in the image, when compose named the image. § 9."
                     }
                 },
                 "required": [
@@ -2279,6 +2283,31 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                     "distribution"
                 ],
                 "description": "Whether a newer release exists, asked by the core so that no client orders versions. § 9."
+            },
+            "UpgradeSteps": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "description": "The image reference compose.yaml named, tag and all."
+                    },
+                    "version": {
+                        "type": "string",
+                        "description": "Set RHAPSODE_VERSION to this in .env first. Absent when the tag already takes the release."
+                    },
+                    "commands": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Then these, in order, beside compose.yaml."
+                    }
+                },
+                "required": [
+                    "image",
+                    "commands"
+                ],
+                "description": "What upgrading this box takes, worked out by the core from the image compose named. § 9."
             },
             "CatalogEntry": {
                 "type": "object",
@@ -2635,10 +2664,15 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 "properties": {
                     "check": {
                         "type": "boolean"
+                    },
+                    "reinstallOutdated": {
+                        "type": "boolean",
+                        "description": "Whether a start reinstalls every engine behind this core. § 10."
                     }
                 },
                 "required": [
-                    "check"
+                    "check",
+                    "reinstallOutdated"
                 ]
             },
             "SettingsEngine": {
@@ -2917,6 +2951,12 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 "type": "object",
                 "properties": {
                     "check": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "reinstallOutdated": {
                         "type": [
                             "boolean",
                             "null"

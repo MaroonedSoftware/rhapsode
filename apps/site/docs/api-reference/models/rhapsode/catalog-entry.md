@@ -1,6 +1,6 @@
 ---
 title: "CatalogEntry"
-sidebar_position: 29
+sidebar_position: 30
 mdx:
     format: "md"
 ---

@@ -302,16 +302,45 @@ page's requests as coming from a site it does not know.
 ## Docker
 
 No checkout, no Node and no build: `compose.yaml` is the whole install, and pulls the published
-image.
+image. The installer writes it, and the rest of what goes beside it, into `./rhapsode`:
+
+```bash
+curl -fsSL https://github.com/maroonedsoftware/rhapsode/releases/latest/download/install.sh | sh
+```
+
+The server is then on 127.0.0.1:8080 and the page on http://localhost:8081. It merges
+`compose.gpu.yaml` when Docker has the NVIDIA runtime and `nvidia-smi` sees a card. Flags go after
+`sh -s --`: `--dir` for somewhere else, `--gpu` or `--no-gpu` to decide the card yourself, `--lan`
+to publish both ports on every interface (`compose.lan.yaml`, and read what it says first),
+`--version` for the image tag, and `--no-start` to write the files and start nothing.
+
+**Run it again, from that directory, to upgrade.** It replaces the three compose files with the
+release's, keeping any that differ beside them with the date, pulls, and starts the new image with
+`--wait`. That is what keeps an install's `compose.yaml` current: downloaded by hand, it never
+changes again, which is how an install from before 0.1.24 kept naming a registry 0.1.24 was not
+published to. It changes `.env` only where a flag says to, so an existing install keeps its pin,
+ports and merged files.
+
+By hand, the same is:
 
 ```bash
 mkdir rhapsode && cd rhapsode
-curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.yaml
+curl -fsSLO https://github.com/maroonedsoftware/rhapsode/releases/latest/download/compose.yaml
+curl -fsSL -o .env https://github.com/maroonedsoftware/rhapsode/releases/latest/download/env.example
 docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
+`.env` is optional, and is where the settings of the install live rather than in `compose.yaml`, so
+a newer `compose.yaml` can be downloaded over the old one without losing them. It names the files
+compose merges (`COMPOSE_FILE`, which is how `compose.gpu.yaml` stays merged without `-f` on every
+command) and the image tag.
+
 One image, [`maroonedsoftware/rhapsode`](https://hub.docker.com/r/maroonedsoftware/rhapsode) on Docker Hub. Each release publishes it for amd64 and arm64,
-tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
+tagged with its version, its minor line (`0.1`) and `latest`. `RHAPSODE_VERSION` picks one, and
+defaults to the minor line `compose.yaml` was released on, so a pull takes every patch release and
+stops at the next minor, where breaking changes go while the version is 0.x. The
+same image, under the same tags, is mirrored to `ghcr.io/maroonedsoftware/rhapsode`, where releases
+went before 0.1.24, so a `compose.yaml` that still names it keeps upgrading. It
 shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
 it installs the engines that were released with it.
 
@@ -321,16 +350,20 @@ The page's header shows the version the server runs, and a banner appears on eve
 release is out. `GET /update` is what it reads: the core asks GitHub for the latest release at most
 once a day, only when something asks, and `update.check: false` turns that off (protocol.md § 9).
 
-The container cannot replace itself, so the upgrade is yours to run, beside `compose.yaml`:
+The container cannot replace itself, so the upgrade is yours to run. `compose.yaml` tells the server
+the image it named (`RHAPSODE_IMAGE`), and from that the banner, `GET /update` (as `upgrade`) and
+`pnpm wizard update` give the exact steps for this box: what `RHAPSODE_VERSION` has to become, if
+anything, and the commands after it. A `compose.yaml` from before 0.1.25 does not pass the image, and
+gets the general form. Beside `compose.yaml`:
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-Both volumes are kept. If you pinned `RHAPSODE_VERSION`, change it first, or the pull fetches the
-version you already have. Releases up to 0.1.23 were published to `ghcr.io/maroonedsoftware/rhapsode`
-and nothing newer is: a `compose.yaml` that still names it pulls 0.1.23 forever, so download the
-file again (or change its `image:` to `maroonedsoftware/rhapsode`) before the first upgrade past it.
+Both volumes are kept. On the minor line that is the whole upgrade for a patch release. For a new
+minor release, or if you pinned `RHAPSODE_VERSION` to a release, change it in `.env` first, or the
+pull fetches the version you already have. 0.1.24 alone was published to Docker Hub without the GHCR mirror, so a
+`compose.yaml` that names `ghcr.io/maroonedsoftware/rhapsode` goes from 0.1.23 straight to 0.1.25.
 
 **Then reinstall the engines the page marks as behind.** Keeping `/data` is what makes the upgrade
 cheap, and it is also what strands the engines: the virtualenvs live there, so an upgraded core comes
@@ -345,6 +378,12 @@ to 0.1.6 went on speaking through a worker from 0.1.2 and only stopped reporting
 needed reinstalling. So every engine on `GET /engines`, and every installed one on `GET /catalog`,
 carries `outdated: true` when its worker is not this core's version, and the page marks it "Behind
 this server". It is a warning, never an error: a stale worker is contract-legal and works.
+
+**A box set up from 0.1.25 on does this by itself.** The config the image writes on first boot turns
+on `update.reinstallOutdated`, so each start reinstalls every engine behind it, and its log says
+which. A box with an older config has it off, and turns it on under Settings, Updates, or with
+`pnpm wizard settings update.reinstallOutdated true`; after that, pull and up are the whole upgrade.
+Off, reinstalling is yours to ask for.
 
 "Reinstall all" on the Engines page does every engine that is behind. From the host, through the
 page's proxy, which carries the management token:
@@ -380,8 +419,10 @@ that is never refused as a whole and does nothing when nothing is behind:
 `--wait` holds the line until the new container is healthy, so the reinstall reaches the new core.
 What it prints is the reinstall's answer: the jobs it queued, and in `skipped` each engine it left
 for a person, `licence` for weights that need accepting again, `busy` for one that already had a job.
+With `update.reinstallOutdated` on, the start has already queued them, the `curl` finds each `busy`,
+and it can be left off the line.
 
-Pin the minor line for this, `RHAPSODE_VERSION=0.1` in the compose environment, so that the box takes
+Leave `RHAPSODE_VERSION` on the minor line for this, as it is by default, so that the box takes
 patch releases on its own and waits for you at the next minor one. Anything else that replaces a
 container when its image changes works as well as `docker compose pull`, but it cannot run the
 reinstall, so the `curl` still needs a cron line of its own. A box that must not phone out sets
@@ -423,7 +464,11 @@ docker compose up -d --remove-orphans
 |           | pip's and uv's download caches                              | `.cache/pip`, `.cache/uv`              |
 
 `/config` is small and is the one to back up: a cloned voice cannot be downloaded again. `/data` is
-tens of GB with Chatterbox and all of it can be. `/data` is the container's `HOME`, which is the
+tens of GB with Chatterbox and all of it can be. The core copies `/config` itself the first time a new
+version starts, into `/config/rhapsode.backups/<time>-before-<version>/`, keeping the three newest, so
+an upgrade needs no backup step of its own. To go back, stop the container and copy one over
+`/config`. A copy inside the volume does not survive losing the volume, so keep backing it up
+elsewhere. `/data` is the container's `HOME`, which is the
 whole mechanism: everything an engine downloads already lands under `HOME`, so none of it needs to
 know it is in a container.
 
@@ -473,9 +518,14 @@ environment is constructed rather than inherited.
 ### GPUs
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.gpu.yaml
-docker compose -f compose.yaml -f compose.gpu.yaml up -d
+curl -fsSLO https://github.com/maroonedsoftware/rhapsode/releases/latest/download/compose.gpu.yaml
+# and in .env: COMPOSE_FILE=compose.yaml:compose.gpu.yaml
+docker compose up -d
 ```
+
+Name it in `COMPOSE_FILE` rather than with `-f` on the command line: with `-f`, the first
+`docker compose up -d` somebody types without it recreates the server with no card, and nothing
+says so until a model loads on the CPU. The installer does this for you.
 
 The image has no CUDA of its own and needs none: the torch wheels Chatterbox installs from PyPI
 carry the CUDA runtime. What cannot come with them is the driver, which has to match the host's

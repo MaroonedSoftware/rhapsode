@@ -4,6 +4,7 @@ import { DateTime, Duration } from 'luxon';
 
 import { CORE_VERSION } from '../core.version.js';
 import type { UpdateSettings } from './update.settings.js';
+import { upgradeSteps } from './upgrade.steps.js';
 import { isNewer } from './version.compare.js';
 
 /** GitHub's own "latest": neither a draft nor a prerelease, so none is ever offered. § 9. */
@@ -55,13 +56,18 @@ export class UpdateChecker {
         const answer = this.answer;
         if (answer === undefined) return { ...base, check: 'pending' };
         if (answer.outcome === 'failed') return { ...base, check: 'failed' };
+        const updateAvailable = isNewer(answer.latest, this.version);
+        const { image, distribution } = this.settings;
+        const upgrade =
+            updateAvailable && distribution === 'docker' && image !== undefined ? upgradeSteps(image, answer.latest, this.settings) : undefined;
         return {
             ...base,
             check: 'ok',
             latest: answer.latest,
-            updateAvailable: isNewer(answer.latest, this.version),
+            updateAvailable,
             ...(answer.releaseUrl === undefined ? {} : { releaseUrl: answer.releaseUrl }),
             checkedAt: answer.at.toISO()!,
+            ...(upgrade === undefined ? {} : { upgrade }),
         };
     }
 

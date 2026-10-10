@@ -10,8 +10,8 @@ import { severityColor } from '../shared/status';
  *
  * Shown only when the core says `updateAvailable`: it does the comparison, so the page never orders
  * two versions itself. The core cannot replace its own container, so for the image this is the
- * command, in both of its forms, because nothing inside the container can see whether the operator's
- * compose file pins `RHAPSODE_VERSION`.
+ * command. Where compose told the core its image, `upgrade` is exactly what this box needs, pin and
+ * all. A compose.yaml older than that tells it nothing, and gets the command in both of its forms.
  */
 export function UpdateBanner() {
     const { data } = useUpdateStatus();
@@ -28,7 +28,18 @@ export function UpdateBanner() {
                         </Anchor>
                     )}
                 </Text>
-                {data.distribution === 'docker' ? (
+                {data.upgrade !== undefined ? (
+                    <>
+                        {data.upgrade.version === undefined ? (
+                            <Text size="sm">Beside your compose.yaml:</Text>
+                        ) : (
+                            <Text size="sm">
+                                In the <Code>.env</Code> beside your compose.yaml, set <Code>RHAPSODE_VERSION={data.upgrade.version}</Code>. Then:
+                            </Text>
+                        )}
+                        <Code block>{data.upgrade.commands.join('\n')}</Code>
+                    </>
+                ) : data.distribution === 'docker' ? (
                     <>
                         <Text size="sm">Beside your compose.yaml:</Text>
                         <Code block>docker compose pull && docker compose up -d</Code>

@@ -277,22 +277,15 @@ export const ResidentModel = z.looseObject({
 export type ResidentModel = z.infer<typeof ResidentModel>;
 
 /**
- * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
- * generated from [UpdateStatus](../../../../contracts/rhapsode.types.ck)
+ * What upgrading this box takes, worked out by the core from the image compose named. § 9.
+ * generated from [UpgradeSteps](../../../../contracts/rhapsode.types.ck)
  */
-export const UpdateStatus = z.looseObject({
-    version: z.string().describe('This core.'),
-    check: z.enum(['off', 'pending', 'ok', 'failed']).describe('off: turned off. pending: no answer yet. failed: the last attempt got none.'),
-    latest: z.string().optional().describe('The latest release, without its `v`. Present with `ok`.'),
-    updateAvailable: z
-        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
-        .optional()
-        .describe('Whether `latest` is newer than this core. Present with `ok`.'),
-    releaseUrl: z.string().optional().describe("The release's page, for its notes."),
-    checkedAt: z.string().optional().describe('ISO 8601, UTC. When `latest` was read.'),
-    distribution: z.enum(['docker', 'source']).describe('Which upgrade instructions apply.'),
+export const UpgradeSteps = z.looseObject({
+    image: z.string().describe('The image reference compose.yaml named, tag and all.'),
+    version: z.string().optional().describe('Set RHAPSODE_VERSION to this in .env first. Absent when the tag already takes the release.'),
+    commands: z.array(z.string()).describe('Then these, in order, beside compose.yaml.'),
 });
-export type UpdateStatus = z.infer<typeof UpdateStatus>;
+export type UpgradeSteps = z.infer<typeof UpgradeSteps>;
 
 /**
  * An outdated engine `POST /installs/outdated` did not queue, and why: each is one a single
@@ -479,6 +472,27 @@ export const ResidencyDetail = ResidencySummary.extend({
     models: z.array(ResidentModel),
 });
 export type ResidencyDetail = z.infer<typeof ResidencyDetail>;
+
+/**
+ * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+ * generated from [UpdateStatus](../../../../contracts/rhapsode.types.ck)
+ */
+export const UpdateStatus = z.looseObject({
+    version: z.string().describe('This core.'),
+    check: z.enum(['off', 'pending', 'ok', 'failed']).describe('off: turned off. pending: no answer yet. failed: the last attempt got none.'),
+    latest: z.string().optional().describe('The latest release, without its `v`. Present with `ok`.'),
+    updateAvailable: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .optional()
+        .describe('Whether `latest` is newer than this core. Present with `ok`.'),
+    releaseUrl: z.string().optional().describe("The release's page, for its notes."),
+    checkedAt: z.string().optional().describe('ISO 8601, UTC. When `latest` was read.'),
+    distribution: z.enum(['docker', 'source']).describe('Which upgrade instructions apply.'),
+    upgrade: UpgradeSteps.optional().describe(
+        "This box's instructions exactly. With updateAvailable, in the image, when compose named the image. § 9.",
+    ),
+});
+export type UpdateStatus = z.infer<typeof UpdateStatus>;
 
 /**
  * generated from [FeedEvent](../../../../contracts/rhapsode.types.ck)

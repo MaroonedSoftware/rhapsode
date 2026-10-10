@@ -41,6 +41,8 @@ import { updateRoutes } from './update/update.routes.js';
 import { workerModule } from './workers/worker.module.js';
 import { WorkerRegistry } from './workers/worker.registry.js';
 import { InstallJobs } from './install/install.jobs.js';
+import { EngineInstaller } from './install/engine.installer.js';
+import { SettingsService } from './settings/settings.service.js';
 import { DEFAULTS, type RhapsodeConfig } from './config.js';
 
 /**
@@ -104,6 +106,19 @@ export async function buildServer(settings: RhapsodeConfig, logger?: Logger, opt
     builder.app.addHook('onClose', async () => {
         await container.get(InstallJobs).stop();
         await container.get(WorkerRegistry).stopAll();
+    });
+
+    // The upgrade step that used to be a curl, for an operator who asked for it. Once ready rather
+    // than at setup, so the jobs run on a server whose registry, workers and routes all exist, and
+    // never awaited, so a reinstall's minutes of pip are not minutes before the port opens. § 10.
+    builder.app.addHook('onReady', async () => {
+        if (!container.get(SettingsService).update.reinstallOutdated) return;
+        const { jobs, skipped } = container.get(EngineInstaller).reinstallOutdated();
+        if (jobs.length === 0 && skipped.length === 0) return;
+        log.info('reinstalling the engines behind this core, as update.reinstallOutdated asks', {
+            jobs: jobs.map(job => ({ engine: job.engine, job: job.id })),
+            skipped,
+        });
     });
 
     builder.setupPlugins(() => [

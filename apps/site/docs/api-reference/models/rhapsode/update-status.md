@@ -8,7 +8,7 @@ mdx:
 > Whether a newer release exists, asked by the core so that no client orders versions. § 9.
 
 <details>
-<summary>Attributes (7)</summary>
+<summary>Attributes (8)</summary>
 
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -19,5 +19,6 @@ mdx:
 | `releaseUrl` | `string` | No | The release's page, for its notes. |
 | `checkedAt` | `string` | No | ISO 8601, UTC. When `latest` was read. |
 | `distribution` | `'docker' \| 'source'` | Yes | Which upgrade instructions apply. |
+| `upgrade` | `UpgradeSteps` | No | This box's instructions exactly. With updateAvailable, in the image, when compose named the image. § 9. |
 
 </details>

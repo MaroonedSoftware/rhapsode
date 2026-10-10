@@ -6,7 +6,7 @@ import { LATEST_RELEASE_URL, UpdateChecker } from '../src/update/update.checker.
 import { resolveUpdateSettings, type UpdateSettings } from '../src/update/update.settings.js';
 
 const silent = () => new RhapsodeJsonLogger('error', () => {});
-const on: UpdateSettings = { check: true, distribution: 'docker' };
+const on: UpdateSettings = { check: true, distribution: 'docker', reinstallOutdated: false, webPort: 8081 };
 
 /** A clock the test moves by hand. */
 function clock(start = DateTime.fromISO('2026-09-21T09:00:00Z', { zone: 'utc' })) {
@@ -129,7 +129,7 @@ describe('the update checker', () => {
 
     it('never asks when turned off', async () => {
         const { fetcher, calls } = github(release('v0.2.0'));
-        const checker = new UpdateChecker({ check: false, distribution: 'source' }, silent(), fetcher, clock().now, '0.1.9');
+        const checker = new UpdateChecker({ ...on, check: false, distribution: 'source' }, silent(), fetcher, clock().now, '0.1.9');
 
         expect(checker.status()).toEqual({ version: '0.1.9', distribution: 'source', check: 'off' });
         expect(checker.refreshIfDue()).toBeUndefined();
@@ -204,14 +204,76 @@ describe('checking now', () => {
 
     it('asks nothing when the check is off, because a button does not overrule the operator', async () => {
         const { fetcher, calls } = github(release('v0.2.0'));
-        const checker = new UpdateChecker({ check: false, distribution: 'docker' }, silent(), fetcher, clock().now, '0.1.9');
+        const checker = new UpdateChecker({ ...on, check: false }, silent(), fetcher, clock().now, '0.1.9');
 
         expect(await checker.checkNow()).toEqual({ version: '0.1.9', distribution: 'docker', check: 'off' });
         expect(calls).toHaveLength(0);
     });
 });
 
+describe('the upgrade steps', () => {
+    const steps = async (image: string | undefined, latest: string, settings: Partial<UpdateSettings> = {}) => {
+        const checker = new UpdateChecker(
+            { ...on, ...settings, ...(image === undefined ? {} : { image }) },
+            silent(),
+            github(release(`v${latest}`)).fetcher,
+            clock().now,
+            '0.1.22',
+        );
+        await checker.checkNow();
+        return checker.status().upgrade;
+    };
+    const pull = ['docker compose pull', 'docker compose up -d --wait'];
+    const reinstall = 'curl -fsS -X POST http://127.0.0.1:8081/api/installs/outdated';
+
+    it('moves a release pin to the latest release', async () => {
+        // The box this was written for: pinned at 0.1.22, and a pull fetched 0.1.22 again.
+        expect(await steps('ghcr.io/maroonedsoftware/rhapsode:0.1.22', '0.1.24')).toEqual({
+            image: 'ghcr.io/maroonedsoftware/rhapsode:0.1.22',
+            version: '0.1.24',
+            commands: [...pull, reinstall],
+        });
+    });
+
+    it('leaves a minor line that takes the release, and moves one that does not', async () => {
+        expect(await steps('maroonedsoftware/rhapsode:0.1', '0.1.24')).toEqual({
+            image: 'maroonedsoftware/rhapsode:0.1',
+            commands: [...pull, reinstall],
+        });
+        expect((await steps('maroonedsoftware/rhapsode:0.1', '0.2.0'))?.version).toBe('0.2');
+    });
+
+    it('leaves latest, and a reference with no tag, which is latest', async () => {
+        expect((await steps('maroonedsoftware/rhapsode:latest', '0.2.0'))?.version).toBeUndefined();
+        expect((await steps('registry.lan:5000/maroonedsoftware/rhapsode', '0.2.0'))?.version).toBeUndefined();
+    });
+
+    it('leaves the reinstall to the start when update.reinstallOutdated is on, through the published port', async () => {
+        expect((await steps('maroonedsoftware/rhapsode:0.1', '0.1.24', { reinstallOutdated: true }))?.commands).toEqual(pull);
+        expect((await steps('maroonedsoftware/rhapsode:0.1', '0.1.24', { webPort: 9081 }))?.commands.at(-1)).toContain('127.0.0.1:9081');
+    });
+
+    it('says nothing for an image built here, for a compose.yaml that named no image, or outside the image', async () => {
+        expect(await steps('maroonedsoftware/rhapsode:local', '0.1.24')).toBeUndefined();
+        expect(await steps(undefined, '0.1.24')).toBeUndefined();
+        expect(await steps('maroonedsoftware/rhapsode:0.1', '0.1.24', { distribution: 'source' })).toBeUndefined();
+    });
+
+    it('says nothing when there is nothing to upgrade to', async () => {
+        expect(await steps('maroonedsoftware/rhapsode:0.1', '0.1.22')).toBeUndefined();
+    });
+});
+
 describe('update settings', () => {
+    it('reads the image compose named, and the port it published the page on', () => {
+        expect(resolveUpdateSettings({}, { RHAPSODE_IMAGE: 'maroonedsoftware/rhapsode:0.1', RHAPSODE_WEB_PORT: '9081' })).toMatchObject({
+            image: 'maroonedsoftware/rhapsode:0.1',
+            webPort: 9081,
+        });
+        expect(resolveUpdateSettings({}, {})).toMatchObject({ webPort: 8081 });
+        expect(resolveUpdateSettings({}, {}).image).toBeUndefined();
+    });
+
     it('checks by default, and the config can turn it off', () => {
         expect(resolveUpdateSettings({}, {}).check).toBe(true);
         expect(resolveUpdateSettings({ update: { check: false } }, {}).check).toBe(false);
