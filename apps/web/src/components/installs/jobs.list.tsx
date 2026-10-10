@@ -15,7 +15,7 @@ export interface JobsListProps {
 export function JobsList({ jobs, selected, onSelect }: JobsListProps) {
     const engineName = useEngineName();
     return (
-        <Stack gap={4}>
+        <Stack gap="xxs">
             {jobs.map(job => (
                 <UnstyledButton
                     key={job.id}

@@ -6,6 +6,7 @@ import { useUpdateSettings } from '../../api/settings.queries';
 import { useEngineName } from '../shared/engine.name';
 import { ErrorAlert } from '../shared/error.alert';
 import { notifyFailure, notifySuccess } from '../shared/notify';
+import { severityColor } from '../shared/status';
 import { fieldFor, patchOf, same, valueAt, type FieldSpec, type GroupSpec } from './settings.fields';
 import { TokenRow } from './token.row';
 
@@ -88,7 +89,7 @@ export function SettingsCard({ group, settings, onDirty }: SettingsCardProps) {
     return (
         <Card>
             <Stack gap="md">
-                <Stack gap={2}>
+                <Stack gap="xxxs">
                     <Title order={2} size="h4">
                         {group.title}
                     </Title>
@@ -188,7 +189,7 @@ function Row({ field, settings, onReset, resetting, children }: RowProps) {
                     </Badge>
                 ) : undefined}
                 {waiting === undefined ? undefined : (
-                    <Badge variant="light" color="yellow" size="sm">
+                    <Badge variant="light" color={severityColor.warning} size="sm">
                         {field.kind === 'token' ? 'New token waiting for a restart' : `${describe(waiting)} after a restart`}
                     </Badge>
                 )}

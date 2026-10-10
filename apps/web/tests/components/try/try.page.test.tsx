@@ -133,6 +133,16 @@ describe('TryPanel', () => {
         expect(line).toHaveValue('Well[sigh]');
     });
 
+    it('speaks the line on Cmd or Ctrl and Enter', async () => {
+        const user = setupUser();
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await user.click(await screen.findByRole('textbox', { name: 'Line' }));
+        await user.keyboard('{Control>}{Enter}{/Control}');
+
+        await waitFor(() => expect(api.speak).toHaveBeenCalledTimes(1));
+    });
+
     it('speaks what was chosen, buffered, and plays it', async () => {
         const user = setupUser();
         render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);

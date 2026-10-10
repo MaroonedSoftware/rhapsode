@@ -1,6 +1,8 @@
 import { Alert, Text } from '@mantine/core';
 import type { CurrentVariant, Variant } from '@maroonedsoftware/rhapsode-sdk';
 
+import { severityColor } from '../shared/status';
+
 /**
  * How long the line is, against what this build will take and what it says at a time.
  *
@@ -30,7 +32,7 @@ export function LineLength({ text, variant, claims, current }: LineLengthProps) 
 
     if (ceiling !== undefined && length > ceiling) {
         return (
-            <Alert color="yellow" title="Longer than this build takes">
+            <Alert color={severityColor.warning} title="Longer than this build takes">
                 {counted}, and this build accepts {ceiling.toLocaleString()}. The server refuses the line rather than speaking part of it.
             </Alert>
         );

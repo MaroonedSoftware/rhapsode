@@ -77,6 +77,18 @@ describe('VoicesCard', () => {
         );
     });
 
+    it('turns the row that is playing into a stop button', async () => {
+        const user = setupUser();
+        render(<VoicesCard engine="chatterbox" voices={[narrator, sine]} onCloned={() => {}} />);
+
+        await user.click(screen.getByRole('button', { name: 'Preview Narrator' }));
+        expect(screen.getByRole('button', { name: 'Preview Sine' })).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Stop Narrator' }));
+
+        expect(screen.queryByLabelText('Preview of Narrator')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Preview Narrator' })).toBeInTheDocument();
+    });
+
     it('offers delete for a clone and not for a built-in voice', () => {
         render(<VoicesCard engine="tone" voices={[narrator, sine]} onCloned={() => {}} />);
         expect(screen.getByRole('button', { name: 'Delete Narrator' })).toBeInTheDocument();

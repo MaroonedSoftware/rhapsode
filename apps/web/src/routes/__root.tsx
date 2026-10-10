@@ -45,7 +45,7 @@ export function RootLayout() {
                             Rhapsode
                         </Text>
                     </Group>
-                    <Group gap={4} wrap="nowrap" component="nav" aria-label="Pages">
+                    <Group gap="xxs" wrap="nowrap" component="nav" aria-label="Pages">
                         {PAGES.map(page => (
                             <Button
                                 key={page.to}
@@ -62,7 +62,7 @@ export function RootLayout() {
                 </Group>
             </AppShell.Header>
             <AppShell.Main id="main" tabIndex={-1}>
-                <Box maw={1100}>
+                <Box maw={1100} mx="auto">
                     <UpdateBanner />
                     <Outlet />
                 </Box>

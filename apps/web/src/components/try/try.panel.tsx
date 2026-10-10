@@ -22,6 +22,7 @@ import { speakBody, useCapabilities, useDialogue, useSpeak, useVoices, type Spok
 import { ErrorAlert } from '../shared/error.alert';
 import { keyWords } from '../shared/key.words';
 import { PageSkeleton } from '../shared/page.skeleton';
+import { severityColor } from '../shared/status';
 import { DialogueEditor, SAMPLE_TURNS, speakerLabel, type EditedTurn } from './dialogue.editor';
 import { LineLength } from './line.length';
 import { RequestSnippet } from './request.snippet';
@@ -196,7 +197,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             allowDeselect={false}
                         />
                         {claims.dialogue !== undefined ? (
-                            <Stack gap={4}>
+                            <Stack gap="xxs">
                                 <Text size="sm" fw={500} id={ids.mode}>
                                     Speak
                                 </Text>
@@ -231,7 +232,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             />
                         ) : undefined}
                         {claims.deliveries.length > 0 && !dialogue ? (
-                            <Stack gap={4}>
+                            <Stack gap="xxs">
                                 <Text size="sm" fw={500} id={ids.delivery}>
                                     Delivery
                                 </Text>
@@ -248,7 +249,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             </Stack>
                         ) : undefined}
                         {Object.entries(claims.dials).map(([name, dial]) => (
-                            <Stack key={name} gap={4}>
+                            <Stack key={name} gap="xxs">
                                 <Group justify="space-between">
                                     <Text size="sm" fw={500}>
                                         {keyWords(name)}
@@ -300,6 +301,13 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                                 <Textarea
                                     ref={textarea}
                                     aria-labelledby={ids.line}
+                                    description="Cmd or Ctrl and Enter speaks it."
+                                    onKeyDown={event => {
+                                        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && text.trim() !== '' && !asking.isPending) {
+                                            event.preventDefault();
+                                            say();
+                                        }
+                                    }}
                                     value={text}
                                     onChange={event => setText(event.currentTarget.value)}
                                     autosize
@@ -307,7 +315,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                                 />
                                 <LineLength text={text} variant={variant} claims={claims} current={current} />
                                 {claims.cues.length > 0 ? (
-                                    <Stack gap={4}>
+                                    <Stack gap="xxs">
                                         <Text size="xs" c="dimmed">
                                             Cues this variant performs. Click to insert at the cursor.
                                         </Text>
@@ -337,7 +345,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             </Button>
                         </Group>
                         {slow && asking.isPending ? (
-                            <Alert color="blue" title="Loading the model" role="status">
+                            <Alert color={severityColor.info} title="Loading the model" role="status">
                                 A first request, or one for a different variant, loads the model before it speaks. That can take a while, and longer
                                 still if its weights have not been downloaded.
                             </Alert>
@@ -346,7 +354,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             <ErrorAlert title="That was not spoken" error={asking.error} fallback="The server did not answer." />
                         ) : undefined}
                         {played ? (
-                            <Stack gap={4}>
+                            <Stack gap="xxs">
                                 <audio
                                     controls
                                     autoPlay

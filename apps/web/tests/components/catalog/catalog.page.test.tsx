@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -5,6 +6,15 @@ import { CatalogPage } from '../../../src/components/catalog/catalog.page';
 import { render, screen } from '../../utils/render';
 
 const catalog = vi.fn<() => Promise<CatalogEntry[]>>();
+
+// An installed engine's card links to Try it, and these tests render with no router around it.
+vi.mock('@tanstack/react-router', () => ({
+    Link: ({ to, search, children, ...props }: { to: string; search?: { engine?: string }; children?: ReactNode }) => (
+        <a href={search?.engine === undefined ? to : `${to}?engine=${search.engine}`} {...props}>
+            {children}
+        </a>
+    ),
+}));
 
 vi.mock('../../../src/api/client', () => ({
     sdk: {
@@ -58,6 +68,21 @@ describe('CatalogPage', () => {
 
         expect(await screen.findByText('Configured by hand')).toBeInTheDocument();
         expect(screen.getByText('Installed')).toBeInTheDocument();
+    });
+
+    it('links an installed engine to Try it, which a page that may not install can still use', async () => {
+        catalog.mockResolvedValue([{ ...chatterbox, installed: 'yes', managed: false }]);
+        render(<CatalogPage />);
+
+        expect(await screen.findByRole('link', { name: 'Try it' })).toHaveAttribute('href', '/try?engine=chatterbox');
+    });
+
+    it('offers no Try it for an engine that is not installed', async () => {
+        catalog.mockResolvedValue([chatterbox]);
+        render(<CatalogPage />);
+
+        expect(await screen.findByText('Not installed')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Try it' })).not.toBeInTheDocument();
     });
 
     it('says the server did not answer, rather than showing an empty catalog', async () => {

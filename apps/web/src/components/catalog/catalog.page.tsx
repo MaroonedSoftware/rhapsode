@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Card, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { IconDownload, IconPackage, IconRefresh, IconTrash } from '@tabler/icons-react';
 import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -267,7 +267,16 @@ export function CatalogPage() {
             ) : catalog.isError ? (
                 <ErrorAlert title="The catalog did not load" error={catalog.error} fallback="The rhapsode server did not answer." />
             ) : catalog.data.length === 0 ? (
-                <EmptyState title="No engines">This rhapsode knows about no engines, which means its catalog is empty.</EmptyState>
+                <EmptyState
+                    title="No engines"
+                    action={
+                        <Anchor href="https://rhapsode.dev/docs/engines" target="_blank" rel="noreferrer" size="sm">
+                            The engines rhapsode can run
+                        </Anchor>
+                    }
+                >
+                    This rhapsode knows about no engines, which means its catalog is empty.
+                </EmptyState>
             ) : (
                 <SimpleGrid cols={{ base: 1, md: 2 }}>
                     {catalog.data.map(entry => (

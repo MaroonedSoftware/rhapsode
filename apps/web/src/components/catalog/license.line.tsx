@@ -22,7 +22,7 @@ export function LicenseLine({ license }: { license: License }) {
                 <Tooltip label="The weights may not be used commercially">
                     {/* The amber goes on the icon only: yellow.7 text on white measured 2.1:1, under
                         WCAG's 4.5:1, and the icon and the words already say it without the colour. */}
-                    <Group gap={4}>
+                    <Group gap="xxs">
                         <IconAlertTriangle size={14} color="var(--mantine-color-yellow-7)" aria-hidden />
                         <Text size="sm" fw={500}>
                             Not for commercial use

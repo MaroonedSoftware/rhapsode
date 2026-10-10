@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Badge, Button, Card, Group, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
 import { IconEraser } from '@tabler/icons-react';
 import { DateTime } from 'luxon';
@@ -48,6 +49,15 @@ export function LoadedModels() {
     const residency = useResidency();
     const unload = useUnloadEngine();
     const engineName = useEngineName();
+    // Redraw every second while a countdown is on screen. The poll is every five, and a countdown
+    // that jumps by five reads as stalled; this re-reads the clock and fetches nothing.
+    const [, setNow] = useState(0);
+    const counting = residency.data?.models.some(model => model.leases === 0 && model.expiresAt !== undefined) ?? false;
+    useEffect(() => {
+        if (!counting) return;
+        const timer = setInterval(() => setNow(tick => tick + 1), 1000);
+        return () => clearInterval(timer);
+    }, [counting]);
 
     // The same argument the catalog makes about the job list: a page from another machine may read
     // this and is refused the unload, so the buttons are not offered rather than offered and failing.
@@ -129,7 +139,7 @@ export function LoadedModels() {
                                                 {describeExpiry(model)}
                                             </Badge>
                                         ) : (
-                                            <Text size="sm" c="dimmed">
+                                            <Text size="sm" c="dimmed" className="rh-num">
                                                 {describeExpiry(model)}
                                             </Text>
                                         )}

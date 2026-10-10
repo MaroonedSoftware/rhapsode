@@ -4,6 +4,7 @@ import type { CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
 import { LicenseLine } from '../catalog/license.line';
 import { ErrorAlert } from '../shared/error.alert';
+import { severityColor } from '../shared/status';
 
 export interface InstallModalProps {
     entry: CatalogEntry | undefined;
@@ -35,7 +36,7 @@ export function InstallModal({ entry, onClose, onConfirm, installing, error }: I
                     </Text>
                     <LicenseLine license={entry.license} />
                     {entry.license.weightsCommercialUse ? undefined : (
-                        <Alert color="yellow" title="Check the weights licence">
+                        <Alert color={severityColor.warning} title="Check the weights licence">
                             These weights may not be used commercially. The code licence does not change that.
                         </Alert>
                     )}

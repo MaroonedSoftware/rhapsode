@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -19,6 +19,15 @@ const api = vi.hoisted(() => ({
     engines: vi.fn(),
     engineCapabilities: vi.fn(),
     warmEngine: vi.fn(),
+}));
+
+// An installed engine's card links to Try it, and these tests render with no router around it.
+vi.mock('@tanstack/react-router', () => ({
+    Link: ({ to, search, children, ...props }: { to: string; search?: { engine?: string }; children?: ReactNode }) => (
+        <a href={search?.engine === undefined ? to : `${to}?engine=${search.engine}`} {...props}>
+            {children}
+        </a>
+    ),
 }));
 
 vi.mock('../../../src/api/client', () => ({ BASE_URL: '/api', sdk: { public: api } }));
