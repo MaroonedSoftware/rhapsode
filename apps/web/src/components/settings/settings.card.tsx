@@ -3,6 +3,7 @@ import { Badge, Button, Card, Divider, Group, NumberInput, Select, Stack, Switch
 import type { Settings, SettingsPatch } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useUpdateSettings } from '../../api/settings.queries';
+import { useEngineName } from '../shared/engine.name';
 import { ErrorAlert } from '../shared/error.alert';
 import { notifyFailure, notifySuccess } from '../shared/notify';
 import { fieldFor, patchOf, same, valueAt, type FieldSpec, type GroupSpec } from './settings.fields';
@@ -25,6 +26,7 @@ export interface SettingsCardProps {
  */
 export function SettingsCard({ group, settings }: SettingsCardProps) {
     const update = useUpdateSettings();
+    const engineName = useEngineName();
     const [draft, setDraft] = useState<Record<string, unknown>>({});
 
     const engineFields: FieldSpec[] =
@@ -33,7 +35,7 @@ export function SettingsCard({ group, settings }: SettingsCardProps) {
                   .sort()
                   .map(id => ({
                       key: `engines.${id}.keepAliveSeconds`,
-                      label: id,
+                      label: engineName(id),
                       unit: 'seconds',
                       kind: 'number',
                       help: `Empty uses the ${settings.values.residency.keepAliveSeconds} seconds above.`,
@@ -121,8 +123,15 @@ export function SettingsCard({ group, settings }: SettingsCardProps) {
                             Discard
                         </Button>
                     ) : undefined}
-                    <Button onClick={save} disabled={changed.length === 0} loading={update.isPending}>
-                        Save {group.title.toLowerCase()}
+                    {/* The card's title already says what is saved, so the button just says Save; the
+                        group stays in its accessible name, which a screen reader lists out of context. */}
+                    <Button
+                        onClick={save}
+                        disabled={changed.length === 0}
+                        loading={update.isPending}
+                        aria-label={`Save ${group.title.toLowerCase()}`}
+                    >
+                        Save
                     </Button>
                 </Group>
             </Stack>

@@ -116,7 +116,7 @@ describe('TryPanel', () => {
         await user.click(await screen.findByRole('option', { name: 'original' }));
 
         expect(await screen.findByText('Delivery')).toBeInTheDocument();
-        expect(screen.getByRole('slider', { name: 'exaggeration' })).toBeInTheDocument();
+        expect(screen.getByRole('slider', { name: 'Exaggeration' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'laugh' })).not.toBeInTheDocument();
         expect(screen.getByText(/performs no cues/)).toBeInTheDocument();
     });

@@ -20,6 +20,7 @@ import type { CurrentVariant, EngineSpeakRequest, Variant, Voice } from '@maroon
 
 import { speakBody, useCapabilities, useDialogue, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
+import { keyWords } from '../shared/key.words';
 import { PageSkeleton } from '../shared/page.skeleton';
 import { DialogueEditor, SAMPLE_TURNS, speakerLabel, type EditedTurn } from './dialogue.editor';
 import { LineLength } from './line.length';
@@ -140,7 +141,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
         text,
         variant,
         ...(voice === undefined ? {} : { voice }),
-        ...(delivery === '' ? {} : { delivery: delivery as 'hushed' | 'frantic' }),
+        ...(delivery === '' ? {} : { delivery: delivery as EngineSpeakRequest['delivery'] }),
         ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
         ...(language === undefined ? {} : { language }),
         ...(seed === undefined ? {} : { seed }),
@@ -237,7 +238,10 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                                 <SegmentedControl
                                     role="radiogroup"
                                     aria-labelledby={ids.delivery}
-                                    data={[{ value: '', label: 'Ordinary' }, ...claims.deliveries.map(entry => ({ value: entry, label: entry }))]}
+                                    data={[
+                                        { value: '', label: 'Ordinary' },
+                                        ...claims.deliveries.map(entry => ({ value: entry, label: keyWords(entry) })),
+                                    ]}
                                     value={delivery}
                                     onChange={setDelivery}
                                 />
@@ -247,14 +251,14 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             <Stack key={name} gap={4}>
                                 <Group justify="space-between">
                                     <Text size="sm" fw={500}>
-                                        {name}
+                                        {keyWords(name)}
                                     </Text>
                                     <Text size="sm" c="dimmed" className="rh-num">
                                         {(dials[name] ?? dial.default).toFixed(2)}
                                     </Text>
                                 </Group>
                                 <Slider
-                                    thumbLabel={name}
+                                    thumbLabel={keyWords(name)}
                                     min={dial.min}
                                     max={dial.max}
                                     step={(dial.max - dial.min) / 100}

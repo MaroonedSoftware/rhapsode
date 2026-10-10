@@ -5,6 +5,7 @@ import type { ResidentModel } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useResidency, useUnloadEngine } from '../../api/residency.queries';
 import { apiErrorCode, apiErrorMessage } from '../../api/sdk.error';
+import { useEngineName } from '../shared/engine.name';
 import { ErrorAlert } from '../shared/error.alert';
 import { notifyFailure, notifyInfo, notifySuccess } from '../shared/notify';
 import { PageSkeleton } from '../shared/page.skeleton';
@@ -46,6 +47,7 @@ function describeExpiry(model: ResidentModel): string {
 export function LoadedModels() {
     const residency = useResidency();
     const unload = useUnloadEngine();
+    const engineName = useEngineName();
 
     // The same argument the catalog makes about the job list: a page from another machine may read
     // this and is refused the unload, so the buttons are not offered rather than offered and failing.
@@ -55,17 +57,20 @@ export function LoadedModels() {
         unload.mutate(
             { engine: model.engine },
             {
-                onSuccess: () => notifySuccess(`${model.engine} let its card go.`),
+                onSuccess: () => notifySuccess(`Unloaded ${engineName(model.engine)}.`),
                 onError: error =>
                     // A 409 is not a failure to fix: it is a state to wait out, so it is not shown in red.
                     apiErrorCode(error) === 'conflict'
-                        ? notifyInfo(`${model.engine} is still loaded`, apiErrorMessage(error, 'It is speaking. Unload it when it finishes.'))
-                        : notifyFailure(`${model.engine} is still loaded`, error, 'The server did not answer.'),
+                        ? notifyInfo(
+                              `${engineName(model.engine)} is still loaded`,
+                              apiErrorMessage(error, 'It is speaking. Unload it when it finishes.'),
+                          )
+                        : notifyFailure(`${engineName(model.engine)} is still loaded`, error, 'The server did not answer.'),
             },
         );
 
     if (residency.isError) {
-        return <ErrorAlert title="What is loaded did not load" error={residency.error} fallback="The rhapsode server did not answer." />;
+        return <ErrorAlert title="Could not read what is loaded" error={residency.error} fallback="The rhapsode server did not answer." />;
     }
 
     const models = residency.data?.models ?? [];
@@ -109,7 +114,7 @@ export function LoadedModels() {
                                 <Table.Tr key={model.engine}>
                                     <Table.Td>
                                         <Text fw={600} size="sm">
-                                            {model.engine}
+                                            {engineName(model.engine)}
                                         </Text>
                                     </Table.Td>
                                     <Table.Td>

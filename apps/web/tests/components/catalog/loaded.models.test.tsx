@@ -103,7 +103,7 @@ describe('LoadedModels', () => {
         residency.mockImplementation(() => Promise.reject(new TypeError('fetch failed')));
         render(<LoadedModels />);
 
-        expect(await screen.findByText('What is loaded did not load')).toBeInTheDocument();
+        expect(await screen.findByText('Could not read what is loaded')).toBeInTheDocument();
     });
 
     it('shows a placeholder while the list is on its way, rather than saying nothing is loaded', () => {

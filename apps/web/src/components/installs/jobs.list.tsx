@@ -1,6 +1,7 @@
 import { Badge, Group, Stack, Text, UnstyledButton } from '@mantine/core';
 import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
+import { useEngineName } from '../shared/engine.name';
 import { jobTitle } from './job.panel';
 import { jobBadge } from './job.state';
 
@@ -12,6 +13,7 @@ export interface JobsListProps {
 
 /** Every job the server remembers, newest first. It forgets them on restart, and says so in the spec. */
 export function JobsList({ jobs, selected, onSelect }: JobsListProps) {
+    const engineName = useEngineName();
     return (
         <Stack gap={4}>
             {jobs.map(job => (
@@ -26,7 +28,7 @@ export function JobsList({ jobs, selected, onSelect }: JobsListProps) {
                     }}
                 >
                     <Group justify="space-between" wrap="nowrap">
-                        <Text size="sm">{jobTitle(job)}</Text>
+                        <Text size="sm">{jobTitle(job, engineName(job.engine))}</Text>
                         <Badge size="sm" variant="light" color={jobBadge(job).color}>
                             {jobBadge(job).label}
                         </Badge>

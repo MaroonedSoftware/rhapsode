@@ -5,6 +5,7 @@ import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 import { useCatalog } from '../../api/catalog.queries';
 import { useInstallJob } from '../../api/installs.queries';
 import { useJobFeed } from '../../api/job.feed';
+import { useEngineName } from '../shared/engine.name';
 import { ErrorAlert } from '../shared/error.alert';
 import { severityColor } from '../shared/status';
 import { isNothingToFetch, jobBadge } from './job.state';
@@ -37,13 +38,23 @@ function stepsOf(job: InstallJob, current: string | undefined): Step[] {
     return job.variant === undefined ? INSTALL : [...INSTALL, WEIGHTS, ...warm];
 }
 
-/** A job's name, in the tense its state calls for. */
-export function jobTitle(job: InstallJob): string {
+/** A job's name, in the tense its state calls for. `name` is the engine's display name where known. */
+export function jobTitle(job: InstallJob, name = job.engine): string {
     const doing = job.state === 'queued' || job.state === 'running';
-    if (job.kind === 'install') return `${doing ? 'Installing' : 'Install'} ${job.engine}`;
-    if (job.kind === 'reinstall') return `${doing ? 'Reinstalling' : 'Reinstall'} ${job.engine}`;
-    if (job.kind === 'warm') return `${doing ? 'Warming' : 'Warm'} ${`${job.engine} ${job.variant ?? ''}`.trim()}`;
-    return `${doing ? 'Downloading' : 'Download'} ${`${job.engine} ${job.variant ?? ''}`.trim()}`;
+    if (job.kind === 'install') return `${doing ? 'Installing' : 'Install'} ${name}`;
+    if (job.kind === 'reinstall') return `${doing ? 'Reinstalling' : 'Reinstall'} ${name}`;
+    if (job.kind === 'warm') return `${doing ? 'Warming' : 'Warm'} ${`${name} ${job.variant ?? ''}`.trim()}`;
+    return `${doing ? 'Downloading' : 'Download'} ${`${name} ${job.variant ?? ''}`.trim()}`;
+}
+
+/** Every step a job can be at, for naming the one a failure stopped on. */
+const ALL_STEPS = [...INSTALL, WEIGHTS, WARM];
+
+/** "Failed at the packages step", in the stepper's words rather than the protocol's `venv`. */
+function failedAt(current: string | undefined): string {
+    const step = ALL_STEPS.find(entry => entry.step === current);
+    if (step !== undefined) return `Failed at the ${step.label.toLowerCase()} step`;
+    return current === undefined ? 'Failed at the start' : `Failed at ${current}`;
 }
 
 const SUCCEEDED: Record<InstallJob['kind'], string> = { install: 'Installed', reinstall: 'Reinstalled', pull: 'Downloaded', warm: 'Warmed' };
@@ -53,6 +64,7 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     const job = useInstallJob(jobId);
     const catalog = useCatalog();
     const feed = useJobFeed(jobId);
+    const engineName = useEngineName();
     const viewport = useRef<HTMLDivElement>(null);
 
     // Follow the newest line, the way a terminal does.
@@ -64,6 +76,8 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     if (job.data === undefined) return <Loader size="sm" aria-label="Reading the job" />;
 
     const data = job.data;
+    const name = engineName(data.engine);
+    const title = jobTitle(data, name);
     const current = feed.progress?.phase ?? data.step;
     const steps = stepsOf(data, current);
     const warmed = current === 'warm';
@@ -76,14 +90,14 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     const running = finished ? undefined : steps[index];
     // What a screen reader hears as the job moves: the step while it runs, the outcome once it ends.
     // The stepper changes only its colours, which a screen reader does not announce.
-    const announcement = finished ? `${jobTitle(data)}: ${badge.label}` : running === undefined ? '' : `${jobTitle(data)}: ${running.label}`;
+    const announcement = finished ? `${title}: ${badge.label}` : running === undefined ? '' : `${title}: ${running.label}`;
 
     return (
         <Card>
             <Stack gap="md">
                 <Group justify="space-between" wrap="nowrap">
                     <Title order={2} size="h4">
-                        {jobTitle(data)}
+                        {title}
                     </Title>
                     <Group gap="xs" wrap="nowrap">
                         {feed.live && !finished ? <Loader size="xs" /> : undefined}
@@ -114,14 +128,14 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
                         {data.kind === 'pull'
                             ? `The ${data.variant ?? 'default'} weights are on this machine, so the first request only has to load them.`
                             : data.kind === 'warm'
-                              ? `${data.engine} ${data.variant ?? ''} is compiled, so its first request loads it from the cache.`
+                              ? `${name} ${data.variant ?? ''} is compiled, so its first request loads it from the cache.`
                               : data.kind === 'reinstall'
-                                ? `${data.engine} now runs from a virtualenv this server built. Its next request loads the model again${warmed ? ', from the compile cache this filled' : ''}.`
+                                ? `${name} now runs from a virtualenv this server built. Its next request loads the model again${warmed ? ', from the compile cache this filled' : ''}.`
                                 : data.variant === undefined
-                                  ? `${data.engine} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
+                                  ? `${name} is ready. Its first request loads the model, and downloads the weights if they are not here yet.`
                                   : warmed
-                                    ? `${data.engine} is ready, with the ${data.variant} weights on this machine and compiled, so its first request loads them from the cache.`
-                                    : `${data.engine} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
+                                    ? `${name} is ready, with the ${data.variant} weights on this machine and compiled, so its first request loads them from the cache.`
+                                    : `${name} is ready, with the ${data.variant} weights on this machine, so its first request only has to load them.`}
                         {/* A reinstall warms only what was recorded, and its old worker is gone, so the card cannot see this. § 10. */}
                         {data.kind === 'reinstall' && onWarm !== undefined && reinstalled !== undefined ? (
                             <Group mt="xs">
@@ -131,22 +145,22 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
                     </Alert>
                 ) : noFetch ? (
                     <Alert color={severityColor.info} title="Nothing to download ahead of time">
-                        {data.engine} does not download weights ahead of time. They arrive with its first request instead.
+                        {name} does not download weights ahead of time. They arrive with its first request instead.
                     </Alert>
                 ) : data.state === 'failed' ? (
-                    <ErrorAlert title={`Failed at ${current ?? 'the start'}`} fallback="The job failed and said nothing.">
+                    <ErrorAlert title={failedAt(current)} fallback="The job failed and said nothing.">
                         {data.error?.message}
                         {/* A reinstall swaps only once its new virtualenv works, so a failure left the old one running. § 10. */}
-                        {data.kind === 'reinstall' && !warmed ? ` ${data.engine} is still running from its previous virtualenv.` : undefined}
+                        {data.kind === 'reinstall' && !warmed ? ` ${name} is still running from its previous virtualenv.` : undefined}
                         {/* A warm comes after the swap or the download, so all that failed is one load. § 10. */}
                         {warmed
                             ? data.kind === 'warm'
-                                ? ` Nothing else about ${data.engine} changed; its first request tries that load again.`
-                                : ` ${data.engine} is ${data.kind === 'reinstall' ? 'reinstalled' : 'installed with its weights'}; its first request tries that load again.`
+                                ? ` Nothing else about ${name} changed; its first request tries that load again.`
+                                : ` ${name} is ${data.kind === 'reinstall' ? 'reinstalled' : 'installed with its weights'}; its first request tries that load again.`
                             : undefined}
                         {/* The engine was registered before its weights were asked for, so it is installed. § 10. */}
                         {data.kind === 'install' && current === 'weights'
-                            ? ` ${data.engine} is installed; download the weights again from its card.`
+                            ? ` ${name} is installed; download the weights again from its card.`
                             : undefined}
                     </ErrorAlert>
                 ) : undefined}

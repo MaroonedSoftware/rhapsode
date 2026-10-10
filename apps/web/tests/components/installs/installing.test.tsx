@@ -76,7 +76,7 @@ describe('installing from the page', () => {
         await user.click(within(dialog).getByRole('button', { name: 'Install under these licences' }));
 
         expect(api.installEngine).toHaveBeenCalledWith('chatterbox', { accept: 'MIT' });
-        expect(await screen.findByText('Installing chatterbox')).toBeInTheDocument();
+        expect(await screen.findByText('Installing Chatterbox')).toBeInTheDocument();
         await waitFor(() => expect(FakeEventSource.latest().url).toBe('/api/installs/j1/events'));
 
         const stream = FakeEventSource.latest();
@@ -86,7 +86,7 @@ describe('installing from the page', () => {
         });
         expect(await screen.findByText(/Successfully installed rhapsode-engine-chatterbox/)).toBeInTheDocument();
         // A screen reader hears the step, which the stepper shows only in colour, and the started job has focus.
-        expect(screen.getByRole('status')).toHaveTextContent('Installing chatterbox: Packages');
+        expect(screen.getByRole('status')).toHaveTextContent('Installing Chatterbox: Packages');
         expect(screen.getByRole('generic', { name: 'The job shown' })).toHaveFocus();
 
         jobs = [job({ state: 'succeeded', step: 'register' })];
@@ -95,8 +95,8 @@ describe('installing from the page', () => {
             stream.emit({ kind: 'progress', correlationId: 'j1', progress: { phase: 'register', index: 4, total: 4, status: 'done' } });
         });
 
-        expect(await screen.findByText('chatterbox is ready.', { exact: false })).toBeInTheDocument();
-        expect(screen.getByRole('status')).toHaveTextContent('Install chatterbox: Done');
+        expect(await screen.findByText('Chatterbox is ready.', { exact: false })).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent('Install Chatterbox: Done');
         expect(stream.closed).toBe(true);
         expect(await screen.findByRole('button', { name: 'Uninstall' })).toBeInTheDocument();
     });
@@ -139,8 +139,8 @@ describe('installing from the page', () => {
         ];
         render(<CatalogPage />);
 
-        expect(await screen.findByText('Failed at weights')).toBeInTheDocument();
-        expect(screen.getByText(/chatterbox is installed; download the weights again from its card/)).toBeInTheDocument();
+        expect(await screen.findByText('Failed at the weights step')).toBeInTheDocument();
+        expect(screen.getByText(/Chatterbox is installed; download the weights again from its card/)).toBeInTheDocument();
     });
 
     it('shows a sixth step once the job warms a variant that compiles, and says it is compiled', async () => {
@@ -155,8 +155,8 @@ describe('installing from the page', () => {
         jobs = [job({ kind: 'warm', variant: 'full', step: 'warm', state: 'succeeded' })];
         render(<CatalogPage />);
 
-        expect(await screen.findByText('Warm chatterbox full')).toBeInTheDocument();
-        expect(await screen.findByText(/chatterbox full is compiled, so its first request loads it from the cache/)).toBeInTheDocument();
+        expect(await screen.findByText('Warm Chatterbox full')).toBeInTheDocument();
+        expect(await screen.findByText(/Chatterbox full is compiled, so its first request loads it from the cache/)).toBeInTheDocument();
     });
 
     it('says the engine is installed with its weights when only its warm failed', async () => {
@@ -170,8 +170,8 @@ describe('installing from the page', () => {
         ];
         render(<CatalogPage />);
 
-        expect(await screen.findByText('Failed at warm')).toBeInTheDocument();
-        expect(screen.getByText(/chatterbox is installed with its weights; its first request tries that load again/)).toBeInTheDocument();
+        expect(await screen.findByText('Failed at the warm step')).toBeInTheDocument();
+        expect(screen.getByText(/Chatterbox is installed with its weights; its first request tries that load again/)).toBeInTheDocument();
     });
 
     it('shows the core’s own reason when a job fails', async () => {
@@ -184,7 +184,7 @@ describe('installing from the page', () => {
         ];
         render(<CatalogPage />);
 
-        expect(await screen.findByText('Failed at packages')).toBeInTheDocument();
+        expect(await screen.findByText('Failed at the packages step')).toBeInTheDocument();
         expect(screen.getByText('pip exited 1: No matching distribution found')).toBeInTheDocument();
     });
 
@@ -261,7 +261,7 @@ describe('installing from the page', () => {
         render(<CatalogPage />);
 
         expect(await screen.findByText('Nothing to download ahead of time')).toBeInTheDocument();
-        expect(screen.queryByText('Failed at weights')).not.toBeInTheDocument();
+        expect(screen.queryByText('Failed at the weights step')).not.toBeInTheDocument();
     });
 
     describe('warming a variant that compiles', () => {
@@ -289,7 +289,7 @@ describe('installing from the page', () => {
             await user.click(within(dialog).getByRole('button', { name: 'Warm' }));
 
             await waitFor(() => expect(api.warmEngine).toHaveBeenCalledWith('chatterbox', { variant: 'turbo' }));
-            expect((await screen.findAllByText('Warming chatterbox turbo')).length).toBeGreaterThan(0);
+            expect((await screen.findAllByText('Warming Chatterbox turbo')).length).toBeGreaterThan(0);
         });
 
         it('starts no worker to ask: an engine whose worker is down offers nothing', async () => {
@@ -350,7 +350,7 @@ describe('installing from the page', () => {
             await user.click(within(dialog).getByRole('button', { name: 'Reinstall' }));
 
             expect(api.reinstallEngine).toHaveBeenCalledWith('chatterbox', { accept: 'MIT' });
-            expect(await screen.findByText('Reinstalling chatterbox')).toBeInTheDocument();
+            expect(await screen.findByText('Reinstalling Chatterbox')).toBeInTheDocument();
         });
 
         it('shows weights that may not be used commercially before a reinstall accepts them', async () => {
@@ -382,7 +382,7 @@ describe('installing from the page', () => {
             await user.click(screen.getByRole('button', { name: 'Reinstall all' }));
 
             expect(api.reinstallOutdated).toHaveBeenCalledTimes(1);
-            expect(await screen.findByText('Reinstalling chatterbox')).toBeInTheDocument();
+            expect(await screen.findByText('Reinstalling Chatterbox')).toBeInTheDocument();
         });
 
         it('offers nothing for an engine the operator configured, and says whose it is', async () => {
@@ -399,7 +399,7 @@ describe('installing from the page', () => {
             jobs = [job({ kind: 'reinstall', state: 'failed', step: 'warm', error: { code: 'internal', message: 'load failed', retryable: false } })];
             render(<CatalogPage />);
 
-            expect(await screen.findByText(/chatterbox is reinstalled; its first request tries that load again/)).toBeInTheDocument();
+            expect(await screen.findByText(/Chatterbox is reinstalled; its first request tries that load again/)).toBeInTheDocument();
             expect(screen.queryByText(/is still running from its previous virtualenv/)).not.toBeInTheDocument();
         });
 
