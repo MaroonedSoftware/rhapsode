@@ -4,9 +4,12 @@ name: image
 # multi-platform tag afterwards. arm64 was built under QEMU on an amd64 runner, and v0.1.0 spent 12.5
 # minutes there against 2.5 for amd64: 310s for the apt-get layer alone that amd64 does in 58s.
 #
+# Published to Docker Hub only, as `maroonedsoftware/rhapsode`, with the `DOCKERHUB_USERNAME` and
+# `DOCKERHUB_TOKEN` repository secrets, which a release passes down with `secrets: inherit`. A build
+# that does not push, as on main, never logs in and needs neither.
+#
 # No top-level `permissions`, on purpose. A called workflow can only narrow its caller's token, so
-# the jobs take theirs from the job that calls this: `packages: write` from a release, read-only
-# from a push to main.
+# the jobs take theirs from the job that calls this, and none of them needs more than to read.
 on:
     workflow_call:
         inputs:
@@ -16,7 +19,7 @@ on:
                 required: true
 
 env:
-    IMAGE: ghcr.io/maroonedsoftware/rhapsode
+    IMAGE: docker.io/maroonedsoftware/rhapsode
 
 jobs:
     platform:
@@ -38,12 +41,10 @@ jobs:
             - if: inputs.push
               uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
               with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ github.token }}
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            # Labels only; the tags go on in `manifest`. The source label is what links the package
-            # to this repository on GitHub.
+            # Labels only; the tags go on in `manifest`.
             - id: meta
               uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
               with:
@@ -96,12 +97,11 @@ jobs:
 
             - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
               with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ github.token }}
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            # Annotations at the index level too, because GHCR reads the source link from the index
-            # of a multi-platform image, and `imagetools create` writes one with none of its own.
+            # Annotations at the index level too, because `imagetools create` writes the index of a
+            # multi-platform image with none of its own, and a registry showing the index shows none.
             - id: meta
               uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
               env:

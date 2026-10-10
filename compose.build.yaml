@@ -6,7 +6,7 @@
 # number, and `docker compose pull` cannot replace what you built with what was published.
 services:
     server:
-        image: ghcr.io/maroonedsoftware/rhapsode:local
+        image: maroonedsoftware/rhapsode:local
         build:
             context: .
             dockerfile: docker/Dockerfile

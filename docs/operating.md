@@ -310,7 +310,7 @@ curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/com
 docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-One image, `ghcr.io/maroonedsoftware/rhapsode`. Each release publishes it for amd64 and arm64,
+One image, `maroonedsoftware/rhapsode` on Docker Hub. Each release publishes it for amd64 and arm64,
 tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
 shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
 it installs the engines that were released with it.
@@ -328,7 +328,9 @@ docker compose pull && docker compose up -d
 ```
 
 Both volumes are kept. If you pinned `RHAPSODE_VERSION`, change it first, or the pull fetches the
-version you already have.
+version you already have. Releases up to 0.1.23 were published to `ghcr.io/maroonedsoftware/rhapsode`
+and nothing newer is: a `compose.yaml` that still names it pulls 0.1.23 forever, so download the
+file again (or change its `image:` to `maroonedsoftware/rhapsode`) before the first upgrade past it.
 
 **Then reinstall the engines the page marks as behind.** Keeping `/data` is what makes the upgrade
 cheap, and it is also what strands the engines: the virtualenvs live there, so an upgraded core comes
@@ -508,7 +510,7 @@ seconds; with `docker run`, pass `--stop-timeout 30`.
 
 ### unraid
 
-One container, from `ghcr.io/maroonedsoftware/rhapsode`: `/config` to `/mnt/user/appdata/rhapsode`,
+One container, from `maroonedsoftware/rhapsode`: `/config` to `/mnt/user/appdata/rhapsode`,
 `/data` to a share such as `/mnt/user/rhapsode`, `--user 99:100` so both are written as unraid's own
 `nobody:users`, ports 8080 and 8081, and `--stop-timeout 30` in Extra Parameters. Choose the user
 before the first start and keep it: the config and `rhapsode.db` are created readable and writable
