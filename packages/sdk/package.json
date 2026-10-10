@@ -35,7 +35,7 @@
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "@rhapsode/core": "workspace:*",
-        "vitest": "^5.0.2"
+        "vitest": "^5.0.3"
     },
     "publishConfig": {
         "access": "public"
