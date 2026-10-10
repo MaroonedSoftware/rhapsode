@@ -1,0 +1,17 @@
+# Both ports on every interface, for a page opened from other machines. docs/operating.md § Docker.
+#
+#   COMPOSE_FILE=compose.yaml:compose.lan.yaml in .env
+#
+# This is a decision, not a convenience. The page has no sign-in and its proxy presents the management
+# token, so anybody who can reach 8081 can install engines, which runs pip on this box. compose.yaml
+# keeps both on 127.0.0.1 for that reason. Add the page's origin, such as http://tower:8081, to
+# `management.origins` too, or the core refuses the page's requests.
+#
+# `!override` because compose appends list entries when it merges files: without it the ports here
+# are added beside compose.yaml's 127.0.0.1 ones, and the container dies on a host port bound twice.
+# It needs Docker Compose 2.24 or later.
+services:
+    server:
+        ports: !override
+            - '${RHAPSODE_API_PORT:-8080}:8080'
+            - '${RHAPSODE_WEB_PORT:-8081}:8081'

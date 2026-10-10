@@ -302,12 +302,31 @@ page's requests as coming from a site it does not know.
 ## Docker
 
 No checkout, no Node and no build: `compose.yaml` is the whole install, and pulls the published
-image.
+image. The installer writes it, and the rest of what goes beside it, into `./rhapsode`:
+
+```bash
+curl -fsSL https://github.com/maroonedsoftware/rhapsode/releases/latest/download/install.sh | sh
+```
+
+The server is then on 127.0.0.1:8080 and the page on http://localhost:8081. It merges
+`compose.gpu.yaml` when Docker has the NVIDIA runtime and `nvidia-smi` sees a card. Flags go after
+`sh -s --`: `--dir` for somewhere else, `--gpu` or `--no-gpu` to decide the card yourself, `--lan`
+to publish both ports on every interface (`compose.lan.yaml`, and read what it says first),
+`--version` for the image tag, and `--no-start` to write the files and start nothing.
+
+**Run it again, from that directory, to upgrade.** It replaces the three compose files with the
+release's, keeping any that differ beside them with the date, pulls, and starts the new image with
+`--wait`. That is what keeps an install's `compose.yaml` current: downloaded by hand, it never
+changes again, which is how an install from before 0.1.24 kept naming a registry 0.1.24 was not
+published to. It changes `.env` only where a flag says to, so an existing install keeps its pin,
+ports and merged files.
+
+By hand, the same is:
 
 ```bash
 mkdir rhapsode && cd rhapsode
-curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.yaml
-curl -fsSL -o .env https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/.env.example
+curl -fsSLO https://github.com/maroonedsoftware/rhapsode/releases/latest/download/compose.yaml
+curl -fsSL -o .env https://github.com/maroonedsoftware/rhapsode/releases/latest/download/env.example
 docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
@@ -499,9 +518,14 @@ environment is constructed rather than inherited.
 ### GPUs
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.gpu.yaml
-docker compose -f compose.yaml -f compose.gpu.yaml up -d
+curl -fsSLO https://github.com/maroonedsoftware/rhapsode/releases/latest/download/compose.gpu.yaml
+# and in .env: COMPOSE_FILE=compose.yaml:compose.gpu.yaml
+docker compose up -d
 ```
+
+Name it in `COMPOSE_FILE` rather than with `-f` on the command line: with `-f`, the first
+`docker compose up -d` somebody types without it recreates the server with no card, and nothing
+says so until a model loads on the CPU. The installer does this for you.
 
 The image has no CUDA of its own and needs none: the torch wheels Chatterbox installs from PyPI
 carry the CUDA runtime. What cannot come with them is the driver, which has to match the host's

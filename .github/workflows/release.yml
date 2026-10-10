@@ -127,4 +127,10 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   node scripts/release.mjs notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
-                  gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+                  # The installer and what it downloads, from /releases/latest/download/<name>, so
+                  # an install made by it and upgraded by running it again always has this
+                  # release's compose files. `.env.example` goes up as `env.example`, because GitHub
+                  # renames an asset whose name starts with a dot. docs/operating.md § Docker.
+                  cp .env.example "$RUNNER_TEMP/env.example"
+                  gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag \
+                      docker/install.sh compose.yaml compose.gpu.yaml compose.lan.yaml "$RUNNER_TEMP/env.example"
