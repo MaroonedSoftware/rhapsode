@@ -110,7 +110,10 @@ describe('reinstalling an engine', () => {
     type App = Awaited<ReturnType<typeof start>>;
 
     async function settled(app: App, id: string): Promise<InstallJob> {
-        for (let attempt = 0; attempt < 200; attempt += 1) {
+        // Thirty seconds, polled every 10ms so a fake runner's job still returns at once. Two seconds
+        // was enough for the fake runner and not for the real compiling worker, which loads twice
+        // during a reinstall: on a CI runner that took 3.3s and failed the 0.1.26 release pull request.
+        for (let attempt = 0; attempt < 3000; attempt += 1) {
             const job = InstallJob.parse((await app.inject({ method: 'GET', url: `/installs/${id}` })).json());
             if (job.state === 'succeeded' || job.state === 'failed') return job;
             await new Promise(fulfil => setTimeout(fulfil, 10));
