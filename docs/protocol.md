@@ -1641,6 +1641,18 @@ not.
 - **A core that finds `rhapsode.engines.json` beside the config imports it** into the database in
   one transaction and renames it `rhapsode.engines.json.imported`. It is left there rather than
   deleted so that a downgrade has something to go back to.
+- **It records the version of the core that last opened it**, as `coreVersion`, and **a core that
+  finds another version there, or none, copies the config directory's state first**, into
+  `rhapsode.backups/<time>-before-<version>/` beside the config: the database, the config file, a
+  `rhapsode.engines.json` that has not been imported yet, and the `voices` directory when there is
+  one beside the config, as the Docker image keeps it. That is everything an upgrade's migrations
+  could change and the one thing (a cloned voice) that cannot be downloaded again. It happens
+  before the database is opened for writing, so before any import or migration, and the three
+  newest copies are kept. Operators were told to `docker cp` the config directory out before every
+  upgrade, about 6 MB on a box with cloned voices, and a step that guards against a rare failure is
+  the first one skipped. The database is copied with `VACUUM INTO`, which is consistent even while
+  another process holds it. A copy that fails is logged and does not stop the start: refusing to
+  boot is a worse outcome than the one the copy guards against.
 
 **Engines keep the rule the file had: where the operator's config and the database name the same
 engine, the operator's config wins.** It is the opposite of the rule for settings, on purpose. An

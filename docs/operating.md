@@ -441,7 +441,11 @@ docker compose up -d --remove-orphans
 |           | pip's and uv's download caches                              | `.cache/pip`, `.cache/uv`              |
 
 `/config` is small and is the one to back up: a cloned voice cannot be downloaded again. `/data` is
-tens of GB with Chatterbox and all of it can be. `/data` is the container's `HOME`, which is the
+tens of GB with Chatterbox and all of it can be. The core copies `/config` itself the first time a new
+version starts, into `/config/rhapsode.backups/<time>-before-<version>/`, keeping the three newest, so
+an upgrade needs no backup step of its own. To go back, stop the container and copy one over
+`/config`. A copy inside the volume does not survive losing the volume, so keep backing it up
+elsewhere. `/data` is the container's `HOME`, which is the
 whole mechanism: everything an engine downloads already lands under `HOME`, so none of it needs to
 know it is in a container.
 

@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { DateTime } from 'luxon';
 
+import { CORE_VERSION } from '../core.version.js';
 import type { ConfiguredEngine } from '../registry/managed.engines.js';
 
 /** The database the core writes, beside the operator's config file. protocol.md § 10. */
@@ -57,6 +58,8 @@ export class StateStore {
         try {
             store.migrate();
             db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('openedAt', DateTime.utc().toISO());
+            // What `backupOnUpgrade` compares against at the next start. § 10.
+            db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('coreVersion', CORE_VERSION);
         } catch (error) {
             db.close();
             throw new Error(`could not open ${path}: ${(error as Error).message}`, { cause: error });

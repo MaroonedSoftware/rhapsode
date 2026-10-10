@@ -2,6 +2,11 @@ import { existsSync, readFileSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { AppConfigBuilder, AppConfigSourceJson } from '@maroonedsoftware/appconfig';
+import type { Logger } from '@maroonedsoftware/logger';
+
+import { CORE_VERSION } from '../core.version.js';
+import { RhapsodeJsonLogger } from '../logging/rhapsode.logger.js';
+import { backupOnUpgrade } from '../state/state.backup.js';
 
 import { StateEnginesSource, StateSettingsSource } from '../state/state.source.js';
 import { STATE_FILE, StateStore } from '../state/state.store.js';
@@ -88,8 +93,11 @@ export interface LoadedSettings {
  * with no config starts with no engines, which has always been true.
  *
  * The caller owns the returned store and closes it; a server built with it closes it at shutdown.
+ * A core at another version than the one that last opened the database copies the directory first.
+ * `logger` says so, and is the server's own format by default, since no server exists yet.
  */
-export async function loadSettings(configPath: string): Promise<LoadedSettings> {
+export async function loadSettings(configPath: string, logger: Logger = new RhapsodeJsonLogger()): Promise<LoadedSettings> {
+    backupOnUpgrade(configPath, CORE_VERSION, logger);
     const store = StateStore.open(join(dirname(configPath), STATE_FILE));
     try {
         importManagedFile(store, join(dirname(configPath), MANAGED_FILE));
