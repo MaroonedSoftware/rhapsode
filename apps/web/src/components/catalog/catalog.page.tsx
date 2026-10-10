@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { IconDownload, IconPackage, IconRefresh, IconTrash } from '@tabler/icons-react';
 import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
@@ -46,6 +46,15 @@ export function CatalogPage() {
     const [removing, setRemoving] = useState<CatalogEntry | undefined>(undefined);
     const [rebuilding, setRebuilding] = useState<CatalogEntry | undefined>(undefined);
     const [watching, setWatching] = useState<string | undefined>(undefined);
+    // A job this page just started, or asked to see. The jobs sit below every card and "On the card",
+    // so a click on the first card started something that happened off screen; this brings it into
+    // view and moves focus to it once its panel exists. Choosing from the job list does not.
+    const [following, setFollowing] = useState<string | undefined>(undefined);
+    const jobRegion = useRef<HTMLDivElement>(null);
+    const watch = (id: string) => {
+        setWatching(id);
+        setFollowing(id);
+    };
     const [warming, setWarming] = useState<{ entry: CatalogEntry; variant: string } | undefined>(undefined);
     // A worker already running answers its capability document without anything being started.
     const running = (engine: string) => engines.data?.find(summary => summary.id === engine)?.process === 'up';
@@ -63,6 +72,13 @@ export function CatalogPage() {
     const pending = (engine: string): InstallJob | undefined =>
         jobs.data?.find(job => job.engine === engine && (job.state === 'queued' || job.state === 'running'));
     const shown = watching ?? jobs.data?.[0]?.id;
+
+    useEffect(() => {
+        if (following === undefined || following !== shown || jobRegion.current === null) return;
+        jobRegion.current.scrollIntoView?.({ block: 'start' });
+        jobRegion.current.focus({ preventScroll: true });
+        setFollowing(undefined);
+    }, [following, shown, jobs.data]);
     // The core decides what is behind; the page only counts what it was told, and only what it may rebuild.
     const behind = (catalog.data ?? []).filter(entry => entry.managed && entry.outdated === true && pending(entry.id) === undefined);
 
@@ -75,7 +91,7 @@ export function CatalogPage() {
             {
                 onSuccess: job => {
                     setInstalling(undefined);
-                    setWatching(job.id);
+                    watch(job.id);
                 },
             },
         );
@@ -85,7 +101,7 @@ export function CatalogPage() {
         pull.mutate(
             { engine: entry.id, ...(entry.defaultVariant === undefined ? {} : { variant: entry.defaultVariant }) },
             {
-                onSuccess: job => setWatching(job.id),
+                onSuccess: job => watch(job.id),
                 onError: error => notifyFailure(`Downloading ${entry.displayName} did not start`, error, 'The server did not answer.'),
             },
         );
@@ -110,7 +126,7 @@ export function CatalogPage() {
             {
                 onSuccess: job => {
                     setRebuilding(undefined);
-                    setWatching(job.id);
+                    watch(job.id);
                 },
             },
         );
@@ -123,7 +139,7 @@ export function CatalogPage() {
             {
                 onSuccess: job => {
                     setWarming(undefined);
-                    setWatching(job.id);
+                    watch(job.id);
                 },
             },
         );
@@ -132,7 +148,7 @@ export function CatalogPage() {
     const startReinstallAll = () =>
         reinstallAll.mutate(undefined, {
             onSuccess: ({ jobs: started, skipped }) => {
-                if (started[0] !== undefined) setWatching(started[0].id);
+                if (started[0] !== undefined) watch(started[0].id);
                 const licence = skipped.filter(entry => entry.reason === 'licence').map(entry => entry.engine);
                 if (licence.length > 0) {
                     notifyInfo(
@@ -149,7 +165,7 @@ export function CatalogPage() {
         const busy = pending(entry.id);
         if (busy !== undefined) {
             return (
-                <Button variant="light" size="xs" onClick={() => setWatching(busy.id)}>
+                <Button variant="light" size="xs" onClick={() => watch(busy.id)}>
                     Show progress
                 </Button>
             );
@@ -265,7 +281,7 @@ export function CatalogPage() {
                                 <JobsList jobs={jobs.data} selected={shown} onSelect={setWatching} />
                             </Card>
                         </Grid.Col>
-                        <Grid.Col span={{ base: 12, md: 8 }}>
+                        <Grid.Col span={{ base: 12, md: 8 }} ref={jobRegion} tabIndex={-1} aria-label="The job shown">
                             <JobPanel key={shown} jobId={shown} onWarm={askToWarm} />
                         </Grid.Col>
                     </Grid>

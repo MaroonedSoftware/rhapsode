@@ -85,6 +85,9 @@ describe('installing from the page', () => {
             stream.emit({ kind: 'log', correlationId: 'j1', message: 'Successfully installed rhapsode-engine-chatterbox-0.0.0' });
         });
         expect(await screen.findByText(/Successfully installed rhapsode-engine-chatterbox/)).toBeInTheDocument();
+        // A screen reader hears the step, which the stepper shows only in colour, and the started job has focus.
+        expect(screen.getByRole('status')).toHaveTextContent('Installing chatterbox: Packages');
+        expect(screen.getByRole('generic', { name: 'The job shown' })).toHaveFocus();
 
         jobs = [job({ state: 'succeeded', step: 'register' })];
         api.catalog.mockResolvedValue([{ ...chatterbox, installed: 'yes', managed: true }]);
@@ -93,6 +96,7 @@ describe('installing from the page', () => {
         });
 
         expect(await screen.findByText('chatterbox is ready.', { exact: false })).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent('Install chatterbox: Done');
         expect(stream.closed).toBe(true);
         expect(await screen.findByRole('button', { name: 'Uninstall' })).toBeInTheDocument();
     });

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Alert, Badge, Card, Code, Group, Loader, ScrollArea, Stack, Stepper, Text, Title } from '@mantine/core';
+import { Alert, Badge, Card, Code, Group, Loader, ScrollArea, Stack, Stepper, Text, Title, VisuallyHidden } from '@mantine/core';
 import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useCatalog } from '../../api/catalog.queries';
@@ -11,7 +11,8 @@ import { isNothingToFetch, jobBadge } from './job.state';
 import { WarmOffer } from './warm.offer';
 
 // Labels only: with a description each, four steps wrap onto two lines in the panel's width and
-// read as a grid. The descriptions went into the tooltip of each step instead.
+// read as a grid. The descriptions went into the tooltip of each step, which only a mouse can
+// reach, so the running step's description is also written out under the stepper.
 type Step = { step: NonNullable<InstallJob['step']>; label: string; hint: string };
 
 const WEIGHTS: Step = { step: 'weights', label: 'Weights', hint: 'Downloaded, not loaded' };
@@ -72,6 +73,10 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     const badge = jobBadge(data);
     const noFetch = isNothingToFetch(data);
     const reinstalled = data.state === 'succeeded' ? catalog.data?.find(entry => entry.id === data.engine) : undefined;
+    const running = finished ? undefined : steps[index];
+    // What a screen reader hears as the job moves: the step while it runs, the outcome once it ends.
+    // The stepper changes only its colours, which a screen reader does not announce.
+    const announcement = finished ? `${jobTitle(data)}: ${badge.label}` : running === undefined ? '' : `${jobTitle(data)}: ${running.label}`;
 
     return (
         <Card>
@@ -95,6 +100,14 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
                         ))}
                     </Stepper>
                 ) : undefined}
+                {running !== undefined && steps.length > 1 ? (
+                    <Text size="sm" c="dimmed">
+                        {running.label}: {running.hint.charAt(0).toLowerCase() + running.hint.slice(1)}.
+                    </Text>
+                ) : undefined}
+                <VisuallyHidden role="status" aria-live="polite">
+                    {announcement}
+                </VisuallyHidden>
 
                 {data.state === 'succeeded' ? (
                     <Alert color={severityColor.success} title={SUCCEEDED[data.kind]}>
@@ -139,7 +152,13 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
                 ) : undefined}
 
                 {feed.lines.length > 0 ? (
-                    <ScrollArea h={220} viewportRef={viewport} type="auto">
+                    <ScrollArea
+                        h={220}
+                        viewportRef={viewport}
+                        type="auto"
+                        // Focusable, so a keyboard can scroll back through what it printed.
+                        viewportProps={{ tabIndex: 0, 'aria-label': 'Job output' }}
+                    >
                         <Code block style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
                             {feed.lines.join('\n')}
                         </Code>

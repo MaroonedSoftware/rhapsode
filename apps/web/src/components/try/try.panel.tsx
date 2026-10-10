@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
     Accordion,
     Alert,
@@ -89,6 +89,8 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
     const [seed, setSeed] = useState<number | undefined>(undefined);
     const [played, setPlayed] = useState<Spoken | undefined>(undefined);
     const [slow, setSlow] = useState(false);
+    // The visible headings name the controls under them, so a screen reader hears the same words.
+    const ids = { mode: useId(), delivery: useId(), line: useId() };
     const textarea = useRef<HTMLTextAreaElement>(null);
 
     const claims = variants[variant]!;
@@ -194,10 +196,12 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                         />
                         {claims.dialogue !== undefined ? (
                             <Stack gap={4}>
-                                <Text size="sm" fw={500}>
+                                <Text size="sm" fw={500} id={ids.mode}>
                                     Speak
                                 </Text>
                                 <SegmentedControl
+                                    role="radiogroup"
+                                    aria-labelledby={ids.mode}
                                     data={[
                                         { value: 'line', label: 'A line' },
                                         { value: 'dialogue', label: `A conversation, up to ${claims.dialogue.maxSpeakers}` },
@@ -227,10 +231,12 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                         ) : undefined}
                         {claims.deliveries.length > 0 && !dialogue ? (
                             <Stack gap={4}>
-                                <Text size="sm" fw={500}>
+                                <Text size="sm" fw={500} id={ids.delivery}>
                                     Delivery
                                 </Text>
                                 <SegmentedControl
+                                    role="radiogroup"
+                                    aria-labelledby={ids.delivery}
                                     data={[{ value: '', label: 'Ordinary' }, ...claims.deliveries.map(entry => ({ value: entry, label: entry }))]}
                                     value={delivery}
                                     onChange={setDelivery}
@@ -272,7 +278,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
 
                 <Card>
                     <Stack gap="md">
-                        <Title order={2} size="h4">
+                        <Title order={2} size="h4" id={ids.line}>
                             {dialogue ? 'Conversation' : 'Line'}
                         </Title>
                         {dialogue ? (
@@ -289,7 +295,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             <>
                                 <Textarea
                                     ref={textarea}
-                                    aria-label="Line"
+                                    aria-labelledby={ids.line}
                                     value={text}
                                     onChange={event => setText(event.currentTarget.value)}
                                     autosize
@@ -327,7 +333,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                             </Button>
                         </Group>
                         {slow && asking.isPending ? (
-                            <Alert color="blue" title="Loading the model">
+                            <Alert color="blue" title="Loading the model" role="status">
                                 A first request, or one for a different variant, loads the model before it speaks. That can take a while, and longer
                                 still if its weights have not been downloaded.
                             </Alert>

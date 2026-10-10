@@ -132,17 +132,20 @@ export function LoadedModels() {
                                     {managed ? (
                                         <Table.Td ta="right">
                                             {/* Refused with a 409 while it is speaking, so it is not offered then. */}
+                                            {/* A disabled button gets no pointer events, so the tooltip hangs on a span around it. */}
                                             <Tooltip label="Wait for it to finish speaking" disabled={model.leases === 0}>
-                                                <Button
-                                                    variant="subtle"
-                                                    size="xs"
-                                                    leftSection={<IconEraser size={14} />}
-                                                    disabled={model.leases > 0}
-                                                    loading={unload.isPending && unload.variables?.engine === model.engine}
-                                                    onClick={() => free(model)}
-                                                >
-                                                    Unload
-                                                </Button>
+                                                <span>
+                                                    <Button
+                                                        variant="subtle"
+                                                        size="xs"
+                                                        leftSection={<IconEraser size={14} />}
+                                                        disabled={model.leases > 0}
+                                                        loading={unload.isPending && unload.variables?.engine === model.engine}
+                                                        onClick={() => free(model)}
+                                                    >
+                                                        Unload
+                                                    </Button>
+                                                </span>
                                             </Tooltip>
                                         </Table.Td>
                                     ) : undefined}

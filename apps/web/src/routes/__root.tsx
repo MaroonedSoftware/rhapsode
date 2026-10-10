@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Anchor, AppShell, Box, Button, Group, Text } from '@mantine/core';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
@@ -10,8 +11,26 @@ export interface RouterContext {
     queryClient: QueryClient;
 }
 
+/**
+ * The four pages, once: the nav draws its buttons from this and the tab takes its title from it, so
+ * a page cannot be added to one and not the other. Four tabs all reading "Rhapsode" could not be
+ * told apart, and a screen reader announced every navigation as the same page.
+ */
+const PAGES = [
+    { to: '/', label: 'Engines' },
+    { to: '/try', label: 'Try it' },
+    { to: '/reference', label: 'API' },
+    { to: '/settings', label: 'Settings' },
+] as const;
+
 export function RootLayout() {
     const pathname = useRouterState({ select: state => state.location.pathname });
+    const here = PAGES.find(page => page.to === pathname);
+
+    useEffect(() => {
+        document.title = here === undefined ? 'Rhapsode' : `${here.label} · Rhapsode`;
+    }, [here]);
+
     return (
         <AppShell header={{ height: 56 }} padding="lg">
             <Anchor href="#main" className="rh-skip">
@@ -27,34 +46,17 @@ export function RootLayout() {
                         </Text>
                     </Group>
                     <Group gap={4} wrap="nowrap" component="nav" aria-label="Pages">
-                        <Button
-                            variant={pathname === '/' ? 'light' : 'subtle'}
-                            size="compact-sm"
-                            renderRoot={(props: object) => <Link to="/" {...props} />}
-                        >
-                            Engines
-                        </Button>
-                        <Button
-                            variant={pathname === '/try' ? 'light' : 'subtle'}
-                            size="compact-sm"
-                            renderRoot={(props: object) => <Link to="/try" {...props} />}
-                        >
-                            Try it
-                        </Button>
-                        <Button
-                            variant={pathname === '/reference' ? 'light' : 'subtle'}
-                            size="compact-sm"
-                            renderRoot={(props: object) => <Link to="/reference" {...props} />}
-                        >
-                            API
-                        </Button>
-                        <Button
-                            variant={pathname === '/settings' ? 'light' : 'subtle'}
-                            size="compact-sm"
-                            renderRoot={(props: object) => <Link to="/settings" {...props} />}
-                        >
-                            Settings
-                        </Button>
+                        {PAGES.map(page => (
+                            <Button
+                                key={page.to}
+                                variant={page === here ? 'light' : 'subtle'}
+                                size="compact-sm"
+                                aria-current={page === here ? 'page' : undefined}
+                                renderRoot={(props: object) => <Link to={page.to} {...props} />}
+                            >
+                                {page.label}
+                            </Button>
+                        ))}
                     </Group>
                     <CoreVersion />
                 </Group>
