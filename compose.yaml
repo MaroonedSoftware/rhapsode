@@ -13,11 +13,15 @@ name: rhapsode
 
 services:
     server:
-        image: maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-0.1}
+        # Anchored so the server is told the same reference, which is how GET /update says exactly
+        # what to change for the next release. protocol.md § 9.
+        image: &image maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-0.1}
         # 99:100 on unraid, to match its shares.
         user: '${PUID:-10001}:${PGID:-10001}'
         environment:
             RHAPSODE_PIP_TRUSTED_HOSTS: ${RHAPSODE_PIP_TRUSTED_HOSTS:-}
+            RHAPSODE_IMAGE: *image
+            RHAPSODE_WEB_PORT: ${RHAPSODE_WEB_PORT:-8081}
         volumes:
             - config:/config
             - data:/data

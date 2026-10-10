@@ -331,7 +331,11 @@ The page's header shows the version the server runs, and a banner appears on eve
 release is out. `GET /update` is what it reads: the core asks GitHub for the latest release at most
 once a day, only when something asks, and `update.check: false` turns that off (protocol.md § 9).
 
-The container cannot replace itself, so the upgrade is yours to run, beside `compose.yaml`:
+The container cannot replace itself, so the upgrade is yours to run. `compose.yaml` tells the server
+the image it named (`RHAPSODE_IMAGE`), and from that the banner, `GET /update` (as `upgrade`) and
+`pnpm wizard update` give the exact steps for this box: what `RHAPSODE_VERSION` has to become, if
+anything, and the commands after it. A `compose.yaml` from before 0.1.25 does not pass the image, and
+gets the general form. Beside `compose.yaml`:
 
 ```bash
 docker compose pull && docker compose up -d

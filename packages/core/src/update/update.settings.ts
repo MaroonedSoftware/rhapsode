@@ -7,6 +7,13 @@ export interface UpdateSettings {
     distribution: 'docker' | 'source';
     /** Whether a start reinstalls every engine behind this core. Off unless turned on. § 10. */
     reinstallOutdated: boolean;
+    /**
+     * The image compose named, tag and all, from `RHAPSODE_IMAGE`, which compose.yaml sets from its
+     * own `image:`. Absent outside the image and under a compose.yaml older than the variable.
+     */
+    image?: string;
+    /** The host port compose published the page on, which the reinstall's `curl` goes through. */
+    webPort: number;
 }
 
 const OFF = new Set(['0', 'false', 'off', 'no']);
@@ -26,5 +33,7 @@ export function resolveUpdateSettings(settings: RhapsodeConfig, env: NodeJS.Proc
         // and never refreshed, and the image is what an upgrade replaces.
         distribution: env.RHAPSODE_DISTRIBUTION === 'docker' ? 'docker' : 'source',
         reinstallOutdated: settings.update?.reinstallOutdated ?? false,
+        ...(env.RHAPSODE_IMAGE?.trim() ? { image: env.RHAPSODE_IMAGE.trim() } : {}),
+        webPort: Number(env.RHAPSODE_WEB_PORT) || 8081,
     };
 }

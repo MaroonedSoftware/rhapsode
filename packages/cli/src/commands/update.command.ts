@@ -95,6 +95,12 @@ function describeRelease(status: UpdateStatus, ui: Ui): void {
                 return;
             }
             ui.warn(`rhapsode ${status.version}. ${status.latest} is out${status.releaseUrl === undefined ? '' : `: ${status.releaseUrl}`}`);
+            // The core worked out this box's steps from the image compose named. § 9.
+            if (status.upgrade !== undefined) {
+                const pin = status.upgrade.version === undefined ? '' : `set RHAPSODE_VERSION=${status.upgrade.version} in .env, then `;
+                ui.info(`Beside compose.yaml, ${pin}run: \`${status.upgrade.commands.join(' && ')}\``);
+                return;
+            }
             ui.info(
                 status.distribution === 'docker'
                     ? `Beside compose.yaml: \`docker compose pull && docker compose up -d\`, after setting RHAPSODE_VERSION to ${status.latest} if your compose pins it. Then run this again for the engines.`

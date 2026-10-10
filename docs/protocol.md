@@ -1269,6 +1269,29 @@ latest release is public, and the only other thing it says is whether this box c
   it cannot parse offers nothing.
 - **`distribution`** is `docker` in the published image and `source` everywhere else. It says which
   instructions to show, because the core cannot follow them itself.
+- **`upgrade`** is those instructions for this box exactly, present with `updateAvailable` in the
+  image when compose told the container which image it named (`RHAPSODE_IMAGE`, which
+  `compose.yaml` sets from its own `image:`). `image` is that reference, `version` is what to set
+  `RHAPSODE_VERSION` to in `.env` first, absent when the tag already takes the release, and
+  `commands` are what to run after it, in order, beside `compose.yaml`:
+
+  ```json
+  "upgrade": {
+    "image": "maroonedsoftware/rhapsode:0.1",
+    "version": "0.2",
+    "commands": ["docker compose pull", "docker compose up -d --wait", "curl -fsS -X POST http://127.0.0.1:8081/api/installs/outdated"]
+  }
+  ```
+
+  The tag decides `version`. A release (`0.1.22`) becomes the latest release, a minor line (`0.1`)
+  stays where it is when the latest release is on it and becomes the latest's minor line when it is
+  not, and `latest` stays. Any other tag (`local`, a digest) gives no `upgrade`, because the box was
+  not built from a published image and nothing here knows how it is rebuilt. The `curl` is left out
+  when `update.reinstallOutdated` is on, because the start does it (§ 10). It is the core's to work
+  out rather than the page's because it orders versions, which no client does, and because a
+  generic "change the pin if you pinned it" is what an operator read on a box whose pin and registry
+  were both in the way, and the upgrade did nothing. A `compose.yaml` from before `RHAPSODE_IMAGE`
+  sends nothing, and gets no `upgrade`: the instructions for it are the generic ones.
 
 **It is on by default**, because the failure it exists to prevent, a box that quietly stays several
 releases behind, is invisible from inside the box, and a check that has to be turned on is one only

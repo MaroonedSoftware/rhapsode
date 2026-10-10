@@ -249,24 +249,16 @@ export interface ResidentModel {
 }
 
 /**
- * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
- * generated from [UpdateStatus](../../../../../../contracts/rhapsode.types.ck)
+ * What upgrading this box takes, worked out by the core from the image compose named. § 9.
+ * generated from [UpgradeSteps](../../../../../../contracts/rhapsode.types.ck)
  */
-export interface UpdateStatus {
-    /** This core. */
-    version: string;
-    /** off: turned off. pending: no answer yet. failed: the last attempt got none. */
-    check: 'off' | 'pending' | 'ok' | 'failed';
-    /** The latest release, without its `v`. Present with `ok`. */
-    latest?: string;
-    /** Whether `latest` is newer than this core. Present with `ok`. */
-    updateAvailable?: boolean;
-    /** The release's page, for its notes. */
-    releaseUrl?: string;
-    /** ISO 8601, UTC. When `latest` was read. */
-    checkedAt?: string;
-    /** Which upgrade instructions apply. */
-    distribution: 'docker' | 'source';
+export interface UpgradeSteps {
+    /** The image reference compose.yaml named, tag and all. */
+    image: string;
+    /** Set RHAPSODE_VERSION to this in .env first. Absent when the tag already takes the release. */
+    version?: string;
+    /** Then these, in order, beside compose.yaml. */
+    commands: string[];
 }
 
 /**
@@ -445,6 +437,29 @@ export interface InstallJob {
  */
 export interface ResidencyDetail extends ResidencySummary {
     models: ResidentModel[];
+}
+
+/**
+ * Whether a newer release exists, asked by the core so that no client orders versions. § 9.
+ * generated from [UpdateStatus](../../../../../../contracts/rhapsode.types.ck)
+ */
+export interface UpdateStatus {
+    /** This core. */
+    version: string;
+    /** off: turned off. pending: no answer yet. failed: the last attempt got none. */
+    check: 'off' | 'pending' | 'ok' | 'failed';
+    /** The latest release, without its `v`. Present with `ok`. */
+    latest?: string;
+    /** Whether `latest` is newer than this core. Present with `ok`. */
+    updateAvailable?: boolean;
+    /** The release's page, for its notes. */
+    releaseUrl?: string;
+    /** ISO 8601, UTC. When `latest` was read. */
+    checkedAt?: string;
+    /** Which upgrade instructions apply. */
+    distribution: 'docker' | 'source';
+    /** This box's instructions exactly. With updateAvailable, in the image, when compose named the image. § 9. */
+    upgrade?: UpgradeSteps;
 }
 
 /**
