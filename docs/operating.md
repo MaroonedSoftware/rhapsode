@@ -311,7 +311,9 @@ docker compose up -d     # the server on 127.0.0.1:8080, the page on http://loca
 ```
 
 One image, `maroonedsoftware/rhapsode` on Docker Hub. Each release publishes it for amd64 and arm64,
-tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
+tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. The
+same image, under the same tags, is mirrored to `ghcr.io/maroonedsoftware/rhapsode`, where releases
+went before 0.1.24, so a `compose.yaml` that still names it keeps upgrading. It
 shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
 it installs the engines that were released with it.
 
@@ -328,9 +330,8 @@ docker compose pull && docker compose up -d
 ```
 
 Both volumes are kept. If you pinned `RHAPSODE_VERSION`, change it first, or the pull fetches the
-version you already have. Releases up to 0.1.23 were published to `ghcr.io/maroonedsoftware/rhapsode`
-and nothing newer is: a `compose.yaml` that still names it pulls 0.1.23 forever, so download the
-file again (or change its `image:` to `maroonedsoftware/rhapsode`) before the first upgrade past it.
+version you already have. 0.1.24 alone was published to Docker Hub without the GHCR mirror, so a
+`compose.yaml` that names `ghcr.io/maroonedsoftware/rhapsode` goes from 0.1.23 straight to 0.1.25.
 
 **Then reinstall the engines the page marks as behind.** Keeping `/data` is what makes the upgrade
 cheap, and it is also what strands the engines: the virtualenvs live there, so an upgraded core comes

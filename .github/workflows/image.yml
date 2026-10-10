@@ -4,12 +4,19 @@ name: image
 # multi-platform tag afterwards. arm64 was built under QEMU on an amd64 runner, and v0.1.0 spent 12.5
 # minutes there against 2.5 for amd64: 310s for the apt-get layer alone that amd64 does in 58s.
 #
-# Published to Docker Hub only, as `maroonedsoftware/rhapsode`, with the `DOCKERHUB_USERNAME` and
+# Published to Docker Hub as `maroonedsoftware/rhapsode`, with the `DOCKERHUB_USERNAME` and
 # `DOCKERHUB_TOKEN` repository secrets, which a release passes down with `secrets: inherit`. A build
 # that does not push, as on main, never logs in and needs neither.
 #
+# And mirrored to `ghcr.io/maroonedsoftware/rhapsode`, where every release up to 0.1.23 went. A
+# compose.yaml is downloaded once and never refreshed, so every install made before the move names
+# GHCR. When 0.1.24 went to Docker Hub alone, those boxes ran `docker compose pull`, found nothing
+# newer, and said nothing: one sat on 0.1.22 through an upgrade its operator thought they had run. The
+# mirror is one more tag on the same digests, so it costs a copy and no build.
+#
 # No top-level `permissions`, on purpose. A called workflow can only narrow its caller's token, so
-# the jobs take theirs from the job that calls this, and none of them needs more than to read.
+# the jobs take theirs from the job that calls this. `manifest` needs `packages: write` for GHCR,
+# which the release's `image` job grants.
 on:
     workflow_call:
         inputs:
@@ -20,6 +27,7 @@ on:
 
 env:
     IMAGE: docker.io/maroonedsoftware/rhapsode
+    MIRROR: ghcr.io/maroonedsoftware/rhapsode
 
 jobs:
     platform:
@@ -82,7 +90,7 @@ jobs:
 
     manifest:
         # The one step that publishes: both digests under the version, its minor line, and
-        # `latest`, which the metadata action moves only for a plain x.y.z tag.
+        # `latest`, which the metadata action moves only for a plain x.y.z tag, in both registries.
         if: inputs.push
         needs: [platform]
         runs-on: ubuntu-latest
@@ -100,14 +108,24 @@ jobs:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+            - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ github.token }}
+
             # Annotations at the index level too, because `imagetools create` writes the index of a
             # multi-platform image with none of its own, and a registry showing the index shows none.
             - id: meta
               uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
               env:
                   DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+              # `imagetools create` copies the Docker Hub digests into GHCR, so the mirror is the same
+              # image byte for byte, under the same tags.
               with:
-                  images: ${{ env.IMAGE }}
+                  images: |
+                      ${{ env.IMAGE }}
+                      ${{ env.MIRROR }}
                   tags: |
                       type=semver,pattern={{version}}
                       type=semver,pattern={{major}}.{{minor}}
