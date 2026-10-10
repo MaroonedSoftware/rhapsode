@@ -10,7 +10,7 @@ name: rhapsode
 
 services:
     server:
-        image: ghcr.io/maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-latest}
+        image: maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-latest}
         # 99:100 on unraid, to match its shares.
         user: '${PUID:-10001}:${PGID:-10001}'
         environment:

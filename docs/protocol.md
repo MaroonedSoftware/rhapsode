@@ -3,7 +3,7 @@
 The contract, written before the code.
 
 **Rhapsode** is a multi-engine speech server: one HTTP contract, many TTS models behind it, each in
-its own process. `MaroonedSoftware/rhapsode`, published as `ghcr.io/maroonedsoftware/rhapsode`, with
+its own process. `MaroonedSoftware/rhapsode`, published on Docker Hub as `maroonedsoftware/rhapsode`, with
 the engine SDK as the Python package `rhapsode-worker`. A rhapsode was a performer who recited written verse
 aloud, which is the job description.
 

@@ -100,8 +100,8 @@ jobs:
         needs: [build]
         permissions:
             contents: read
-            packages: write
         uses: ./.github/workflows/image.yml
+        secrets: inherit
         with:
             push: true
 
