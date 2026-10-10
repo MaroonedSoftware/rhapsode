@@ -32,6 +32,19 @@
         "test": {
             "dependsOn": ["^build"]
         },
+        "@rhapsode/core#test": {
+            "dependsOn": ["^build"],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/python/*/src/**",
+                "$TURBO_ROOT$/python/*/pyproject.toml",
+                "$TURBO_ROOT$/python/rhapsode-worker/tests/**"
+            ]
+        },
+        "@maroonedsoftware/rhapsode-sdk#test": {
+            "dependsOn": ["^build"],
+            "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/python/*/src/**", "$TURBO_ROOT$/python/*/pyproject.toml"]
+        },
         "typecheck": {
             "dependsOn": ["^build"]
         },
