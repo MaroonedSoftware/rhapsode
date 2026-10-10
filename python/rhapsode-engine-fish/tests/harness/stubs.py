@@ -321,10 +321,17 @@ def modules(recorder: Recorder) -> dict[str, types.ModuleType]:
             self.ref_by_hash: dict[str, tuple[Any, str]] = {}
 
         def encode_reference(self, reference_audio: bytes, enable_reference_audio: bool) -> Any:
-            """The clip's codes. These are its bytes, so a test can see which clip reached the model."""
+            """The clip's codes. These are its bytes, so a test can see which clip reached the model.
+            The clip is loaded first, as upstream's is, at the codec's rate."""
             assert enable_reference_audio
+            audio = self.load_audio(reference_audio, SAMPLE_RATE)
+            assert audio.dtype == np.float32 and audio.ndim == 1 and audio.size > 0
             recorder.encodes.append(reference_audio)
             return reference_audio
+
+        def load_audio(self, reference_audio: bytes, sr: int) -> np.ndarray:
+            """Upstream's, as it behaves on torchaudio 2.9 and later without torchcodec installed."""
+            raise ImportError("TorchCodec is required for load_with_torchcodec.")
 
         def load_by_hash(self, references: list[Any], use_cache: str) -> tuple[list[Any], list[str]]:
             tokens, texts = [], []

@@ -49,9 +49,10 @@ updates:
       ignore:
           - dependency-name: '*'
 
-    # Fish pins upstream's torch 2.8.0 and torchaudio 2.8.0, and torchaudio requires that torch
-    # exactly. A security update bumped torch alone to 2.13.0 (#88), the same unresolvable engine as
-    # Breeze's above, and it went unblocked because the Breeze entry covers only its own directory.
+    # Fish pins torch 2.11.0 and torchaudio 2.11.0, and torchaudio requires that torch exactly. A
+    # security update bumped torch alone to 2.13.0 (#88), the same unresolvable engine as Breeze's
+    # above, and it went unblocked because the Breeze entry covers only its own directory. 2.11.0 is
+    # torchaudio's last release, so torch cannot move past it while upstream imports torchaudio.
     - package-ecosystem: pip
       directory: /python/rhapsode-engine-fish
       schedule:

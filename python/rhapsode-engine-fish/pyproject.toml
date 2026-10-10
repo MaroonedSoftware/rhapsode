@@ -19,11 +19,17 @@ dependencies = [
     # What upstream's inference path imports, found by importing it in a clean virtualenv on Python
     # 3.12: fish_speech.inference_engine, models.text2semantic.inference and models.dac.inference.
     # Upstream's code itself is fetched beside the weights (upstream.py), so its own pyproject, which
-    # adds pyaudio, gradio, wandb, datasets and modelscope, is never installed. Pinned where upstream
-    # pins: torch 2.8.0, which has wheels up to Python 3.13, and transformers up to 4.57.3. Not its
-    # pydantic==2.9.2: its schema works on 2.13 and the SDK needs only 2.0.
-    "torch==2.8.0",
-    "torchaudio==2.8.0",
+    # adds pyaudio, gradio, wandb, datasets and modelscope, is never installed. transformers is
+    # capped where upstream caps it, at 4.57.3. Not its pydantic==2.9.2: its schema works on 2.13 and
+    # the SDK needs only 2.0.
+    #
+    # torch and torchaudio are not upstream's 2.8.0, which carries three memory-corruption advisories
+    # (GHSA-vgrw-7cvw-pwgx, GHSA-qfhq-4f3w-5fph, GHSA-rrmf-rvhw-rf47). 2.11.0 is the last torchaudio
+    # there is, and torchaudio requires its own torch exactly, so torch stops there too, short of the
+    # 2.13.0 the third advisory wants. On 2.11 upstream's reference loading needs torchcodec, which the
+    # adapter steps around (backends.py).
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
     "transformers<=4.57.3",
     # fish_speech.utils imports Lightning and Rich at import time, though inference uses neither.
     "lightning>=2.1.0",

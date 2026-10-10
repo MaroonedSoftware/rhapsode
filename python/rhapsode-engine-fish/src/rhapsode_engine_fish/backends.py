@@ -19,6 +19,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from . import upstream
+from .voices import SAMPLE_RATE, decoded
 
 #: Positions the model's key/value cache holds, and so the longest conversation one request can be:
 #: the reference's codes and transcript, every piece of text, and every piece's audio so far.
@@ -152,6 +153,12 @@ def _prompted(engine: type) -> type:
     first's, until the model was unloaded. The adapter keeps the codes itself instead, by the file
     they came from (engine.py), and reads the words afresh on every request. `inference` hands the
     model whatever its references resolved to, so the encoded prompt replaces those here.
+
+    The clip is decoded here too. Upstream's `load_audio` calls `torchaudio.load`, which from
+    torchaudio 2.9 hands every file to torchcodec and ignores the backend it is asked for: on 2.11,
+    without torchcodec, every clone failed with "TorchCodec is required for load_with_torchcodec".
+    torchcodec in turn needs FFmpeg's shared libraries, which a source install need not have. The
+    clip is a WAV the adapter wrote itself (voices.py), and soundfile reads it.
     """
 
     class Prompted(engine):  # type: ignore[misc]
@@ -159,6 +166,11 @@ def _prompted(engine: type) -> type:
 
         def send_Llama_request(self, req: Any, prompt_tokens: list[Any], prompt_texts: list[str]) -> Any:
             return super().send_Llama_request(req, *self.prompt)
+
+        def load_audio(self, reference_audio: bytes, sr: int) -> np.ndarray:
+            if sr != SAMPLE_RATE:
+                raise ValueError(f"the codec runs at {sr} Hz and the clips are stored at {SAMPLE_RATE}")
+            return decoded(reference_audio)
 
     return Prompted
 

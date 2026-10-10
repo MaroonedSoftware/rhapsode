@@ -82,8 +82,9 @@ export const CATALOG: Record<string, CatalogRecord> = {
         package: 'rhapsode-engine-fish',
         // The one build, named as upstream names it.
         defaultVariant: 's2-pro',
-        // 3.11 for the worker SDK. Below 3.14 for torch 2.8.0, which upstream pins and which has
-        // wheels for nothing newer; on 3.14 pip would find no torch at that version and fail.
+        // 3.11 for the worker SDK. Below 3.14 because nothing newer has run it: the bound was torch
+        // 2.8.0's, which had no 3.14 wheels. Its torch 2.11.0 has them and its set resolves on 3.14,
+        // but upstream's code has not been run on real weights there.
         python: { from: '3.11', below: '3.14' },
         license: {
             // The code licence is what the worker runs, and the worker runs fish-speech, which the
