@@ -53,7 +53,7 @@ def store(voice_dir: Path, request: CreateVoiceRequest) -> Path:
     if not request.reference:
         raise BadRequest("the reference audio is empty")
 
-    audio = _decoded(request.reference)
+    audio = decoded(request.reference)
     seconds = audio.size / SAMPLE_RATE
     if seconds > LONGEST_SECONDS:
         raise BadRequest(
@@ -107,7 +107,7 @@ def wav(audio: np.ndarray) -> bytes:
     return buffer.getvalue()
 
 
-def _decoded(data: bytes) -> np.ndarray:
+def decoded(data: bytes) -> np.ndarray:
     """Mono float32 at the codec's rate. The import is here so the adapter loads without soundfile."""
     import soundfile
 

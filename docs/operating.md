@@ -228,7 +228,7 @@ and "Built with Fish Audio". An install has to accept it by name: `?accept=Fish-
 rhapsode ships none of Fish Audio's code. The worker runs `fish-speech`, which a pull or the first
 load downloads from upstream at a pinned commit and checks against a digest of its files
 (protocol.md § 8), because its own package cannot be installed here: it depends on `pyaudio`, which
-needs PortAudio's headers and a compiler. It needs Python 3.11 to 3.13, for torch 2.8.0.
+needs PortAudio's headers and a compiler. It needs Python 3.11 to 3.13.
 
 Measured on an RTX 4070 Ti SUPER: it loads in 33 s, holds 12.3 GiB while speaking, and speaks at 1.03
 to 1.08 times real time. Upstream asks for a 24 GB card; it fits 16 because the adapter keeps a
