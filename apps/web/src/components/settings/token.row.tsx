@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Group, PasswordInput, Stack, Text } from '@mantine/core';
+import { Button, CopyButton, Group, PasswordInput, Stack, Text } from '@mantine/core';
 import type { Settings } from '@maroonedsoftware/rhapsode-sdk';
 
 import { ConfirmModal } from '../shared/confirm.modal';
@@ -9,8 +9,10 @@ export interface TokenRowProps {
     /** A new token typed or generated here, not yet saved. The page never has the current one. */
     draft: string;
     onDraft: (token: string) => void;
-    onRemove: () => void;
+    /** Removes it, then calls `done` once the core has agreed, so the dialog stays open on a refusal. */
+    onRemove: (done: () => void) => void;
     removing: boolean;
+    removeError?: unknown;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface TokenRowProps {
  * field for a new one. Generated here from the browser's own random source rather than suggested by
  * the core, so it crosses the network once, on its way in.
  */
-export function TokenRow({ settings, draft, onDraft, onRemove, removing }: TokenRowProps) {
+export function TokenRow({ settings, draft, onDraft, onRemove, removing, removeError }: TokenRowProps) {
     const [confirming, setConfirming] = useState(false);
     const set = settings.values.management.tokenSet;
 
@@ -47,22 +49,36 @@ export function TokenRow({ settings, draft, onDraft, onRemove, removing }: Token
                 <Button variant="default" onClick={() => onDraft(generate())}>
                     Generate
                 </Button>
+                {draft === '' ? undefined : (
+                    <CopyButton value={draft}>
+                        {({ copied, copy }) => (
+                            <Button variant="default" onClick={copy}>
+                                {copied ? 'Copied' : 'Copy'}
+                            </Button>
+                        )}
+                    </CopyButton>
+                )}
                 {set ? (
                     <Button variant="subtle" color="red" onClick={() => setConfirming(true)}>
                         Remove the token
                     </Button>
                 ) : undefined}
             </Group>
+            {/* The core never sends a token back (§ 10), so a generated one that was not copied
+                before Save has to be replaced to be used anywhere else. */}
+            {draft === '' ? undefined : (
+                <Text size="xs" c="dimmed">
+                    Copy it now: once saved, this page cannot show it again.
+                </Text>
+            )}
             <ConfirmModal
                 opened={confirming}
                 onClose={() => setConfirming(false)}
-                onConfirm={() => {
-                    onRemove();
-                    setConfirming(false);
-                }}
+                onConfirm={() => onRemove(() => setConfirming(false))}
                 title="Remove the management token?"
                 confirmLabel="Remove the token"
                 confirming={removing}
+                error={confirming ? removeError : undefined}
             >
                 From the next restart only this machine can install engines or change settings. A page or a script on another machine that uses the
                 token will be refused.

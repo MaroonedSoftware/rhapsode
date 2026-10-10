@@ -11,6 +11,9 @@ const { settings, updateSettings } = vi.hoisted(() => ({
     updateSettings: vi.fn<(patch: SettingsPatch) => Promise<Answer>>(),
 }));
 
+// The page asks before leaving with unsaved changes, and these tests render it with no router around it.
+vi.mock('@tanstack/react-router', () => ({ useBlocker: () => ({ status: 'idle' }) }));
+
 vi.mock('../../../src/api/client', () => ({
     sdk: {
         public: {
@@ -114,6 +117,9 @@ describe('SettingsPage', () => {
         render(<SettingsPage />);
 
         await user.click(within(await card('Memory on the card')).getByRole('button', { name: 'Reset' }));
+        // It asks first: the value it clears was typed by somebody, and nothing here can bring it back.
+        expect(updateSettings).not.toHaveBeenCalled();
+        await user.click(await screen.findByRole('button', { name: 'Reset kokoro' }));
 
         await waitFor(() => expect(updateSettings).toHaveBeenCalledWith({ engines: { kokoro: { keepAliveSeconds: null } } }));
     });

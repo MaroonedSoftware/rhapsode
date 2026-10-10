@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Alert, Badge, Card, Code, Group, Loader, ScrollArea, Stack, Stepper, Text, Title, VisuallyHidden } from '@mantine/core';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Badge, Button, Card, Code, Group, Loader, ScrollArea, Stack, Stepper, Text, Title, VisuallyHidden } from '@mantine/core';
 import type { InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useCatalog } from '../../api/catalog.queries';
@@ -66,11 +66,28 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     const feed = useJobFeed(jobId);
     const engineName = useEngineName();
     const viewport = useRef<HTMLDivElement>(null);
+    // Whether the reader is at the bottom of the log. A pip install prints hundreds of lines, and
+    // following every one dragged anybody reading an earlier line back down mid-sentence.
+    const atBottom = useRef(true);
+    const [behind, setBehind] = useState(false);
 
-    // Follow the newest line, the way a terminal does.
+    // Follow the newest line, the way a terminal does, only while the reader is already there.
     useEffect(() => {
-        viewport.current?.scrollTo({ top: viewport.current.scrollHeight });
+        if (atBottom.current) viewport.current?.scrollTo({ top: viewport.current.scrollHeight });
+        else setBehind(true);
     }, [feed.lines.length]);
+
+    const onScroll = () => {
+        const element = viewport.current;
+        if (element === null) return;
+        atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+        if (atBottom.current) setBehind(false);
+    };
+    const jumpToLatest = () => {
+        atBottom.current = true;
+        setBehind(false);
+        viewport.current?.scrollTo({ top: viewport.current.scrollHeight });
+    };
 
     if (job.isError) return <ErrorAlert title="That job could not be read" error={job.error} fallback="The server did not answer." />;
     if (job.data === undefined) return <Loader size="sm" aria-label="Reading the job" />;
@@ -88,6 +105,9 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     const noFetch = isNothingToFetch(data);
     const reinstalled = data.state === 'succeeded' ? catalog.data?.find(entry => entry.id === data.engine) : undefined;
     const running = finished ? undefined : steps[index];
+    // What it printed last, above the log rather than in it: the reason a pip install failed is
+    // usually that line, and it sits under hundreds of others.
+    const lastLine = data.state === 'failed' ? [...feed.lines].reverse().find(line => line.trim() !== '') : undefined;
     // What a screen reader hears as the job moves: the step while it runs, the outcome once it ends.
     // The stepper changes only its colours, which a screen reader does not announce.
     const announcement = finished ? `${title}: ${badge.label}` : running === undefined ? '' : `${title}: ${running.label}`;
@@ -162,16 +182,28 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
                         {data.kind === 'install' && current === 'weights'
                             ? ` ${name} is installed; download the weights again from its card.`
                             : undefined}
+                        {lastLine === undefined ? undefined : (
+                            <Text size="xs" mt="xs">
+                                Its last line: <Code>{lastLine}</Code>
+                            </Text>
+                        )}
                     </ErrorAlert>
                 ) : undefined}
 
+                {behind && feed.lines.length > 0 ? (
+                    <Group justify="flex-end">
+                        <Button variant="light" size="compact-xs" onClick={jumpToLatest}>
+                            Jump to the latest line
+                        </Button>
+                    </Group>
+                ) : undefined}
                 {feed.lines.length > 0 ? (
                     <ScrollArea
                         h={220}
                         viewportRef={viewport}
                         type="auto"
                         // Focusable, so a keyboard can scroll back through what it printed.
-                        viewportProps={{ tabIndex: 0, 'aria-label': 'Job output' }}
+                        viewportProps={{ tabIndex: 0, 'aria-label': 'Job output', onScroll }}
                     >
                         <Code block style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
                             {feed.lines.join('\n')}

@@ -380,6 +380,11 @@ describe('installing from the page', () => {
 
             expect(await screen.findByText('One engine was installed by an earlier release')).toBeInTheDocument();
             await user.click(screen.getByRole('button', { name: 'Reinstall all' }));
+            // Asked first, like the one reinstall it is several of.
+            expect(api.reinstallOutdated).not.toHaveBeenCalled();
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).getByText(/Chatterbox: each gets a new virtualenv/)).toBeInTheDocument();
+            await user.click(within(dialog).getByRole('button', { name: 'Reinstall all' }));
 
             expect(api.reinstallOutdated).toHaveBeenCalledTimes(1);
             expect(await screen.findByText('Reinstalling Chatterbox')).toBeInTheDocument();

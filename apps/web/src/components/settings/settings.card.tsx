@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Badge, Button, Card, Divider, Group, NumberInput, Select, Stack, Switch, TagsInput, Text, TextInput, Title } from '@mantine/core';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Badge, Button, Card, Divider, Group, NumberInput, Popover, Select, Stack, Switch, TagsInput, Text, TextInput, Title } from '@mantine/core';
 import type { Settings, SettingsPatch } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useUpdateSettings } from '../../api/settings.queries';
@@ -14,6 +14,8 @@ const LEVELS = ['error', 'warn', 'info', 'debug', 'trace'];
 export interface SettingsCardProps {
     group: GroupSpec;
     settings: Settings;
+    /** Told whether this card holds changes not yet saved, so the page can ask before they are lost. */
+    onDirty?: (group: string, dirty: boolean) => void;
 }
 
 /**
@@ -24,7 +26,7 @@ export interface SettingsCardProps {
  * every setting would then read as set here. Its own mutation, so a refusal is shown in the card whose
  * change it refused.
  */
-export function SettingsCard({ group, settings }: SettingsCardProps) {
+export function SettingsCard({ group, settings, onDirty }: SettingsCardProps) {
     const update = useUpdateSettings();
     const engineName = useEngineName();
     const [draft, setDraft] = useState<Record<string, unknown>>({});
@@ -45,12 +47,19 @@ export function SettingsCard({ group, settings }: SettingsCardProps) {
     const current = (key: string): unknown => valueAt(settings.values, key);
     const changed = Object.keys(draft).filter(key => !same(draft[key], current(key)) && !(draft[key] === null && current(key) === undefined));
     const restart = changed.some(key => fieldFor(settings, key)?.applies === 'restart');
+    const dirty = changed.length > 0;
 
-    const send = (patch: SettingsPatch, done: string) =>
+    useEffect(() => {
+        onDirty?.(group.id, dirty);
+    }, [onDirty, group.id, dirty]);
+    useEffect(() => () => onDirty?.(group.id, false), [onDirty, group.id]);
+
+    const send = (patch: SettingsPatch, done: string, after?: () => void) =>
         update.mutate(patch, {
             onSuccess: () => {
                 setDraft({});
                 notifySuccess(done);
+                after?.();
             },
         });
 
@@ -95,8 +104,9 @@ export function SettingsCard({ group, settings }: SettingsCardProps) {
                                 settings={settings}
                                 draft={typeof draft[field.key] === 'string' ? (draft[field.key] as string) : ''}
                                 onDraft={value => edit(field.key, value === '' ? undefined : value)}
-                                onRemove={() => send(patchOf({ [field.key]: '' }), 'The token is removed when rhapsode restarts.')}
+                                onRemove={done => send(patchOf({ [field.key]: '' }), 'The token is removed when rhapsode restarts.', done)}
                                 removing={update.isPending}
+                                removeError={update.error ?? undefined}
                             />
                         ) : (
                             <Control field={field} value={shown(field.key)} onChange={value => edit(field.key, value)} />
@@ -161,9 +171,7 @@ function Row({ field, settings, onReset, resetting, children }: RowProps) {
                         <Badge variant="light" size="sm">
                             Set here
                         </Badge>
-                        <Button variant="subtle" size="compact-xs" onClick={onReset} disabled={resetting}>
-                            Reset
-                        </Button>
+                        <ResetButton label={field.label} onReset={onReset} resetting={resetting} />
                     </>
                 ) : reported?.source === 'config' ? (
                     <Badge variant="default" size="sm">
@@ -186,6 +194,43 @@ function Row({ field, settings, onReset, resetting, children }: RowProps) {
                 )}
             </Group>
         </Stack>
+    );
+}
+
+/**
+ * Reset goes to the core straight away (see `reset` above), and the value it clears was typed by
+ * somebody who may not remember it, so it asks first. A popover rather than a dialog: it is one
+ * setting, and the question belongs next to it.
+ */
+function ResetButton({ label, onReset, resetting }: { label: string; onReset: () => void; resetting: boolean }) {
+    const [opened, setOpened] = useState(false);
+    return (
+        <Popover opened={opened} onChange={setOpened} position="bottom-start" withArrow trapFocus>
+            <Popover.Target>
+                <Button variant="subtle" size="compact-xs" onClick={() => setOpened(open => !open)} disabled={resetting}>
+                    Reset
+                </Button>
+            </Popover.Target>
+            <Popover.Dropdown>
+                <Stack gap="xs" maw={280}>
+                    <Text size="sm">{`${label} goes back to rhapsode.config.json's value, or the default. What was set here is forgotten.`}</Text>
+                    <Group justify="flex-end" gap="xs">
+                        <Button variant="default" size="compact-sm" onClick={() => setOpened(false)}>
+                            Keep it
+                        </Button>
+                        <Button
+                            size="compact-sm"
+                            onClick={() => {
+                                setOpened(false);
+                                onReset();
+                            }}
+                        >
+                            Reset {label.toLowerCase()}
+                        </Button>
+                    </Group>
+                </Stack>
+            </Popover.Dropdown>
+        </Popover>
     );
 }
 
