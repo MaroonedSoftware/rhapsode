@@ -2635,10 +2635,15 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 "properties": {
                     "check": {
                         "type": "boolean"
+                    },
+                    "reinstallOutdated": {
+                        "type": "boolean",
+                        "description": "Whether a start reinstalls every engine behind this core. § 10."
                     }
                 },
                 "required": [
-                    "check"
+                    "check",
+                    "reinstallOutdated"
                 ]
             },
             "SettingsEngine": {
@@ -2917,6 +2922,12 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                 "type": "object",
                 "properties": {
                     "check": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "reinstallOutdated": {
                         "type": [
                             "boolean",
                             "null"

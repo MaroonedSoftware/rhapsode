@@ -158,7 +158,7 @@ export class SettingsService {
     private running(): Resolved {
         const resolved = valuesOf(this.booted, this.env);
         resolved.values.residency = { ...this.residencyPolicy };
-        resolved.values.update = { check: this.update.check };
+        resolved.values.update = { check: this.update.check, reinstallOutdated: this.update.reinstallOutdated };
         for (const id of this.engines.ids().sort()) {
             const keepAliveSeconds = this.engines.entry(id)?.keepAliveSeconds;
             resolved.values.engines[id] = keepAliveSeconds === undefined ? {} : { keepAliveSeconds };
@@ -248,6 +248,7 @@ interface Resolved {
 function valuesOf(config: RhapsodeConfig, env: NodeJS.ProcessEnv): Resolved {
     const workers = resolveWorkerOptions(config);
     const install = resolveInstallSettings(config, env);
+    const update = resolveUpdateSettings(config, env);
     // An empty token is none, as the management module reads it.
     const token = typeof config.management?.token === 'string' && config.management.token !== '' ? config.management.token : undefined;
 
@@ -275,7 +276,7 @@ function valuesOf(config: RhapsodeConfig, env: NodeJS.ProcessEnv): Resolved {
                 python: install.python,
             },
             management: { tokenSet: token !== undefined, origins: config.management?.origins ?? [] },
-            update: { check: resolveUpdateSettings(config, env).check },
+            update: { check: update.check, reinstallOutdated: update.reinstallOutdated },
             engines: {},
         },
     };

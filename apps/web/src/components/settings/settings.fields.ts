@@ -85,6 +85,12 @@ export const GROUPS: GroupSpec[] = [
                 kind: 'switch',
                 help: 'At most once a day, only when this page or the wizard asks, sending nothing about this box. RHAPSODE_UPDATE_CHECK=0 in the environment turns it off whatever this says.',
             },
+            {
+                key: 'update.reinstallOutdated',
+                label: 'Reinstall engines behind this server when it starts',
+                kind: 'switch',
+                help: 'After an upgrade, rebuilds every engine the Engines page marks as behind, so the upgrade needs nothing else. Read at each start. An engine whose licence needs accepting again waits for you.',
+            },
         ],
     },
     {

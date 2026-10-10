@@ -1761,8 +1761,12 @@ components:
             properties:
                 check:
                     type: boolean
+                reinstallOutdated:
+                    type: boolean
+                    description: Whether a start reinstalls every engine behind this core. § 10.
             required:
                 - check
+                - reinstallOutdated
         SettingsEngine:
             type: object
             properties:
@@ -1962,6 +1966,10 @@ components:
             type: object
             properties:
                 check:
+                    type:
+                        - boolean
+                        - "null"
+                reinstallOutdated:
                     type:
                         - boolean
                         - "null"

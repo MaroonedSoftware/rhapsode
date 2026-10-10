@@ -37,6 +37,11 @@ const seed = {
     // The page has no sign-in and a published port is never loopback to the core, so the page's
     // proxy presents this for it. Ports are published on 127.0.0.1 for the same reason.
     management: { token: randomBytes(32).toString('base64url') },
+    // An upgrade here always replaces the core under engines it did not build, and the reinstall
+    // after it was the step that got forgotten: a box went from 0.1.3 to 0.1.6 with Chatterbox still
+    // on a 0.1.2 worker. On for a new box only; one that already has a config keeps what it says.
+    // protocol.md § 10, "Reinstalling".
+    update: { reinstallOutdated: true },
 };
 
 try {

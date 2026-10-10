@@ -72,6 +72,11 @@ export interface RhapsodeConfig {
          * asked. On by default. `RHAPSODE_UPDATE_CHECK=0` turns it off from the environment.
          */
         check?: boolean;
+        /**
+         * Whether the core reinstalls every engine an upgrade left behind each time it starts, as
+         * `POST /installs/outdated` would. Off by default; the Docker image seeds it on. § 10.
+         */
+        reinstallOutdated?: boolean;
     };
     engines?: Record<
         string,
@@ -136,6 +141,7 @@ export const SETTINGS: Readonly<Record<string, SettingApplies>> = {
     'management.token': 'restart',
     'management.origins': 'restart',
     'update.check': 'live',
+    'update.reinstallOutdated': 'live',
 };
 
 /** The settings each engine has, under `engines.<id>.`. The engine's entry itself is not one. */

@@ -96,7 +96,7 @@ describe('reinstalling an engine', () => {
 
     async function start(runner: CommandRunner, operator: RhapsodeConfig = {}) {
         const configPath = join(dir, 'rhapsode.config.json');
-        if (operator.engines !== undefined) writeFileSync(configPath, JSON.stringify(operator));
+        if (Object.keys(operator).length > 0) writeFileSync(configPath, JSON.stringify(operator));
         const { settings, managed } = await loadSettings(configPath);
         const builder = await buildServer({ ...settings, workers: { socketDir: join(dir, 's') }, install: { venvDir } }, silent(), {
             managed,
@@ -271,6 +271,36 @@ describe('reinstalling an engine', () => {
         const refused = await app.inject({ method: 'POST', url: '/engines/tone/reinstall', remoteAddress: '10.0.0.5' });
 
         expect(refused.statusCode).toBe(403);
+    });
+
+    describe('update.reinstallOutdated', () => {
+        const restart = async (operator: RhapsodeConfig) => {
+            await running?.app.close();
+            return start(fakeRunner({ version: CORE_VERSION }).runner, operator);
+        };
+        const jobs = async (app: App) => InstallJob.array().parse((await app.inject({ method: 'GET', url: '/installs' })).json());
+
+        it('reinstalls every engine behind this core when the server starts', async () => {
+            const options = { version: '0.0.1' };
+            await installStale(await start(fakeRunner(options).runner), options);
+
+            const app = await restart({ update: { reinstallOutdated: true } });
+
+            const queued = await jobs(app);
+            expect(queued.map(job => [job.engine, job.kind])).toEqual([['tone', 'reinstall']]);
+            expect((await settled(app, queued[0]!.id)).state).toBe('succeeded');
+            expect(await catalogEntry(app, 'tone')).toMatchObject({ workerVersion: CORE_VERSION, outdated: false });
+        });
+
+        it('leaves an engine behind until somebody asks, while it is off as it is by default', async () => {
+            const options = { version: '0.0.1' };
+            await installStale(await start(fakeRunner(options).runner), options);
+
+            const app = await restart({});
+
+            expect(await jobs(app)).toEqual([]);
+            expect(await catalogEntry(app, 'tone')).toMatchObject({ outdated: true });
+        });
     });
 
     describe('POST /installs/outdated', () => {

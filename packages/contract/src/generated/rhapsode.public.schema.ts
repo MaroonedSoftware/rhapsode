@@ -81,6 +81,9 @@ export type SettingsManagement = z.infer<typeof SettingsManagement>;
  */
 export const SettingsUpdate = z.looseObject({
     check: z.preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean()),
+    reinstallOutdated: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .describe('Whether a start reinstalls every engine behind this core. § 10.'),
 });
 export type SettingsUpdate = z.infer<typeof SettingsUpdate>;
 
@@ -201,6 +204,10 @@ export type SettingsManagementPatch = z.infer<typeof SettingsManagementPatch>;
  */
 export const SettingsUpdatePatch = z.strictObject({
     check: z
+        .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
+        .nullable()
+        .optional(),
+    reinstallOutdated: z
         .preprocess(v => (v === 'true' ? true : v === 'false' ? false : v), z.boolean())
         .nullable()
         .optional(),

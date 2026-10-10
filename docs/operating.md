@@ -356,6 +356,12 @@ needed reinstalling. So every engine on `GET /engines`, and every installed one 
 carries `outdated: true` when its worker is not this core's version, and the page marks it "Behind
 this server". It is a warning, never an error: a stale worker is contract-legal and works.
 
+**A box set up from 0.1.25 on does this by itself.** The config the image writes on first boot turns
+on `update.reinstallOutdated`, so each start reinstalls every engine behind it, and its log says
+which. A box with an older config has it off, and turns it on under Settings, Updates, or with
+`pnpm wizard settings update.reinstallOutdated true`; after that, pull and up are the whole upgrade.
+Off, reinstalling is yours to ask for.
+
 "Reinstall all" on the Engines page does every engine that is behind. From the host, through the
 page's proxy, which carries the management token:
 
@@ -390,6 +396,8 @@ that is never refused as a whole and does nothing when nothing is behind:
 `--wait` holds the line until the new container is healthy, so the reinstall reaches the new core.
 What it prints is the reinstall's answer: the jobs it queued, and in `skipped` each engine it left
 for a person, `licence` for weights that need accepting again, `busy` for one that already had a job.
+With `update.reinstallOutdated` on, the start has already queued them, the `curl` finds each `busy`,
+and it can be left off the line.
 
 Leave `RHAPSODE_VERSION` on the minor line for this, as it is by default, so that the box takes
 patch releases on its own and waits for you at the next minor one. Anything else that replaces a

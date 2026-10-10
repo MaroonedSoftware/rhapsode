@@ -52,7 +52,11 @@ class SettingsManagement(BaseModel):
     origins: list[str]
 
 class SettingsUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     check: bool
+    # Whether a start reinstalls every engine behind this core. § 10.
+    reinstall_outdated: bool = Field(alias="reinstallOutdated")
 
 class SettingsEngine(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -114,7 +118,10 @@ class SettingsManagementPatch(BaseModel):
     origins: list[str] | None = None
 
 class SettingsUpdatePatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     check: bool | None = None
+    reinstall_outdated: bool | None = Field(alias="reinstallOutdated", default=None)
 
 class SettingsEnginePatch(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

@@ -5,6 +5,8 @@ export interface UpdateSettings {
     check: boolean;
     /** Which upgrade instructions apply. The image says `docker` in its own environment. */
     distribution: 'docker' | 'source';
+    /** Whether a start reinstalls every engine behind this core. Off unless turned on. § 10. */
+    reinstallOutdated: boolean;
 }
 
 const OFF = new Set(['0', 'false', 'off', 'no']);
@@ -23,5 +25,6 @@ export function resolveUpdateSettings(settings: RhapsodeConfig, env: NodeJS.Proc
         // Set by the image rather than passed through compose, because compose.yaml is downloaded once
         // and never refreshed, and the image is what an upgrade replaces.
         distribution: env.RHAPSODE_DISTRIBUTION === 'docker' ? 'docker' : 'source',
+        reinstallOutdated: settings.update?.reinstallOutdated ?? false,
     };
 }

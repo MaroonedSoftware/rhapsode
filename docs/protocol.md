@@ -1227,9 +1227,11 @@ healthcheck polls.
 
 The remedy is to reinstall that engine (§ 10), which builds a new virtualenv beside the old one and
 does not take the engine away while it does. It is worth a warning and never a refusal, and it is
-never done automatically: the worker is contract-legal, it works, a reinstall costs a cold load and
-the network, and an operator who has reasons to run an engine at another version is inside what this
-section allows.
+never done unless the operator asked for it: the worker is contract-legal, it works, a reinstall
+costs a cold load and the network, and an operator who has reasons to run an engine at another
+version is inside what this section allows. Asking once is enough: with `update.reinstallOutdated`
+on, the core reinstalls every engine behind it each time it starts (§ 10, "Reinstalling"). It is off
+by default, and the Docker image turns it on in the config it writes on first boot.
 
 ### The core asks whether it is current
 
@@ -1408,7 +1410,7 @@ the ones a page could not.
     "workers": { "socketDir": "/tmp/rhapsode", "voiceDir": "/config/voices", "startupTimeoutSeconds": 60, "drainGraceMs": 10000, "maxRestarts": 5, "restartDecaySeconds": 300 },
     "install": { "venvDir": "/data/.rhapsode/venvs", "sourceDir": "/app/python", "python": "3.12" },
     "management": { "tokenSet": true, "origins": [] },
-    "update": { "check": true },
+    "update": { "check": true, "reinstallOutdated": false },
     "engines": { "kokoro": { "keepAliveSeconds": 900 } }
   },
   "fields": [
@@ -1441,10 +1443,11 @@ rather than adding to it: `management.origins` set in the database is the whole 
 one transaction, so a patch that is refused changes nothing, even where some of its keys were
 allowed.
 
-**What applies now, and what waits.** Five settings apply as soon as they are written:
+**What applies now, and what waits.** Six settings apply as soon as they are written:
 `residency.maxResidentModels`, `residency.evictionWaitSeconds`, `residency.keepAliveSeconds`, each
-engine's `keepAliveSeconds`, and `update.check`. They are the ones the core reads when it uses them
-rather than once at boot, and they are the ones a person tunes while watching a box run: a
+engine's `keepAliveSeconds`, `update.check` and `update.reinstallOutdated`. They are the ones the core
+reads when it uses them rather than once at boot (`update.reinstallOutdated` is used at a start, so a
+change to it is read by the next one without waiting to be applied), and they are the ones a person tunes while watching a box run: a
 keep-alive is set by seeing how long a model sits idle on the card, and a restart to try a value
 would drop the model being measured. A change to either keep-alive moves the deadline of every model
 idle now, rather than from its next request, because a deadline nobody sees move reads as a setting
@@ -1750,6 +1753,24 @@ already queued or running, `uncatalogued` where the catalog no longer has it. No
 every night. It is a route rather than a loop in each client because the question of which engines
 it covers is the core's to answer, and the one client that can always reach an upgraded container
 is `curl`.
+
+**With `update.reinstallOutdated` on, the core does the same when it starts.** Once the server is
+ready, it queues what `POST /installs/outdated` would, and logs the jobs and every engine skipped,
+with the reason, at `info`. An upgrade in the image is then `docker compose pull` and
+`docker compose up -d` and nothing else. The curl at the end of the upgrade was the step that got
+forgotten, and forgetting it failed silently, which is the case `outdated` exists to make visible:
+on a box upgraded from 0.1.3 to 0.1.6, Chatterbox went on running a 0.1.2 worker until somebody
+noticed `/residency` reporting no `sizeBytes`.
+
+- **It is off by default**, for the reasons in § 9 that a reinstall is the operator's to ask for.
+  A setting is asking. The Docker image writes `true` into the config it seeds on first boot, since
+  an upgrade there always replaces the core under engines it did not build, and a box that already
+  has a config keeps what it says.
+- **Nothing it skips is retried until the next start**, and a skip is not a failure. An engine
+  whose licence needs accepting again waits for a person, as it does for the route.
+- **Every start with an engine behind queues a reinstall**, not only the first after an upgrade.
+  A reinstall that failed leaves the engine behind, so the next start tries again, which is what a
+  person would do; one that keeps failing costs one failed job per start, in `GET /installs`.
 
 ### Pulling weights
 

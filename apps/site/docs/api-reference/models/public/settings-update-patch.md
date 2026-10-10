@@ -6,10 +6,11 @@ mdx:
 ---
 
 <details>
-<summary>Attributes (1)</summary>
+<summary>Attributes (2)</summary>
 
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |
 | `check` | `boolean` | No | *nullable* |
+| `reinstallOutdated` | `boolean` | No | *nullable* |
 
 </details>
