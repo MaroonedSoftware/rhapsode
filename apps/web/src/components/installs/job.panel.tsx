@@ -7,6 +7,7 @@ import { useInstallJob } from '../../api/installs.queries';
 import { useJobFeed } from '../../api/job.feed';
 import { useEngineName } from '../shared/engine.name';
 import { ErrorAlert } from '../shared/error.alert';
+import { PageSkeleton } from '../shared/page.skeleton';
 import { severityColor } from '../shared/status';
 import { isNothingToFetch, jobBadge } from './job.state';
 import { WarmOffer } from './warm.offer';
@@ -90,7 +91,9 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     };
 
     if (job.isError) return <ErrorAlert title="That job could not be read" error={job.error} fallback="The server did not answer." />;
-    if (job.data === undefined) return <Loader size="sm" aria-label="Reading the job" />;
+    // Card height, not a spinner: the page scrolls a job it just started into view, and a spinner a
+    // line tall left the panel that replaced it mostly below the fold.
+    if (job.data === undefined) return <PageSkeleton variant="card" />;
 
     const data = job.data;
     const name = engineName(data.engine);

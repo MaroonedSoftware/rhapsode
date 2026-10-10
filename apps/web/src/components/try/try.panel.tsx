@@ -302,6 +302,7 @@ function Controls({ engine, variants, initial, voices, voicesPending, voicesErro
                                     ref={textarea}
                                     aria-labelledby={ids.line}
                                     description="Cmd or Ctrl and Enter speaks it."
+                                    inputWrapperOrder={['label', 'input', 'description', 'error']}
                                     onKeyDown={event => {
                                         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && text.trim() !== '' && !asking.isPending) {
                                             event.preventDefault();
