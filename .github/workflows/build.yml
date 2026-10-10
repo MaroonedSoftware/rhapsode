@@ -7,7 +7,9 @@ permissions:
     contents: read
 
 jobs:
-    build:
+    # Two jobs where there was one, because the Python half's mypy, ruff, pytest and conformance needed
+    # nothing from the TypeScript half's build and waited about four minutes behind it.
+    node:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,9 +27,8 @@ jobs:
               with:
                   python-version: '3.11'
 
-            # Every format in capabilities.formats has to actually produce bytes in that format, so
-            # the encoder is not something the suite can stub. A runner without ffmpeg would pass a
-            # worker that only ever serves pcm and wav.
+            # The venv and ffmpeg here too, not only in the python job: the core's and the SDK's
+            # tests start real tone workers out of python/.venv and ask them for every format.
             - name: Install ffmpeg
               run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
@@ -38,10 +39,36 @@ jobs:
             - run: pnpm run codegen:check
             - run: pnpm run build
             - run: pnpm run typecheck
-            - run: node scripts/python.mjs typecheck
             - run: pnpm run lint
+            - run: pnpm run test:js
+
+    python:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            # Only to run scripts/python.mjs, so no pnpm, and no install of the workspace.
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 22
+                  package-manager-cache: false
+
+            - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+              with:
+                  python-version: '3.11'
+
+            # Every format in capabilities.formats has to actually produce bytes in that format, so
+            # the encoder is not something the suite can stub. A runner without ffmpeg would pass a
+            # worker that only ever serves pcm and wav.
+            - name: Install ffmpeg
+              run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+            - run: node scripts/python.mjs sync
+            - run: node scripts/python.mjs typecheck
             - run: node scripts/python.mjs lint
-            - run: pnpm run test
+            - run: node scripts/python.mjs test
 
             # The suite an engine author runs before opening a pull request, against the engine that
             # exists to prove the protocol. If this passes and their engine fails it, the difference
