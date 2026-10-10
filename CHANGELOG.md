@@ -2,6 +2,15 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.25
+
+- The server image is mirrored to `ghcr.io/maroonedsoftware/rhapsode` again, beside Docker Hub, so an install whose `compose.yaml` predates the move keeps finding new releases with `docker compose pull`. 0.1.24 was published to Docker Hub only, so such an install goes from 0.1.23 to this release.
+- `compose.yaml` now pulls the image's minor line (`0.1`) by default rather than `latest`, so `docker compose pull` takes every patch release and stops at the next minor. A new `.env.example` holds the settings of an install, `COMPOSE_FILE` and `RHAPSODE_VERSION` among them, so that a newer `compose.yaml` can be downloaded over the old one without losing them.
+- A new setting, `update.reinstallOutdated`, has the server reinstall every engine an upgrade left behind each time it starts, as `POST /installs/outdated` would, so an upgrade needs nothing after `docker compose pull` and `docker compose up -d`. It is off by default. The Docker image turns it on in the config it writes on first boot; an existing box turns it on under Settings, Updates, or with `pnpm wizard settings update.reinstallOutdated true`.
+- The first time a new version of the core starts, it copies the state database, the config file and the `voices` directory beside it into `rhapsode.backups/<time>-before-<version>/` before opening anything for writing, keeping the three newest copies. An upgrade no longer needs a `docker cp` of `/config` first.
+- `GET /update` now carries `upgrade`, the exact steps for this box when a release is out: what `RHAPSODE_VERSION` has to become, if anything, and the commands to run after it, leaving out the engine reinstall when `update.reinstallOutdated` does it. `compose.yaml` passes the server the image it named as `RHAPSODE_IMAGE`, which is what the core works them out from. The page's banner and `pnpm wizard update` show them. A `compose.yaml` from before this release passes nothing and gets the general instructions as before.
+- A new installer: `curl -fsSL https://github.com/maroonedsoftware/rhapsode/releases/latest/download/install.sh | sh` sets up an install in `./rhapsode`, with `compose.gpu.yaml` merged when Docker can reach an NVIDIA card, and running it again in that directory upgrades it, compose files included. Every release now carries the installer, `compose.yaml`, `compose.gpu.yaml`, the new `compose.lan.yaml` (both ports on every interface) and `env.example` as assets.
+
 ## 0.1.24
 
 - Fish now installs torch and torchaudio 2.11.0 rather than upstream's 2.8.0, which clears two of the

@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-engine-fish"
-version = "0.1.24"
+version = "0.1.25"
 description = "Fish Audio S2 Pro for rhapsode: eighty languages and free-form direction, on research-only weights."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rhapsode-worker==0.1.24",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "rhapsode-worker==0.1.25",  # Its own version, exactly, and bumped with it. protocol.md § 9.
     "numpy>=1.26",
     "huggingface_hub>=0.23",
     # Reads a reference clip in any of the four formats a clone accepts. 0.12 is the first whose
