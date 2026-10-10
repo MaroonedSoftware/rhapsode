@@ -2,6 +2,16 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.24
+
+- Fish now installs torch and torchaudio 2.11.0 rather than upstream's 2.8.0, which clears two of the
+  three PyTorch memory-corruption advisories against it (GHSA-vgrw-7cvw-pwgx, GHSA-qfhq-4f3w-5fph).
+  The third, GHSA-rrmf-rvhw-rf47, is fixed only in torch 2.13.0, and 2.11.0 is the last torchaudio
+  release. Cloned voices are decoded by the adapter rather than by upstream's `torchaudio.load`, which
+  from torchaudio 2.9 needs torchcodec and FFmpeg. Reinstall Fish to pick this up
+  (`pnpm wizard reinstall fish`, or `POST /installs/outdated`).
+- The server image is published to Docker Hub as `maroonedsoftware/rhapsode`, and no longer to `ghcr.io/maroonedsoftware/rhapsode`, which stays at 0.1.23. An existing install must download `compose.yaml` again, or change its `image:` to `maroonedsoftware/rhapsode`, before `docker compose pull` will find this release.
+
 ## 0.1.23
 
 - The core now removes emoji and markdown emphasis from the text before a worker sees it, on `/speak`, `/dialogue`, the OpenAI shim and MCP alike. Text from a language model arrives decorated, and engines voiced the decoration: Chatterbox turbo spent over half as long again on a sentence with `*really*` and `**Jon**` in it, or with a few emoji. Emphasis keeps the words it wrapped. `snake_case`, `2 * 3` and every kind of bracket are left alone, so cues and engine tags are unaffected. `©`, `®` and `™` stay, because they are read as words. `withoutDecoration` is exported from `@rhapsode/contract` for clients that want to apply the same rule.
