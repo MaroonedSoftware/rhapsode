@@ -3,6 +3,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 import { themes as prismThemes } from 'prism-react-renderer';
 
 const repository = 'https://github.com/MaroonedSoftware/rhapsode';
+const image = 'https://hub.docker.com/r/maroonedsoftware/rhapsode';
 
 /**
  * Where "Edit this page" goes.
@@ -107,6 +108,7 @@ const config: Config = {
                     title: 'Project',
                     items: [
                         { label: 'Source', href: repository },
+                        { label: 'Docker image', href: image },
                         { label: 'Issues', href: `${repository}/issues` },
                         { label: 'Changelog', href: `${repository}/blob/main/CHANGELOG.md` },
                         { label: 'Security', href: `${repository}/blob/main/SECURITY.md` },

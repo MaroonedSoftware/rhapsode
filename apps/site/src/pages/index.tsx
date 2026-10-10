@@ -103,8 +103,8 @@ export default function Home() {
                             </Link>
                         </div>
                         <p className={styles.small}>
-                            MIT licensed. One Docker image for amd64 and arm64, with or without a GPU. A rhapsode was a performer who recited written
-                            verse aloud, which is the job description.
+                            MIT licensed. One <a href="https://hub.docker.com/r/maroonedsoftware/rhapsode">Docker image</a> for amd64 and arm64, with
+                            or without a GPU. A rhapsode was a performer who recited written verse aloud, which is the job description.
                         </p>
                     </div>
                     <CueDemo />
@@ -193,8 +193,9 @@ export default function Home() {
                     <div className={styles.prose}>
                         <h2>Run it</h2>
                         <p>
-                            With Docker there is nothing to clone. The image serves the API on port 8080 and a web page for installing engines on
-                            8081, and keeps engines and their weights in a volume.
+                            With Docker there is nothing to clone. The image,{' '}
+                            <a href="https://hub.docker.com/r/maroonedsoftware/rhapsode">maroonedsoftware/rhapsode</a> on Docker Hub, serves the API
+                            on port 8080 and a web page for installing engines on 8081, and keeps engines and their weights in a volume.
                         </p>
                         <p>
                             Install Kokoro from the page and it speaks on the CPU, from a download of about 200 MB. With an NVIDIA card, add{' '}

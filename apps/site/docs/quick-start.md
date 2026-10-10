@@ -5,7 +5,8 @@ description: Run rhapsode in Docker, install an engine, and make it speak.
 
 # Quick start
 
-Docker is the whole install. There is nothing to clone and no Node or Python to set up.
+Docker is the whole install. There is nothing to clone and no Node or Python to set up. The image is
+[`maroonedsoftware/rhapsode`](https://hub.docker.com/r/maroonedsoftware/rhapsode) on Docker Hub, for amd64 and arm64.
 
 ## 1. Start it
 

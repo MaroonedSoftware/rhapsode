@@ -310,7 +310,7 @@ curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/com
 docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
-One image, `maroonedsoftware/rhapsode` on Docker Hub. Each release publishes it for amd64 and arm64,
+One image, [`maroonedsoftware/rhapsode`](https://hub.docker.com/r/maroonedsoftware/rhapsode) on Docker Hub. Each release publishes it for amd64 and arm64,
 tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. It
 shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
 it installs the engines that were released with it.
