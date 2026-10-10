@@ -307,11 +307,19 @@ image.
 ```bash
 mkdir rhapsode && cd rhapsode
 curl -fsSLO https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/MaroonedSoftware/rhapsode/main/.env.example
 docker compose up -d     # the server on 127.0.0.1:8080, the page on http://localhost:8081
 ```
 
+`.env` is optional, and is where the settings of the install live rather than in `compose.yaml`, so
+a newer `compose.yaml` can be downloaded over the old one without losing them. It names the files
+compose merges (`COMPOSE_FILE`, which is how `compose.gpu.yaml` stays merged without `-f` on every
+command) and the image tag.
+
 One image, `maroonedsoftware/rhapsode` on Docker Hub. Each release publishes it for amd64 and arm64,
-tagged with its version, its minor line (`0.1`) and `latest`, and `RHAPSODE_VERSION` pins one. The
+tagged with its version, its minor line (`0.1`) and `latest`. `RHAPSODE_VERSION` picks one, and
+defaults to the minor line `compose.yaml` was released on, so a pull takes every patch release and
+stops at the next minor, where breaking changes go while the version is 0.x. The
 same image, under the same tags, is mirrored to `ghcr.io/maroonedsoftware/rhapsode`, where releases
 went before 0.1.24, so a `compose.yaml` that still names it keeps upgrading. It
 shares the version every package carries (`docs/protocol.md` § 9), so image 0.3.0 is core 0.3.0, and
@@ -329,8 +337,9 @@ The container cannot replace itself, so the upgrade is yours to run, beside `com
 docker compose pull && docker compose up -d
 ```
 
-Both volumes are kept. If you pinned `RHAPSODE_VERSION`, change it first, or the pull fetches the
-version you already have. 0.1.24 alone was published to Docker Hub without the GHCR mirror, so a
+Both volumes are kept. On the minor line that is the whole upgrade for a patch release. For a new
+minor release, or if you pinned `RHAPSODE_VERSION` to a release, change it in `.env` first, or the
+pull fetches the version you already have. 0.1.24 alone was published to Docker Hub without the GHCR mirror, so a
 `compose.yaml` that names `ghcr.io/maroonedsoftware/rhapsode` goes from 0.1.23 straight to 0.1.25.
 
 **Then reinstall the engines the page marks as behind.** Keeping `/data` is what makes the upgrade
@@ -382,7 +391,7 @@ that is never refused as a whole and does nothing when nothing is behind:
 What it prints is the reinstall's answer: the jobs it queued, and in `skipped` each engine it left
 for a person, `licence` for weights that need accepting again, `busy` for one that already had a job.
 
-Pin the minor line for this, `RHAPSODE_VERSION=0.1` in the compose environment, so that the box takes
+Leave `RHAPSODE_VERSION` on the minor line for this, as it is by default, so that the box takes
 patch releases on its own and waits for you at the next minor one. Anything else that replaces a
 container when its image changes works as well as `docker compose pull`, but it cannot run the
 reinstall, so the `curl` still needs a cron line of its own. A box that must not phone out sets

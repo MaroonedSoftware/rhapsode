@@ -5,12 +5,15 @@
 #   docker compose up -d                                                 the published image
 #   docker compose -f compose.yaml -f compose.build.yaml up -d --build   built from this checkout
 #
-# RHAPSODE_VERSION pins a release, such as 0.1.0. Every package and the image share one version.
+# RHAPSODE_VERSION picks the image tag, and defaults to the minor line this file was released on, so
+# `docker compose pull` takes every patch release and stops at the next minor, where the page's
+# banner says what to change. A release, such as 0.1.24, pins exactly. Every package and the image
+# share one version. .env.example is the rest of what goes beside this file.
 name: rhapsode
 
 services:
     server:
-        image: maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-latest}
+        image: maroonedsoftware/rhapsode:${RHAPSODE_VERSION:-0.1}
         # 99:100 on unraid, to match its shares.
         user: '${PUID:-10001}:${PGID:-10001}'
         environment:

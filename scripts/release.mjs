@@ -107,7 +107,31 @@ function setVersions(version) {
         if (!pattern.test(text)) fail(`${path} has no info.version where release.mjs expects one`);
         write(path, text.replace(pattern, `$1${version}$2`));
     }
+    for (const [path, pattern] of MINOR_LINE) {
+        const text = read(path);
+        if (!pattern.test(text)) fail(`${path} has no minor line where release.mjs expects one`);
+        write(path, text.replace(pattern, `$1${minorOf(version)}$3`));
+    }
 }
+
+/**
+ * Where an install is pinned to the image's minor line, `0.1`, rather than to `latest` or a release.
+ *
+ * `latest` takes a minor release unasked, and under 0.x a minor is where breaking changes go. An exact
+ * release has to be edited before every upgrade, and an install that forgot sat on 0.1.22 through a
+ * `docker compose pull` that fetched nothing. The minor line takes every patch on a plain pull, and
+ * stops at the next minor, where the page's banner says what to change. Moved by every release so a
+ * compose.yaml downloaded from main always names the line it was released on.
+ */
+const MINOR_LINE = [
+    ['compose.yaml', /(\$\{RHAPSODE_VERSION:-)([^}]*)(\})/],
+    ['.env.example', /^(RHAPSODE_VERSION=)(.*)()$/m],
+];
+
+const minorOf = version => version.split('.').slice(0, 2).join('.');
+
+/** Each place `MINOR_LINE` names, and the line it names now. */
+const minorLines = () => MINOR_LINE.map(([path, pattern]) => ({ where: path, line: pattern.exec(read(path))?.[2] }));
 
 /**
  * Where the OpenAPI documents carry the core's version as `info.version` (§ 9). Left at the old
@@ -218,6 +242,9 @@ function commandCheck(tag) {
     const wrong = current().filter(entry => entry.version !== version);
     if (wrong.length > 0)
         fail(`${tag} does not match what would be published:\n${wrong.map(entry => `  ${entry.where} is ${entry.version}`).join('\n')}`);
+    const behind = minorLines().filter(entry => entry.line !== minorOf(version));
+    if (behind.length > 0)
+        fail(`${tag} is not on the minor line installs are pinned to:\n${behind.map(entry => `  ${entry.where} names ${entry.line}`).join('\n')}`);
     console.log(`every versioned package is at ${version}`);
 }
 
