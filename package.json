@@ -24,7 +24,7 @@
         "@changesets/cli": "^3.0.2",
         "@contractkit/cli": "^0.11.9",
         "@contractkit/plugin-docs": "^0.8.0",
-        "@contractkit/plugin-python": "^0.16.0",
+        "@contractkit/plugin-python": "^0.16.1",
         "@contractkit/plugin-typescript": "^0.41.0",
         "@contractkit/prettier-plugin": "^0.14.14",
         "@types/node": "^26.6.4",
