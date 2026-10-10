@@ -1,7 +1,10 @@
+import { useCallback, useState } from 'react';
 import { Alert, List, Stack } from '@mantine/core';
+import { useBlocker } from '@tanstack/react-router';
 
 import { useSettings } from '../../api/settings.queries';
 import { apiErrorCode } from '../../api/sdk.error';
+import { ConfirmModal } from '../shared/confirm.modal';
 import { ErrorAlert } from '../shared/error.alert';
 import { PageHeader } from '../shared/page.header';
 import { PageSkeleton } from '../shared/page.skeleton';
@@ -18,6 +21,21 @@ import { SettingsCard } from './settings.card';
  */
 export function SettingsPage() {
     const settings = useSettings();
+    // Every card keeps its own draft, so leaving the page dropped a change typed into one without a
+    // word. The cards report whether they hold one, and the page asks before it goes.
+    const [dirty, setDirty] = useState<ReadonlySet<string>>(new Set());
+    const onDirty = useCallback(
+        (group: string, isDirty: boolean) =>
+            setDirty(current => {
+                if (current.has(group) === isDirty) return current;
+                const next = new Set(current);
+                if (isDirty) next.add(group);
+                else next.delete(group);
+                return next;
+            }),
+        [],
+    );
+    const blocker = useBlocker({ shouldBlockFn: () => dirty.size > 0, enableBeforeUnload: () => dirty.size > 0, withResolver: true });
 
     // Reading is a management route too, so a page opened from another machine without its origin
     // listed is refused before it sees anything. That is the whole answer, said once, as the Engines
@@ -53,16 +71,27 @@ export function SettingsPage() {
             ) : (
                 <>
                     {GROUPS.map(group => (
-                        <SettingsCard key={group.id} group={group} settings={settings.data} />
+                        <SettingsCard key={group.id} group={group} settings={settings.data} onDirty={onDirty} />
                     ))}
                     {others.length > 0 ? (
                         <SettingsCard
                             group={{ id: 'other', title: 'Other', description: 'Settings this page has no words for yet.', fields: others }}
                             settings={settings.data}
+                            onDirty={onDirty}
                         />
                     ) : undefined}
                 </>
             )}
+
+            <ConfirmModal
+                opened={blocker.status === 'blocked'}
+                onClose={() => blocker.reset?.()}
+                onConfirm={() => blocker.proceed?.()}
+                title="Leave without saving?"
+                confirmLabel="Leave"
+            >
+                {`What was changed in ${[...dirty].map(id => GROUPS.find(group => group.id === id)?.title ?? 'Other').join(' and ')} has not been saved, and is lost if you leave.`}
+            </ConfirmModal>
         </Stack>
     );
 }

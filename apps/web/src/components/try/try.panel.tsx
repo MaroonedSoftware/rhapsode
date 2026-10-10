@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
     Accordion,
     Alert,
@@ -20,7 +20,9 @@ import type { CurrentVariant, EngineSpeakRequest, Variant, Voice } from '@maroon
 
 import { speakBody, useCapabilities, useDialogue, useSpeak, useVoices, type Spoken } from '../../api/engines.queries';
 import { ErrorAlert } from '../shared/error.alert';
+import { keyWords } from '../shared/key.words';
 import { PageSkeleton } from '../shared/page.skeleton';
+import { severityColor } from '../shared/status';
 import { DialogueEditor, SAMPLE_TURNS, speakerLabel, type EditedTurn } from './dialogue.editor';
 import { LineLength } from './line.length';
 import { RequestSnippet } from './request.snippet';
@@ -56,6 +58,8 @@ export function TryPanel({ engine, defaultVariant }: TryPanelProps) {
             variants={variants}
             initial={initial}
             voices={voices.data ?? []}
+            voicesPending={voices.isPending}
+            voicesError={voices.isError ? voices.error : undefined}
             current={capabilities.data.current}
         />
     );
@@ -66,10 +70,13 @@ interface ControlsProps {
     variants: Record<string, Variant>;
     initial: string;
     voices: Voice[];
+    /** The list is still on its way, which is not the same as there being none. */
+    voicesPending: boolean;
+    voicesError?: Error;
     current?: CurrentVariant;
 }
 
-function Controls({ engine, variants, initial, voices, current }: ControlsProps) {
+function Controls({ engine, variants, initial, voices, voicesPending, voicesError, current }: ControlsProps) {
     const speak = useSpeak();
     const converse = useDialogue();
     const [variant, setVariant] = useState(initial);
@@ -84,6 +91,8 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
     const [seed, setSeed] = useState<number | undefined>(undefined);
     const [played, setPlayed] = useState<Spoken | undefined>(undefined);
     const [slow, setSlow] = useState(false);
+    // The visible headings name the controls under them, so a screen reader hears the same words.
+    const ids = { mode: useId(), delivery: useId(), line: useId() };
     const textarea = useRef<HTMLTextAreaElement>(null);
 
     const claims = variants[variant]!;
@@ -133,7 +142,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
         text,
         variant,
         ...(voice === undefined ? {} : { voice }),
-        ...(delivery === '' ? {} : { delivery: delivery as 'hushed' | 'frantic' }),
+        ...(delivery === '' ? {} : { delivery: delivery as EngineSpeakRequest['delivery'] }),
         ...(Object.keys(dials).length === 0 ? {} : { params: dials }),
         ...(language === undefined ? {} : { language }),
         ...(seed === undefined ? {} : { seed }),
@@ -188,11 +197,13 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                             allowDeselect={false}
                         />
                         {claims.dialogue !== undefined ? (
-                            <Stack gap={4}>
-                                <Text size="sm" fw={500}>
+                            <Stack gap="xxs">
+                                <Text size="sm" fw={500} id={ids.mode}>
                                     Speak
                                 </Text>
                                 <SegmentedControl
+                                    role="radiogroup"
+                                    aria-labelledby={ids.mode}
                                     data={[
                                         { value: 'line', label: 'A line' },
                                         { value: 'dialogue', label: `A conversation, up to ${claims.dialogue.maxSpeakers}` },
@@ -221,29 +232,34 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                             />
                         ) : undefined}
                         {claims.deliveries.length > 0 && !dialogue ? (
-                            <Stack gap={4}>
-                                <Text size="sm" fw={500}>
+                            <Stack gap="xxs">
+                                <Text size="sm" fw={500} id={ids.delivery}>
                                     Delivery
                                 </Text>
                                 <SegmentedControl
-                                    data={[{ value: '', label: 'Ordinary' }, ...claims.deliveries.map(entry => ({ value: entry, label: entry }))]}
+                                    role="radiogroup"
+                                    aria-labelledby={ids.delivery}
+                                    data={[
+                                        { value: '', label: 'Ordinary' },
+                                        ...claims.deliveries.map(entry => ({ value: entry, label: keyWords(entry) })),
+                                    ]}
                                     value={delivery}
                                     onChange={setDelivery}
                                 />
                             </Stack>
                         ) : undefined}
                         {Object.entries(claims.dials).map(([name, dial]) => (
-                            <Stack key={name} gap={4}>
+                            <Stack key={name} gap="xxs">
                                 <Group justify="space-between">
                                     <Text size="sm" fw={500}>
-                                        {name}
+                                        {keyWords(name)}
                                     </Text>
                                     <Text size="sm" c="dimmed" className="rh-num">
                                         {(dials[name] ?? dial.default).toFixed(2)}
                                     </Text>
                                 </Group>
                                 <Slider
-                                    thumbLabel={name}
+                                    thumbLabel={keyWords(name)}
                                     min={dial.min}
                                     max={dial.max}
                                     step={(dial.max - dial.min) / 100}
@@ -267,7 +283,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
 
                 <Card>
                     <Stack gap="md">
-                        <Title order={2} size="h4">
+                        <Title order={2} size="h4" id={ids.line}>
                             {dialogue ? 'Conversation' : 'Line'}
                         </Title>
                         {dialogue ? (
@@ -284,7 +300,15 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                             <>
                                 <Textarea
                                     ref={textarea}
-                                    aria-label="Line"
+                                    aria-labelledby={ids.line}
+                                    description="Cmd or Ctrl and Enter speaks it."
+                                    inputWrapperOrder={['label', 'input', 'description', 'error']}
+                                    onKeyDown={event => {
+                                        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && text.trim() !== '' && !asking.isPending) {
+                                            event.preventDefault();
+                                            say();
+                                        }
+                                    }}
                                     value={text}
                                     onChange={event => setText(event.currentTarget.value)}
                                     autosize
@@ -292,7 +316,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                                 />
                                 <LineLength text={text} variant={variant} claims={claims} current={current} />
                                 {claims.cues.length > 0 ? (
-                                    <Stack gap={4}>
+                                    <Stack gap="xxs">
                                         <Text size="xs" c="dimmed">
                                             Cues this variant performs. Click to insert at the cursor.
                                         </Text>
@@ -322,7 +346,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                             </Button>
                         </Group>
                         {slow && asking.isPending ? (
-                            <Alert color="blue" title="Loading the model">
+                            <Alert color={severityColor.info} title="Loading the model" role="status">
                                 A first request, or one for a different variant, loads the model before it speaks. That can take a while, and longer
                                 still if its weights have not been downloaded.
                             </Alert>
@@ -331,7 +355,7 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                             <ErrorAlert title="That was not spoken" error={asking.error} fallback="The server did not answer." />
                         ) : undefined}
                         {played ? (
-                            <Stack gap={4}>
+                            <Stack gap="xxs">
                                 <audio
                                     controls
                                     autoPlay
@@ -360,7 +384,15 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                     </Stack>
                 </Card>
             </SimpleGrid>
-            <VoicesCard engine={engine} voices={voices} cloning={cloning} blending={blending} onCloned={setVoice} />
+            <VoicesCard
+                engine={engine}
+                voices={voices}
+                pending={voicesPending}
+                error={voicesError}
+                cloning={cloning}
+                blending={blending}
+                onCloned={setVoice}
+            />
         </Stack>
     );
 }

@@ -1,4 +1,4 @@
-import { Button, Card, Group, Stack, Text, Title } from '@mantine/core';
+import { Button, Card, Code, Group, Stack, Text, Title } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 import { useRouter, type ErrorComponentProps } from '@tanstack/react-router';
 
@@ -21,9 +21,16 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
                         This page did not load
                     </Title>
                     <Text c="dimmed" size="sm">
-                        {isUnreachable(error)
-                            ? 'The rhapsode server is not answering. Start it with `node apps/server/dist/main.js`.'
-                            : apiErrorMessage(error, 'Something in this page failed while it was loading.')}
+                        {isUnreachable(error) ? (
+                            // Both ways it runs: the backticks of the old sentence were printed as they were, and
+                            // it named only the checkout, which nobody running the image has.
+                            <>
+                                The rhapsode server is not answering. Start it with <Code>docker compose up -d</Code> where it runs as an image, or{' '}
+                                <Code>pnpm dev</Code> in a checkout, then try again.
+                            </>
+                        ) : (
+                            apiErrorMessage(error, 'Something in this page failed while it was loading.')
+                        )}
                     </Text>
                 </Stack>
                 <Group>

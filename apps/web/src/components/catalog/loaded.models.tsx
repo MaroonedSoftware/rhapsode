@@ -1,12 +1,15 @@
+import { useEffect, useState } from 'react';
 import { Badge, Button, Card, Group, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
 import { IconEraser } from '@tabler/icons-react';
 import { DateTime } from 'luxon';
 import type { ResidentModel } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useResidency, useUnloadEngine } from '../../api/residency.queries';
-import { apiErrorCode } from '../../api/sdk.error';
+import { apiErrorCode, apiErrorMessage } from '../../api/sdk.error';
+import { useEngineName } from '../shared/engine.name';
 import { ErrorAlert } from '../shared/error.alert';
-import { notifyFailure, notifySuccess } from '../shared/notify';
+import { notifyFailure, notifyInfo, notifySuccess } from '../shared/notify';
+import { PageSkeleton } from '../shared/page.skeleton';
 
 const UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB'] as const;
 
@@ -45,6 +48,16 @@ function describeExpiry(model: ResidentModel): string {
 export function LoadedModels() {
     const residency = useResidency();
     const unload = useUnloadEngine();
+    const engineName = useEngineName();
+    // Redraw every second while a countdown is on screen. The poll is every five, and a countdown
+    // that jumps by five reads as stalled; this re-reads the clock and fetches nothing.
+    const [, setNow] = useState(0);
+    const counting = residency.data?.models.some(model => model.leases === 0 && model.expiresAt !== undefined) ?? false;
+    useEffect(() => {
+        if (!counting) return;
+        const timer = setInterval(() => setNow(tick => tick + 1), 1000);
+        return () => clearInterval(timer);
+    }, [counting]);
 
     // The same argument the catalog makes about the job list: a page from another machine may read
     // this and is refused the unload, so the buttons are not offered rather than offered and failing.
@@ -54,19 +67,20 @@ export function LoadedModels() {
         unload.mutate(
             { engine: model.engine },
             {
-                onSuccess: () => notifySuccess(`${model.engine} let its card go.`),
+                onSuccess: () => notifySuccess(`Unloaded ${engineName(model.engine)}.`),
                 onError: error =>
-                    notifyFailure(
-                        `${model.engine} is still loaded`,
-                        error,
-                        // A 409 is not a failure to fix: it is a state to wait out.
-                        'The server did not answer.',
-                    ),
+                    // A 409 is not a failure to fix: it is a state to wait out, so it is not shown in red.
+                    apiErrorCode(error) === 'conflict'
+                        ? notifyInfo(
+                              `${engineName(model.engine)} is still loaded`,
+                              apiErrorMessage(error, 'It is speaking. Unload it when it finishes.'),
+                          )
+                        : notifyFailure(`${engineName(model.engine)} is still loaded`, error, 'The server did not answer.'),
             },
         );
 
     if (residency.isError) {
-        return <ErrorAlert title="What is loaded did not load" error={residency.error} fallback="The rhapsode server did not answer." />;
+        return <ErrorAlert title="Could not read what is loaded" error={residency.error} fallback="The rhapsode server did not answer." />;
     }
 
     const models = residency.data?.models ?? [];
@@ -88,7 +102,9 @@ export function LoadedModels() {
             </Group>
 
             <Card padding="xs">
-                {models.length === 0 ? (
+                {residency.isPending ? (
+                    <PageSkeleton variant="rows" count={2} />
+                ) : models.length === 0 ? (
                     <Text size="sm" c="dimmed" p="sm">
                         Nothing is loaded. A model arrives when something asks an engine to speak, and leaves again when its keep-alive runs out.
                     </Text>
@@ -108,7 +124,7 @@ export function LoadedModels() {
                                 <Table.Tr key={model.engine}>
                                     <Table.Td>
                                         <Text fw={600} size="sm">
-                                            {model.engine}
+                                            {engineName(model.engine)}
                                         </Text>
                                     </Table.Td>
                                     <Table.Td>
@@ -123,7 +139,7 @@ export function LoadedModels() {
                                                 {describeExpiry(model)}
                                             </Badge>
                                         ) : (
-                                            <Text size="sm" c="dimmed">
+                                            <Text size="sm" c="dimmed" className="rh-num">
                                                 {describeExpiry(model)}
                                             </Text>
                                         )}
@@ -131,17 +147,20 @@ export function LoadedModels() {
                                     {managed ? (
                                         <Table.Td ta="right">
                                             {/* Refused with a 409 while it is speaking, so it is not offered then. */}
+                                            {/* A disabled button gets no pointer events, so the tooltip hangs on a span around it. */}
                                             <Tooltip label="Wait for it to finish speaking" disabled={model.leases === 0}>
-                                                <Button
-                                                    variant="subtle"
-                                                    size="xs"
-                                                    leftSection={<IconEraser size={14} />}
-                                                    disabled={model.leases > 0}
-                                                    loading={unload.isPending && unload.variables?.engine === model.engine}
-                                                    onClick={() => free(model)}
-                                                >
-                                                    Unload
-                                                </Button>
+                                                <span>
+                                                    <Button
+                                                        variant="subtle"
+                                                        size="xs"
+                                                        leftSection={<IconEraser size={14} />}
+                                                        disabled={model.leases > 0}
+                                                        loading={unload.isPending && unload.variables?.engine === model.engine}
+                                                        onClick={() => free(model)}
+                                                    >
+                                                        Unload
+                                                    </Button>
+                                                </span>
                                             </Tooltip>
                                         </Table.Td>
                                     ) : undefined}

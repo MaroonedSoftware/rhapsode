@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, Button, Card, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Anchor, Button, Card, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { IconDownload, IconPackage, IconRefresh, IconTrash } from '@tabler/icons-react';
 import type { CatalogEntry, InstallJob } from '@maroonedsoftware/rhapsode-sdk';
 
@@ -22,7 +22,7 @@ import { WARM_COST, WarmOffer } from '../installs/warm.offer';
 import { ConfirmModal } from '../shared/confirm.modal';
 import { EmptyState } from '../shared/empty.state';
 import { ErrorAlert } from '../shared/error.alert';
-import { notifyFailure, notifySuccess } from '../shared/notify';
+import { notifyFailure, notifyInfo, notifySuccess } from '../shared/notify';
 import { PageHeader } from '../shared/page.header';
 import { PageSkeleton } from '../shared/page.skeleton';
 import { severityColor } from '../shared/status';
@@ -46,6 +46,16 @@ export function CatalogPage() {
     const [removing, setRemoving] = useState<CatalogEntry | undefined>(undefined);
     const [rebuilding, setRebuilding] = useState<CatalogEntry | undefined>(undefined);
     const [watching, setWatching] = useState<string | undefined>(undefined);
+    // A job this page just started, or asked to see. The jobs sit below every card and "On the card",
+    // so a click on the first card started something that happened off screen; this brings it into
+    // view and moves focus to it once its panel exists. Choosing from the job list does not.
+    const [rebuildingAll, setRebuildingAll] = useState(false);
+    const [following, setFollowing] = useState<string | undefined>(undefined);
+    const jobRegion = useRef<HTMLDivElement>(null);
+    const watch = (id: string) => {
+        setWatching(id);
+        setFollowing(id);
+    };
     const [warming, setWarming] = useState<{ entry: CatalogEntry; variant: string } | undefined>(undefined);
     // A worker already running answers its capability document without anything being started.
     const running = (engine: string) => engines.data?.find(summary => summary.id === engine)?.process === 'up';
@@ -63,6 +73,13 @@ export function CatalogPage() {
     const pending = (engine: string): InstallJob | undefined =>
         jobs.data?.find(job => job.engine === engine && (job.state === 'queued' || job.state === 'running'));
     const shown = watching ?? jobs.data?.[0]?.id;
+
+    useEffect(() => {
+        if (following === undefined || following !== shown || jobRegion.current === null) return;
+        jobRegion.current.scrollIntoView?.({ block: 'start' });
+        jobRegion.current.focus({ preventScroll: true });
+        setFollowing(undefined);
+    }, [following, shown, jobs.data]);
     // The core decides what is behind; the page only counts what it was told, and only what it may rebuild.
     const behind = (catalog.data ?? []).filter(entry => entry.managed && entry.outdated === true && pending(entry.id) === undefined);
 
@@ -75,7 +92,7 @@ export function CatalogPage() {
             {
                 onSuccess: job => {
                     setInstalling(undefined);
-                    setWatching(job.id);
+                    watch(job.id);
                 },
             },
         );
@@ -85,7 +102,7 @@ export function CatalogPage() {
         pull.mutate(
             { engine: entry.id, ...(entry.defaultVariant === undefined ? {} : { variant: entry.defaultVariant }) },
             {
-                onSuccess: job => setWatching(job.id),
+                onSuccess: job => watch(job.id),
                 onError: error => notifyFailure(`Downloading ${entry.displayName} did not start`, error, 'The server did not answer.'),
             },
         );
@@ -110,7 +127,7 @@ export function CatalogPage() {
             {
                 onSuccess: job => {
                     setRebuilding(undefined);
-                    setWatching(job.id);
+                    watch(job.id);
                 },
             },
         );
@@ -123,7 +140,7 @@ export function CatalogPage() {
             {
                 onSuccess: job => {
                     setWarming(undefined);
-                    setWatching(job.id);
+                    watch(job.id);
                 },
             },
         );
@@ -132,17 +149,16 @@ export function CatalogPage() {
     const startReinstallAll = () =>
         reinstallAll.mutate(undefined, {
             onSuccess: ({ jobs: started, skipped }) => {
-                if (started[0] !== undefined) setWatching(started[0].id);
+                setRebuildingAll(false);
+                if (started[0] !== undefined) watch(started[0].id);
                 const licence = skipped.filter(entry => entry.reason === 'licence').map(entry => entry.engine);
                 if (licence.length > 0) {
-                    notifyFailure(
+                    notifyInfo(
                         'Some engines were left alone',
-                        undefined,
                         `${licence.join(', ')}: the weights licence has to be accepted again, so reinstall ${licence.length === 1 ? 'it' : 'each one'} from its card.`,
                     );
                 }
             },
-            onError: error => notifyFailure('Reinstalling did not start', error, 'The server did not answer.'),
         });
 
     const actions = (entry: CatalogEntry) => {
@@ -150,7 +166,7 @@ export function CatalogPage() {
         const busy = pending(entry.id);
         if (busy !== undefined) {
             return (
-                <Button variant="light" size="xs" onClick={() => setWatching(busy.id)}>
+                <Button variant="light" size="xs" onClick={() => watch(busy.id)}>
                     Show progress
                 </Button>
             );
@@ -233,7 +249,14 @@ export function CatalogPage() {
                             {behind.length === 1 ? 'sends' : 'send'} anything added to rhapsode since. Reinstalling builds each a new virtualenv
                             beside its old one, so nothing stops working while it runs.
                         </Text>
-                        <Button size="xs" leftSection={<IconRefresh size={14} />} loading={reinstallAll.isPending} onClick={startReinstallAll}>
+                        <Button
+                            size="xs"
+                            leftSection={<IconRefresh size={14} />}
+                            onClick={() => {
+                                reinstallAll.reset();
+                                setRebuildingAll(true);
+                            }}
+                        >
                             Reinstall all
                         </Button>
                     </Group>
@@ -244,7 +267,16 @@ export function CatalogPage() {
             ) : catalog.isError ? (
                 <ErrorAlert title="The catalog did not load" error={catalog.error} fallback="The rhapsode server did not answer." />
             ) : catalog.data.length === 0 ? (
-                <EmptyState title="No engines">This rhapsode knows about no engines, which means its catalog is empty.</EmptyState>
+                <EmptyState
+                    title="No engines"
+                    action={
+                        <Anchor href="https://rhapsode.dev/docs/engines" target="_blank" rel="noreferrer" size="sm">
+                            The engines rhapsode can run
+                        </Anchor>
+                    }
+                >
+                    This rhapsode knows about no engines, which means its catalog is empty.
+                </EmptyState>
             ) : (
                 <SimpleGrid cols={{ base: 1, md: 2 }}>
                     {catalog.data.map(entry => (
@@ -266,7 +298,7 @@ export function CatalogPage() {
                                 <JobsList jobs={jobs.data} selected={shown} onSelect={setWatching} />
                             </Card>
                         </Grid.Col>
-                        <Grid.Col span={{ base: 12, md: 8 }}>
+                        <Grid.Col span={{ base: 12, md: 8 }} ref={jobRegion} tabIndex={-1} aria-label="The job shown">
                             <JobPanel key={shown} jobId={shown} onWarm={askToWarm} />
                         </Grid.Col>
                     </Grid>
@@ -300,10 +332,26 @@ export function CatalogPage() {
                 onConfirm={confirmWarm}
                 title={warming ? `Warm ${warming.entry.displayName} ${warming.variant}?` : ''}
                 confirmLabel="Warm"
+                tone="default"
                 confirming={warm.isPending}
                 error={warm.error ?? undefined}
             >
                 {`${warming?.entry.displayName ?? ''} ${warming?.variant ?? ''} compiles on its first load, and nothing has warmed it here, so its first request would wait for that. ${WARM_COST}`}
+            </ConfirmModal>
+            <ConfirmModal
+                opened={rebuildingAll}
+                onClose={() => setRebuildingAll(false)}
+                onConfirm={startReinstallAll}
+                title={`Reinstall ${behind.length === 1 ? 'one engine' : `${behind.length} engines`}?`}
+                confirmLabel="Reinstall all"
+                tone="default"
+                confirming={reinstallAll.isPending}
+                error={reinstallAll.error ?? undefined}
+                errorFallback="The server did not answer."
+            >
+                {/* One click starts a pip install per engine, which is minutes of downloading each, so it is asked
+                    like the single reinstall it is several of. */}
+                {`${behind.map(entry => entry.displayName).join(', ')}: each gets a new virtualenv built beside its current one, and keeps working until its own is ready. An engine whose weights licence has to be accepted again is left for its card.`}
             </ConfirmModal>
             <ConfirmModal
                 opened={rebuilding !== undefined}
@@ -311,6 +359,7 @@ export function CatalogPage() {
                 onConfirm={confirmReinstall}
                 title={rebuilding ? `Reinstall ${rebuilding.displayName}?` : ''}
                 confirmLabel="Reinstall"
+                tone="default"
                 confirming={reinstall.isPending}
                 error={reinstall.error ?? undefined}
             >

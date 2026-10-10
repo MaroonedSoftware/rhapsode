@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActionIcon, Badge, Button, Card, FileInput, Group, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core';
-import { IconArrowsShuffle, IconMicrophone, IconPlayerPlay, IconTrash, IconUpload } from '@tabler/icons-react';
+import { IconArrowsShuffle, IconMicrophone, IconPlayerPlay, IconPlayerStop, IconTrash, IconUpload } from '@tabler/icons-react';
 import type { Cloning, Voice } from '@maroonedsoftware/rhapsode-sdk';
 
 import { BASE_URL } from '../../api/client';
@@ -8,6 +8,7 @@ import { useBlendVoice, useCloneVoice, useDeleteVoice } from '../../api/engines.
 import { ConfirmModal } from '../shared/confirm.modal';
 import { ErrorAlert } from '../shared/error.alert';
 import { notifySuccess } from '../shared/notify';
+import { PageSkeleton } from '../shared/page.skeleton';
 
 /** What § 7 allows as an id, so the form refuses what the server would, before the upload. */
 const VOICE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -27,6 +28,10 @@ const MADE = ['cloned', 'blended', 'uploaded'];
 export interface VoicesCardProps {
     engine: string;
     voices: Voice[];
+    /** Still loading: shown as such, so an empty list is never read as "this engine has none". */
+    pending?: boolean;
+    /** The list could not be read. */
+    error?: Error;
     /**
      * The chosen variant's cloning claim, which also says what files it makes voices from. The form
      * is offered unless it says no: absent means a worker too old to say, and the worker refuses a
@@ -40,7 +45,7 @@ export interface VoicesCardProps {
 }
 
 /** This engine's voices: hear each, make one from a file or a blend, delete one that was made. */
-export function VoicesCard({ engine, voices, cloning, blending, onCloned }: VoicesCardProps) {
+export function VoicesCard({ engine, voices, pending, error, cloning, blending, onCloned }: VoicesCardProps) {
     const remove = useDeleteVoice(engine);
     const [playing, setPlaying] = useState<string | undefined>(undefined);
     const [removing, setRemoving] = useState<Voice | undefined>(undefined);
@@ -53,7 +58,11 @@ export function VoicesCard({ engine, voices, cloning, blending, onCloned }: Voic
                     Voices
                 </Title>
                 <Stack gap={6}>
-                    {voices.length === 0 ? (
+                    {pending ? <PageSkeleton variant="rows" count={3} /> : undefined}
+                    {error !== undefined ? (
+                        <ErrorAlert title="The voices could not be read" error={error} fallback="Its worker did not answer." />
+                    ) : undefined}
+                    {!pending && error === undefined && voices.length === 0 ? (
                         <Text size="sm" c="dimmed">
                             {clones || blending
                                 ? 'This engine has no voices yet. Make one below, or speak in its default.'
@@ -66,11 +75,25 @@ export function VoicesCard({ engine, voices, cloning, blending, onCloned }: Voic
                             <Group key={voice.id} justify="space-between" wrap="nowrap">
                                 <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
                                     {voice.previewUrl ? (
-                                        <Tooltip label="Hear a preview">
-                                            <ActionIcon variant="light" aria-label={`Preview ${voice.label}`} onClick={() => setPlaying(voice.spec)}>
-                                                <IconPlayerPlay size={14} />
-                                            </ActionIcon>
-                                        </Tooltip>
+                                        // The row's own button stops what it started, so which voice is playing is
+                                        // shown where it was asked for, not only in the player below the list.
+                                        playing === voice.spec ? (
+                                            <Tooltip label="Stop the preview">
+                                                <ActionIcon variant="filled" aria-label={`Stop ${voice.label}`} onClick={() => setPlaying(undefined)}>
+                                                    <IconPlayerStop size={14} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        ) : (
+                                            <Tooltip label="Hear a preview">
+                                                <ActionIcon
+                                                    variant="light"
+                                                    aria-label={`Preview ${voice.label}`}
+                                                    onClick={() => setPlaying(voice.spec)}
+                                                >
+                                                    <IconPlayerPlay size={14} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        )
                                     ) : undefined}
                                     <Text size="sm" truncate>
                                         {voice.label}
@@ -110,6 +133,7 @@ export function VoicesCard({ engine, voices, cloning, blending, onCloned }: Voic
                                       src={`${BASE_URL}${voice.previewUrl}?spec=${encodeURIComponent(voice.spec)}`}
                                       style={{ width: '100%' }}
                                       aria-label={`Preview of ${voice.label}`}
+                                      onEnded={() => setPlaying(undefined)}
                                   />
                               ) : undefined;
                           })()

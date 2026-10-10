@@ -36,6 +36,17 @@ describe('VoicesCard', () => {
         expect(screen.getByText(/no voices yet/)).toBeInTheDocument();
     });
 
+    it('shows a placeholder while the list loads, rather than saying there are none', () => {
+        render(<VoicesCard engine="chatterbox" voices={[]} pending onCloned={() => {}} />);
+        expect(screen.queryByText(/no voices yet/)).not.toBeInTheDocument();
+    });
+
+    it('says the list could not be read, rather than that there are none', () => {
+        render(<VoicesCard engine="chatterbox" voices={[]} error={new TypeError('fetch failed')} onCloned={() => {}} />);
+        expect(screen.getByText('The voices could not be read')).toBeInTheDocument();
+        expect(screen.queryByText(/no voices yet/)).not.toBeInTheDocument();
+    });
+
     it('offers no clone form when the variant says it cannot clone', () => {
         render(<VoicesCard engine="orpheus" voices={[]} cloning={{ supported: false }} onCloned={() => {}} />);
         expect(screen.queryByText('Clone a voice')).not.toBeInTheDocument();
@@ -64,6 +75,18 @@ describe('VoicesCard', () => {
             'src',
             '/api/engines/chatterbox/voices/narrator/preview?spec=narrator%40turbo%3Aab12',
         );
+    });
+
+    it('turns the row that is playing into a stop button', async () => {
+        const user = setupUser();
+        render(<VoicesCard engine="chatterbox" voices={[narrator, sine]} onCloned={() => {}} />);
+
+        await user.click(screen.getByRole('button', { name: 'Preview Narrator' }));
+        expect(screen.getByRole('button', { name: 'Preview Sine' })).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Stop Narrator' }));
+
+        expect(screen.queryByLabelText('Preview of Narrator')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Preview Narrator' })).toBeInTheDocument();
     });
 
     it('offers delete for a clone and not for a built-in voice', () => {

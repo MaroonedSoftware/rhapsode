@@ -116,7 +116,7 @@ describe('TryPanel', () => {
         await user.click(await screen.findByRole('option', { name: 'original' }));
 
         expect(await screen.findByText('Delivery')).toBeInTheDocument();
-        expect(screen.getByRole('slider', { name: 'exaggeration' })).toBeInTheDocument();
+        expect(screen.getByRole('slider', { name: 'Exaggeration' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'laugh' })).not.toBeInTheDocument();
         expect(screen.getByText(/performs no cues/)).toBeInTheDocument();
     });
@@ -131,6 +131,16 @@ describe('TryPanel', () => {
         await user.click(screen.getByRole('button', { name: 'sigh' }));
 
         expect(line).toHaveValue('Well[sigh]');
+    });
+
+    it('speaks the line on Cmd or Ctrl and Enter', async () => {
+        const user = setupUser();
+        render(<TryPanel engine="chatterbox" defaultVariant="turbo" />);
+
+        await user.click(await screen.findByRole('textbox', { name: 'Line' }));
+        await user.keyboard('{Control>}{Enter}{/Control}');
+
+        await waitFor(() => expect(api.speak).toHaveBeenCalledTimes(1));
     });
 
     it('speaks what was chosen, buffered, and plays it', async () => {

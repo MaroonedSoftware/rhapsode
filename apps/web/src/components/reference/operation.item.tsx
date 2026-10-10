@@ -31,7 +31,7 @@ function RequestBodies({ bodies }: { bodies: Body[] }) {
     return (
         <Stack gap="sm">
             {bodies.map(body => (
-                <Stack key={body.contentType} gap={4}>
+                <Stack key={body.contentType} gap="xxs">
                     <Text size="xs" ff="monospace" c="dimmed">
                         {body.contentType}
                     </Text>
@@ -48,7 +48,7 @@ function RequestBodies({ bodies }: { bodies: Body[] }) {
  */
 function ResponseBodies({ bodies }: { bodies: Body[] }) {
     return (
-        <Stack gap={2} pl="md">
+        <Stack gap="xxxs" pl="md">
             {bodies.map(body => (
                 <Group key={body.contentType} gap="xs" wrap="nowrap">
                     <Text size="xs" ff="monospace" c="dimmed">
@@ -130,7 +130,7 @@ export function OperationItem({ operation }: { operation: Operation }) {
                     <Section title="Responses">
                         <Stack gap="sm">
                             {operation.responses.map(response => (
-                                <Stack key={response.status} gap={4}>
+                                <Stack key={response.status} gap="xxs">
                                     <Group gap="xs">
                                         <Code fw={600}>{response.status}</Code>
                                         <Text size="sm" c="dimmed">

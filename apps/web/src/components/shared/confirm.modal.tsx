@@ -16,9 +16,15 @@ export interface ConfirmModalProps {
     /** Reported inside the dialog, because the dialog is where the person still is. */
     error?: unknown;
     errorFallback?: string;
+    /**
+     * `danger` for what cannot be taken back, which is the default; `default` for an action that
+     * only costs time, such as a warm or a reinstall beside the old virtualenv. Red on everything
+     * taught people to read red as "a dialog", which is the opposite of what it is for.
+     */
+    tone?: 'danger' | 'default';
 }
 
-/** Asking before something that cannot be taken back, with room for a pending state and an error. */
+/** Asking before something costly or that cannot be taken back, with room for a pending state and an error. */
 export function ConfirmModal({
     opened,
     onClose,
@@ -29,6 +35,7 @@ export function ConfirmModal({
     confirming = false,
     error,
     errorFallback = 'Nothing was changed.',
+    tone = 'danger',
 }: ConfirmModalProps) {
     return (
         <Modal opened={opened} onClose={onClose} title={title} centered>
@@ -39,7 +46,7 @@ export function ConfirmModal({
                     <Button variant="default" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button color="red" loading={confirming} onClick={onConfirm}>
+                    <Button color={tone === 'danger' ? 'red' : undefined} loading={confirming} onClick={onConfirm}>
                         {confirmLabel}
                     </Button>
                 </Group>

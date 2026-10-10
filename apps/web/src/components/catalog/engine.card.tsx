@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { Anchor, Badge, Card, Group, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Button, Card, Group, Stack, Text, Title } from '@mantine/core';
+import { IconPlayerPlay } from '@tabler/icons-react';
+import { Link } from '@tanstack/react-router';
 import type { CatalogEntry } from '@maroonedsoftware/rhapsode-sdk';
 
 import { severityColor } from '../shared/status';
@@ -26,7 +28,7 @@ export function EngineCard({ entry, actions }: EngineCardProps) {
         <Card>
             <Stack gap="sm">
                 <Group justify="space-between" align="flex-start" wrap="nowrap">
-                    <Stack gap={2}>
+                    <Stack gap="xxxs">
                         <Title order={2} size="h4">
                             {entry.displayName}
                         </Title>
@@ -34,7 +36,8 @@ export function EngineCard({ entry, actions }: EngineCardProps) {
                             {entry.package}
                         </Text>
                     </Stack>
-                    <Group gap="xs" wrap="nowrap">
+                    {/* Wraps: three badges on a narrow card pushed the last one off its edge. */}
+                    <Group gap="xs" wrap="wrap" justify="flex-end">
                         {/* An engine the operator configured by hand is theirs: installed, and not the page's to remove. */}
                         {entry.installed === 'yes' && !entry.managed ? (
                             <Badge variant="light" color="gray">
@@ -70,7 +73,22 @@ export function EngineCard({ entry, actions }: EngineCardProps) {
                             : 'It is configured by hand, so rebuilding it is the operator’s to do.'}
                     </Text>
                 ) : undefined}
-                {actions ? <Group gap="xs">{actions}</Group> : undefined}
+                {actions !== undefined || entry.installed === 'yes' ? (
+                    <Group gap="xs">
+                        {/* Speaking is a public route, so a page that may not install can still try what is here. */}
+                        {entry.installed === 'yes' ? (
+                            <Button
+                                variant="light"
+                                size="xs"
+                                leftSection={<IconPlayerPlay size={14} />}
+                                renderRoot={(props: object) => <Link to="/try" search={{ engine: entry.id }} {...props} />}
+                            >
+                                Try it
+                            </Button>
+                        ) : undefined}
+                        {actions}
+                    </Group>
+                ) : undefined}
             </Stack>
         </Card>
     );

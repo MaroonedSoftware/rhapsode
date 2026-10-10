@@ -85,7 +85,7 @@ export function CoreVersion() {
         });
 
     return (
-        <Group gap={4} ml="auto" wrap="nowrap">
+        <Group gap="xxs" ml="auto" wrap="nowrap">
             {/* On a phone the version goes into the button's tooltip: with both, the button fell 23 px off a 375 px screen. */}
             <Text
                 size="xs"

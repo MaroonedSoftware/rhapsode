@@ -20,9 +20,11 @@ export function LicenseLine({ license }: { license: License }) {
             </Text>
             {license.weightsCommercialUse ? undefined : (
                 <Tooltip label="The weights may not be used commercially">
-                    <Group gap={4} c="yellow.7">
-                        <IconAlertTriangle size={14} />
-                        <Text size="sm" c="yellow.7">
+                    {/* The amber goes on the icon only: yellow.7 text on white measured 2.1:1, under
+                        WCAG's 4.5:1, and the icon and the words already say it without the colour. */}
+                    <Group gap="xxs">
+                        <IconAlertTriangle size={14} color="var(--mantine-color-yellow-7)" aria-hidden />
+                        <Text size="sm" fw={500}>
                             Not for commercial use
                         </Text>
                     </Group>
