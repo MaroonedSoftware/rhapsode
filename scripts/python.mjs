@@ -48,11 +48,12 @@ const DEV_DEPENDENCIES = [
 // certificate pip has no way to trust. RHAPSODE_PIP_TRUSTED_HOSTS is the escape hatch for that
 // machine, deliberately an environment variable rather than a checked-in pip.conf: weakening
 // verification is a local decision and must not be the default anybody inherits by cloning.
-const trustedHosts = (process.env.RHAPSODE_PIP_TRUSTED_HOSTS ?? '')
+// uv honours the same variable under its own flag.
+const insecureHosts = (process.env.RHAPSODE_PIP_TRUSTED_HOSTS ?? '')
     .split(',')
     .map(host => host.trim())
-    .filter(Boolean)
-    .flatMap(host => ['--trusted-host', host]);
+    .filter(Boolean);
+const trustedHosts = insecureHosts.flatMap(host => ['--trusted-host', host]);
 
 const has = command => spawnSync(command, ['--version'], { stdio: 'ignore' }).status === 0;
 
@@ -91,16 +92,32 @@ const runEach = async (args, names) => {
 };
 
 const sync = () => {
+    const uv = has('uv');
     if (!existsSync(venvPython)) {
         console.log(`[python] creating ${venv}`);
-        if (has('uv')) run('uv', ['venv', venv]);
+        if (uv) run('uv', ['venv', venv]);
         else run(process.env.PYTHON ?? 'python3', ['-m', 'venv', venv]);
     }
+    // With uv, uv installs as well as creating the venv. `uv venv` seeds no pip, so the pip
+    // invocations below would fail on the venv it made, and uv's resolver is most of the reason to
+    // prefer it: CI's sync took 29s through pip.
+    const install = uv
+        ? args =>
+              run('uv', [
+                  'pip',
+                  'install',
+                  '--quiet',
+                  '--python',
+                  venvPython,
+                  ...insecureHosts.flatMap(host => ['--allow-insecure-host', host]),
+                  ...args,
+              ])
+        : args => run(venvPython, ['-m', 'pip', 'install', '--quiet', ...trustedHosts, ...args]);
     const editable = PACKAGES.flatMap(name => ['-e', join(pythonRoot, name)]);
     console.log('[python] installing packages and dev dependencies');
-    run(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip', ...trustedHosts]);
-    run(venvPython, ['-m', 'pip', 'install', '--quiet', ...trustedHosts, ...editable, ...DEV_DEPENDENCIES]);
-    run(venvPython, ['-m', 'pip', 'install', '--quiet', '--no-deps', ...trustedHosts, ...ADAPTERS.flatMap(name => ['-e', join(pythonRoot, name)])]);
+    if (!uv) install(['--upgrade', 'pip']);
+    install([...editable, ...DEV_DEPENDENCIES]);
+    install(['--no-deps', ...ADAPTERS.flatMap(name => ['-e', join(pythonRoot, name)])]);
 };
 
 const ensureSynced = () => {
