@@ -18,20 +18,20 @@ importers:
         specifier: ^3.0.2
         version: 3.0.3
       '@contractkit/cli':
-        specifier: ^0.11.8
-        version: 0.11.8(prettier@3.9.9)
+        specifier: ^0.11.9
+        version: 0.11.9(prettier@3.9.9)
       '@contractkit/plugin-docs':
-        specifier: ^0.6.0
-        version: 0.6.0
+        specifier: ^0.8.0
+        version: 0.8.0
       '@contractkit/plugin-python':
         specifier: ^0.16.0
         version: 0.16.0
       '@contractkit/plugin-typescript':
-        specifier: ^0.40.0
-        version: 0.40.1
+        specifier: ^0.41.0
+        version: 0.41.0
       '@contractkit/prettier-plugin':
-        specifier: ^0.14.13
-        version: 0.14.13(prettier@3.9.9)
+        specifier: ^0.14.14
+        version: 0.14.14(prettier@3.9.9)
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -1189,8 +1189,8 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@contractkit/cli@0.11.8':
-    resolution: {integrity: sha512-aY/i+D6wi+hY2GlAQyNhvyd2xwh2/D7Wn+mNx6R8wP4uUpqk3BQEj14oR4BbvXcvziqEWLwfz8BcCoMC1H+Qeg==}
+  '@contractkit/cli@0.11.9':
+    resolution: {integrity: sha512-NbmSLbmlNRb//1uHrei+yIdMKpEX9WSee1MzOv3ZHXui6a4hobljqYgssVbdqTFOX622Bgos3ZXSP/o5+fvNbA==}
     hasBin: true
     peerDependencies:
       prettier: '>=3.0.0'
@@ -1201,20 +1201,23 @@ packages:
   '@contractkit/core@0.33.0':
     resolution: {integrity: sha512-/V8jJGbGS4BKq6+AhEQhhb5IYHs+cw/zcTORGX8KjVqukA8dxxgETI4OxEkmV5+vo6xPE0TaXkLBLoPAVNxhfw==}
 
-  '@contractkit/openapi-to-ck@0.12.10':
-    resolution: {integrity: sha512-NzhNli6Z9AoeAI38+UoJdDu1z+nxQhX/Hzpks5KxVqqEc2VO+DPcel0io5dCt6XyRsXF8FLvNHf7Nt1bM35RHQ==}
+  '@contractkit/core@0.34.0':
+    resolution: {integrity: sha512-TxbFe2ytD2zOUhck1iVs+5tYOpAvCO2+Wcrn8OFBSmJYYJ0Ph+pyO52th4TxqdoWi1OrGqOZVw1BsAfO5glARg==}
 
-  '@contractkit/plugin-docs@0.6.0':
-    resolution: {integrity: sha512-FY5YgHEZm7p6AxNQrJmUaCXzRmKCHfFNIikLEGJz2AxvUoGdn2LeG1C5XPuBpn3bGJaCRXhdCROpMDHtcZJxCg==}
+  '@contractkit/openapi-to-ck@0.12.11':
+    resolution: {integrity: sha512-Z9qFvwnGxa5B0peu3OPkpARG/sr5iyIpEM26K+cfPjKQpd1FkgRcYLsdHAzL8WQrfQBuLmmgmpD0tVl3u+Dbjw==}
+
+  '@contractkit/plugin-docs@0.8.0':
+    resolution: {integrity: sha512-dvuRolUbnTbU2nv9fdUtkKZvBdjZAG69bMjXTS5jUDE8xBMVa2fmnNLcV5hmzDwQ0sJ1ulKdN6BKzbwLkraMQw==}
 
   '@contractkit/plugin-python@0.16.0':
     resolution: {integrity: sha512-L0QUFRbvDmdEZj33zP946bQiaAz1n96Wn8xUNGxwuzdeDmhrngYprnLzBYE1rHThNW3DzfC6fwpTa7U/5xjwHw==}
 
-  '@contractkit/plugin-typescript@0.40.1':
-    resolution: {integrity: sha512-IB0cdOR10MMVC1HiSFsIn2o2Q/dOU3gfdtV2QFopH6yMRNDqW3l1Lecflxc3uDrwVxeGaUR5H/USPQPFV/B3bg==}
+  '@contractkit/plugin-typescript@0.41.0':
+    resolution: {integrity: sha512-gXxDLsYOT9WcUOWg/Gk5XthITHUB59kSbrjqSCaClQat1X6KmuUjLUiEGn2znsuKuS55hEsGOE85g6fJUITdzw==}
 
-  '@contractkit/prettier-plugin@0.14.13':
-    resolution: {integrity: sha512-I2hPFKib0+sB0v7D7WTTuI9MqNVpCSnB3GlKfaqRJvN+hW3veTSJWAvSj/ghaDSlioVWATtujeYmV9P1j89HWA==}
+  '@contractkit/prettier-plugin@0.14.14':
+    resolution: {integrity: sha512-UYIvWcnvoTEkl3V4l6//VAPfIz74C08jxv/jrnBKRwrEPrD+6P84hxOgkkOu41H7QavZCeQG55qKTXV2ATfGWg==}
     peerDependencies:
       prettier: ^3.0.0
 
@@ -6254,10 +6257,6 @@ packages:
     resolution: {integrity: sha512-ozCC6gdQ+glXOQsveKD0YsDy8DSQFjDTz4zyzEHNV5+JP5D62LmfDZ6o1cycFx9ouG940M5dE8C8CTewdj2YWQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  lru-cache@11.5.2:
-    resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
-    engines: {node: 20 || >=22}
-
   lru-cache@11.5.3:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
     engines: {node: 20 || >=22}
@@ -10123,10 +10122,10 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@contractkit/cli@0.11.8(prettier@3.9.9)':
+  '@contractkit/cli@0.11.9(prettier@3.9.9)':
     dependencies:
-      '@contractkit/core': 0.33.0
-      '@contractkit/openapi-to-ck': 0.12.10
+      '@contractkit/core': 0.34.0
+      '@contractkit/openapi-to-ck': 0.12.11
       glob: 13.0.6
     optionalDependencies:
       prettier: 3.9.9
@@ -10135,26 +10134,30 @@ snapshots:
     dependencies:
       ohm-js: 17.5.0
 
-  '@contractkit/openapi-to-ck@0.12.10':
+  '@contractkit/core@0.34.0':
     dependencies:
-      '@contractkit/core': 0.33.0
+      ohm-js: 17.5.0
+
+  '@contractkit/openapi-to-ck@0.12.11':
+    dependencies:
+      '@contractkit/core': 0.34.0
       yaml: 2.9.1
 
-  '@contractkit/plugin-docs@0.6.0':
+  '@contractkit/plugin-docs@0.8.0':
     dependencies:
-      '@contractkit/core': 0.33.0
+      '@contractkit/core': 0.34.0
 
   '@contractkit/plugin-python@0.16.0':
     dependencies:
       '@contractkit/core': 0.33.0
 
-  '@contractkit/plugin-typescript@0.40.1':
+  '@contractkit/plugin-typescript@0.41.0':
     dependencies:
-      '@contractkit/core': 0.33.0
+      '@contractkit/core': 0.34.0
 
-  '@contractkit/prettier-plugin@0.14.13(prettier@3.9.9)':
+  '@contractkit/prettier-plugin@0.14.14(prettier@3.9.9)':
     dependencies:
-      '@contractkit/core': 0.33.0
+      '@contractkit/core': 0.34.0
       prettier: 3.9.9
 
   '@csstools/cascade-layer-name-parser@2.0.5(@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4))(@csstools/css-tokenizer@3.0.4)':
@@ -16249,8 +16252,6 @@ snapshots:
 
   lowercase-keys@3.0.0: {}
 
-  lru-cache@11.5.2: {}
-
   lru-cache@11.5.3: {}
 
   lru-cache@5.1.1:
@@ -17200,7 +17201,7 @@ snapshots:
 
   path-scurry@2.0.2:
     dependencies:
-      lru-cache: 11.5.2
+      lru-cache: 11.5.3
       minipass: 7.1.3
 
   path-to-regexp@0.1.13: {}
