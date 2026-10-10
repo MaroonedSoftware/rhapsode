@@ -68,6 +68,10 @@ testpaths = ["tests"]
 # misbehaving engines under tests/engines/ and for conftest's helpers.
 pythonpath = ["tests", "."]
 asyncio_mode = "auto"
+# Across every core. Nearly every test starts and drains a real worker process, so the suite is
+# interpreter startup end to end: 58s on one core, 8s on eighteen, and the 67s that set the floor of
+# CI's Python step.
+addopts = "-n auto"
 # A deadlock in a suite that spawns processes and streams over sockets otherwise wedges CI instead
 # of failing it. Generous, because a cold start on a loaded runner is legitimately slow.
 timeout = 60

@@ -6,8 +6,9 @@
 // back to the stdlib venv module, because a contributor who has never met uv should still be able
 // to run the tests.
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,17 +33,27 @@ const ADAPTERS = [
     'rhapsode-engine-fish',
     'rhapsode-engine-styletts2',
 ];
-const DEV_DEPENDENCIES = ['pytest>=8', 'pytest-asyncio>=0.24', 'pytest-timeout>=2.3', 'httpx>=0.27', 'ruff>=0.6', 'mypy>=1.11', 'numpy>=1.26'];
+const DEV_DEPENDENCIES = [
+    'pytest>=8',
+    'pytest-asyncio>=0.24',
+    'pytest-timeout>=2.3',
+    'pytest-xdist>=3.6',
+    'httpx>=0.27',
+    'ruff>=0.6',
+    'mypy>=1.11',
+    'numpy>=1.26',
+];
 
 // A sandbox or a corporate proxy that intercepts TLS makes pip's certificate check fail against a
 // certificate pip has no way to trust. RHAPSODE_PIP_TRUSTED_HOSTS is the escape hatch for that
 // machine, deliberately an environment variable rather than a checked-in pip.conf: weakening
 // verification is a local decision and must not be the default anybody inherits by cloning.
-const trustedHosts = (process.env.RHAPSODE_PIP_TRUSTED_HOSTS ?? '')
+// uv honours the same variable under its own flag.
+const insecureHosts = (process.env.RHAPSODE_PIP_TRUSTED_HOSTS ?? '')
     .split(',')
     .map(host => host.trim())
-    .filter(Boolean)
-    .flatMap(host => ['--trusted-host', host]);
+    .filter(Boolean);
+const trustedHosts = insecureHosts.flatMap(host => ['--trusted-host', host]);
 
 const has = command => spawnSync(command, ['--version'], { stdio: 'ignore' }).status === 0;
 
@@ -52,17 +63,61 @@ const run = (command, args, options = {}) => {
     if (result.status !== 0) process.exit(result.status ?? 1);
 };
 
+// Every package at once, up to one per core, each with its output held back and printed whole when it
+// finishes so ten logs do not interleave. Serial, the packages took 160s of CI's 6.5 minutes and
+// left three of the runner's four cores idle: most of a package's time is starting interpreters,
+// not using one core hard. Every package runs even after one fails, so one red run shows them all.
+const runEach = async (args, names) => {
+    const queue = [...names];
+    const failed = [];
+    const next = async () => {
+        for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
+            const chunks = [];
+            const child = spawn(venvPython, args, { cwd: join(pythonRoot, name), stdio: ['ignore', 'pipe', 'pipe'] });
+            child.stdout.on('data', chunk => chunks.push(chunk));
+            child.stderr.on('data', chunk => chunks.push(chunk));
+            const status = await new Promise((fulfil, fail) => {
+                child.once('error', fail);
+                child.once('close', fulfil);
+            });
+            process.stdout.write(`[python] ${name}\n${Buffer.concat(chunks)}`);
+            if (status !== 0) failed.push(name);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(availableParallelism(), queue.length) }, next));
+    if (failed.length > 0) {
+        console.error(`[python] failed: ${failed.join(', ')}`);
+        process.exit(1);
+    }
+};
+
 const sync = () => {
+    const uv = has('uv');
     if (!existsSync(venvPython)) {
         console.log(`[python] creating ${venv}`);
-        if (has('uv')) run('uv', ['venv', venv]);
+        if (uv) run('uv', ['venv', venv]);
         else run(process.env.PYTHON ?? 'python3', ['-m', 'venv', venv]);
     }
+    // With uv, uv installs as well as creating the venv. `uv venv` seeds no pip, so the pip
+    // invocations below would fail on the venv it made, and uv's resolver is most of the reason to
+    // prefer it: CI's sync took 29s through pip.
+    const install = uv
+        ? args =>
+              run('uv', [
+                  'pip',
+                  'install',
+                  '--quiet',
+                  '--python',
+                  venvPython,
+                  ...insecureHosts.flatMap(host => ['--allow-insecure-host', host]),
+                  ...args,
+              ])
+        : args => run(venvPython, ['-m', 'pip', 'install', '--quiet', ...trustedHosts, ...args]);
     const editable = PACKAGES.flatMap(name => ['-e', join(pythonRoot, name)]);
     console.log('[python] installing packages and dev dependencies');
-    run(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip', ...trustedHosts]);
-    run(venvPython, ['-m', 'pip', 'install', '--quiet', ...trustedHosts, ...editable, ...DEV_DEPENDENCIES]);
-    run(venvPython, ['-m', 'pip', 'install', '--quiet', '--no-deps', ...trustedHosts, ...ADAPTERS.flatMap(name => ['-e', join(pythonRoot, name)])]);
+    if (!uv) install(['--upgrade', 'pip']);
+    install([...editable, ...DEV_DEPENDENCIES]);
+    install(['--no-deps', ...ADAPTERS.flatMap(name => ['-e', join(pythonRoot, name)])]);
 };
 
 const ensureSynced = () => {
@@ -71,16 +126,14 @@ const ensureSynced = () => {
 
 const commands = {
     sync,
-    test: () => {
+    test: async () => {
         ensureSynced();
         // One invocation per package, not one across all of them. Each package has its own
         // conftest, and pytest imports conftest by module name: pointed at several test directories
         // at once, the first `conftest` found shadows the rest and every other package's tests fail
         // to import their own helpers. Running per package also means each package's own pytest
         // configuration actually applies, which is what a contributor running it by hand would get.
-        for (const name of [...PACKAGES, ...ADAPTERS]) {
-            run(venvPython, ['-m', 'pytest', '-q'], { cwd: join(pythonRoot, name) });
-        }
+        await runEach(['-m', 'pytest', '-q'], [...PACKAGES, ...ADAPTERS]);
     },
     lint: () => {
         ensureSynced();
@@ -92,11 +145,9 @@ const commands = {
         run(venvPython, ['-m', 'ruff', 'format', pythonRoot]);
         run(venvPython, ['-m', 'ruff', 'check', '--fix', pythonRoot]);
     },
-    typecheck: () => {
+    typecheck: async () => {
         ensureSynced();
-        for (const name of [...PACKAGES, ...ADAPTERS]) {
-            run(venvPython, ['-m', 'mypy'], { cwd: join(pythonRoot, name) });
-        }
+        await runEach(['-m', 'mypy'], [...PACKAGES, ...ADAPTERS]);
     },
 };
 
@@ -105,4 +156,4 @@ if (!Object.hasOwn(commands, command)) {
     console.error(`usage: node scripts/python.mjs <${Object.keys(commands).join('|')}>`);
     process.exit(2);
 }
-commands[command]();
+await commands[command]();
