@@ -75,9 +75,7 @@ describe('copying the config directory before an upgrade', () => {
             backupOnUpgrade(configPath, CORE_VERSION, logger(), DateTime.utc(2026, 10, day));
         }
 
-        expect(copies()).toEqual(
-            ['20261003T000000Z', '20261004T000000Z', '20261005T000000Z'].map(time => `${time}-before-${CORE_VERSION}`),
-        );
+        expect(copies()).toEqual(['20261003T000000Z', '20261004T000000Z', '20261005T000000Z'].map(time => `${time}-before-${CORE_VERSION}`));
     });
 
     it('starts without a copy when it cannot make one, and says so', () => {

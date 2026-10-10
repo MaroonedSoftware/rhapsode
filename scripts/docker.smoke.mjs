@@ -116,15 +116,36 @@ try {
     // What an upgrade leaves: a worker in the volume from an earlier release. Renaming its metadata
     // is all that takes, because that is all `workerVersion` reads, and a new container is needed
     // because the core reads it once per engine rather than on every /health.
-    compose(
-        'exec',
-        '-T',
-        'server',
-        'sh',
-        '-c',
-        'for d in /data/.rhapsode/venvs/tone/lib/python*/site-packages/rhapsode_worker-*.dist-info; do mv "$d" "$(dirname "$d")/rhapsode_worker-0.0.1.dist-info"; done',
-    );
-    compose('up', '--detach', '--wait', '--force-recreate');
+    const leaveBehind = () => {
+        compose(
+            'exec',
+            '-T',
+            'server',
+            'sh',
+            '-c',
+            'for d in /data/.rhapsode/venvs/tone/lib/python*/site-packages/rhapsode_worker-*.dist-info /data/.rhapsode/venvs/tone.alt/lib/python*/site-packages/rhapsode_worker-*.dist-info; do [ -d "$d" ] && mv "$d" "$(dirname "$d")/rhapsode_worker-0.0.1.dist-info"; done; true',
+        );
+        compose('up', '--detach', '--wait', '--force-recreate');
+    };
+
+    // The config the image seeds turns update.reinstallOutdated on, so the start does it. § 10.
+    leaveBehind();
+    await reachable();
+    const queued = (await (await fetch(`${page}/installs`)).json()).filter(job => job.engine === 'tone' && job.kind === 'reinstall');
+    check(queued.length === 1, 'a start reinstalls an engine behind the core, as the seeded config asks');
+    const atStart = await settled(queued[0].id);
+    check(atStart.state === 'succeeded', `the reinstall at start finished as ${atStart.state}`);
+    check((await engine('tone')).outdated === false, 'tone is on the core’s version again');
+    check(await speak(), 'tone speaks from the virtualenv the start built');
+
+    // Off, it waits to be asked, and the route does it.
+    const off = await fetch(`${page}/settings`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ update: { reinstallOutdated: false } }),
+    });
+    check(off.ok, 'update.reinstallOutdated turns off through the page proxy');
+    leaveBehind();
     await reachable();
     const stale = await engine('tone');
     check(stale.outdated === true && stale.workerVersion === '0.0.1', `tone reads as behind core ${stale.version}`);
