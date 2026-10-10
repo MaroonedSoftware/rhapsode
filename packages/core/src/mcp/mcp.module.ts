@@ -3,6 +3,7 @@ import { Logger } from '@maroonedsoftware/logger';
 import {
     McpConfig,
     McpDispatcher,
+    McpPromptHandlerMap,
     McpResourceHandlerMap,
     McpServerFactory,
     McpSessionRegistry,
@@ -59,6 +60,10 @@ export const mcpModule = (): ServerKitModule => ({
             .register(McpResourceHandlerMap)
             .useFactory(() => new McpResourceHandlerMap())
             .asSingleton();
+        registry
+            .register(McpPromptHandlerMap)
+            .useFactory(() => new McpPromptHandlerMap())
+            .asSingleton();
 
         registry
             .register(McpServerFactory)
@@ -67,6 +72,7 @@ export const mcpModule = (): ServerKitModule => ({
                     new McpServerFactory(
                         container.get(McpToolHandlerMap),
                         container.get(McpResourceHandlerMap),
+                        container.get(McpPromptHandlerMap),
                         container.get(McpConfig),
                         container.get(Logger),
                     ),
