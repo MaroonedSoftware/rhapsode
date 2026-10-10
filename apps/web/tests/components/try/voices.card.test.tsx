@@ -36,6 +36,17 @@ describe('VoicesCard', () => {
         expect(screen.getByText(/no voices yet/)).toBeInTheDocument();
     });
 
+    it('shows a placeholder while the list loads, rather than saying there are none', () => {
+        render(<VoicesCard engine="chatterbox" voices={[]} pending onCloned={() => {}} />);
+        expect(screen.queryByText(/no voices yet/)).not.toBeInTheDocument();
+    });
+
+    it('says the list could not be read, rather than that there are none', () => {
+        render(<VoicesCard engine="chatterbox" voices={[]} error={new TypeError('fetch failed')} onCloned={() => {}} />);
+        expect(screen.getByText('The voices could not be read')).toBeInTheDocument();
+        expect(screen.queryByText(/no voices yet/)).not.toBeInTheDocument();
+    });
+
     it('offers no clone form when the variant says it cannot clone', () => {
         render(<VoicesCard engine="orpheus" voices={[]} cloning={{ supported: false }} onCloned={() => {}} />);
         expect(screen.queryByText('Clone a voice')).not.toBeInTheDocument();

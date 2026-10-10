@@ -56,6 +56,8 @@ export function TryPanel({ engine, defaultVariant }: TryPanelProps) {
             variants={variants}
             initial={initial}
             voices={voices.data ?? []}
+            voicesPending={voices.isPending}
+            voicesError={voices.isError ? voices.error : undefined}
             current={capabilities.data.current}
         />
     );
@@ -66,10 +68,13 @@ interface ControlsProps {
     variants: Record<string, Variant>;
     initial: string;
     voices: Voice[];
+    /** The list is still on its way, which is not the same as there being none. */
+    voicesPending: boolean;
+    voicesError?: Error;
     current?: CurrentVariant;
 }
 
-function Controls({ engine, variants, initial, voices, current }: ControlsProps) {
+function Controls({ engine, variants, initial, voices, voicesPending, voicesError, current }: ControlsProps) {
     const speak = useSpeak();
     const converse = useDialogue();
     const [variant, setVariant] = useState(initial);
@@ -360,7 +365,15 @@ function Controls({ engine, variants, initial, voices, current }: ControlsProps)
                     </Stack>
                 </Card>
             </SimpleGrid>
-            <VoicesCard engine={engine} voices={voices} cloning={cloning} blending={blending} onCloned={setVoice} />
+            <VoicesCard
+                engine={engine}
+                voices={voices}
+                pending={voicesPending}
+                error={voicesError}
+                cloning={cloning}
+                blending={blending}
+                onCloned={setVoice}
+            />
         </Stack>
     );
 }

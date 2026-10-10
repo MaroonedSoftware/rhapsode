@@ -6,6 +6,9 @@ import type { EngineSummary, ResidencyDetail, ResidentModel } from '@maroonedsof
 import { LoadedModels } from '../../../src/components/catalog/loaded.models';
 import { render, screen } from '../../utils/render';
 
+const notify = vi.hoisted(() => ({ notifyFailure: vi.fn(), notifyInfo: vi.fn(), notifySuccess: vi.fn() }));
+vi.mock('../../../src/components/shared/notify', () => notify);
+
 const residency = vi.fn<() => Promise<ResidencyDetail>>();
 const unloadEngine = vi.fn<(engine: string, query?: { mode?: string }) => Promise<EngineSummary>>();
 
@@ -34,6 +37,7 @@ describe('LoadedModels', () => {
     beforeEach(() => {
         residency.mockReset();
         unloadEngine.mockReset();
+        for (const mock of Object.values(notify)) mock.mockReset();
     });
     afterEach(() => vi.clearAllMocks());
 
@@ -100,5 +104,26 @@ describe('LoadedModels', () => {
         render(<LoadedModels />);
 
         expect(await screen.findByText('What is loaded did not load')).toBeInTheDocument();
+    });
+
+    it('shows a placeholder while the list is on its way, rather than saying nothing is loaded', () => {
+        residency.mockImplementation(() => new Promise(() => {}));
+        render(<LoadedModels />);
+
+        expect(screen.queryByText(/Nothing is loaded/)).not.toBeInTheDocument();
+    });
+
+    it('treats a refusal while speaking as a state to wait out, not a failure', async () => {
+        residency.mockResolvedValue(detail([model()]));
+        unloadEngine.mockResolvedValue({
+            status: 409,
+            data: { error: { code: 'conflict', message: 'tone is speaking.' } },
+        } as unknown as EngineSummary);
+        render(<LoadedModels />);
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Unload' }));
+
+        await vi.waitFor(() => expect(notify.notifyInfo).toHaveBeenCalledWith('tone is still loaded', 'tone is speaking.'));
+        expect(notify.notifyFailure).not.toHaveBeenCalled();
     });
 });

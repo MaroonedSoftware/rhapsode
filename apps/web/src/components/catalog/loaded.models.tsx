@@ -4,9 +4,10 @@ import { DateTime } from 'luxon';
 import type { ResidentModel } from '@maroonedsoftware/rhapsode-sdk';
 
 import { useResidency, useUnloadEngine } from '../../api/residency.queries';
-import { apiErrorCode } from '../../api/sdk.error';
+import { apiErrorCode, apiErrorMessage } from '../../api/sdk.error';
 import { ErrorAlert } from '../shared/error.alert';
-import { notifyFailure, notifySuccess } from '../shared/notify';
+import { notifyFailure, notifyInfo, notifySuccess } from '../shared/notify';
+import { PageSkeleton } from '../shared/page.skeleton';
 
 const UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB'] as const;
 
@@ -56,12 +57,10 @@ export function LoadedModels() {
             {
                 onSuccess: () => notifySuccess(`${model.engine} let its card go.`),
                 onError: error =>
-                    notifyFailure(
-                        `${model.engine} is still loaded`,
-                        error,
-                        // A 409 is not a failure to fix: it is a state to wait out.
-                        'The server did not answer.',
-                    ),
+                    // A 409 is not a failure to fix: it is a state to wait out, so it is not shown in red.
+                    apiErrorCode(error) === 'conflict'
+                        ? notifyInfo(`${model.engine} is still loaded`, apiErrorMessage(error, 'It is speaking. Unload it when it finishes.'))
+                        : notifyFailure(`${model.engine} is still loaded`, error, 'The server did not answer.'),
             },
         );
 
@@ -88,7 +87,9 @@ export function LoadedModels() {
             </Group>
 
             <Card padding="xs">
-                {models.length === 0 ? (
+                {residency.isPending ? (
+                    <PageSkeleton variant="rows" count={2} />
+                ) : models.length === 0 ? (
                     <Text size="sm" c="dimmed" p="sm">
                         Nothing is loaded. A model arrives when something asks an engine to speak, and leaves again when its keep-alive runs out.
                     </Text>

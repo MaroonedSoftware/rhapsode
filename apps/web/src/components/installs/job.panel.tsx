@@ -60,7 +60,7 @@ export function JobPanel({ jobId, onWarm }: { jobId: string; onWarm?: (engine: s
     }, [feed.lines.length]);
 
     if (job.isError) return <ErrorAlert title="That job could not be read" error={job.error} fallback="The server did not answer." />;
-    if (job.data === undefined) return <Loader size="sm" />;
+    if (job.data === undefined) return <Loader size="sm" aria-label="Reading the job" />;
 
     const data = job.data;
     const current = feed.progress?.phase ?? data.step;

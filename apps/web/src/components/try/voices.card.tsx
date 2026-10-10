@@ -8,6 +8,7 @@ import { useBlendVoice, useCloneVoice, useDeleteVoice } from '../../api/engines.
 import { ConfirmModal } from '../shared/confirm.modal';
 import { ErrorAlert } from '../shared/error.alert';
 import { notifySuccess } from '../shared/notify';
+import { PageSkeleton } from '../shared/page.skeleton';
 
 /** What § 7 allows as an id, so the form refuses what the server would, before the upload. */
 const VOICE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -27,6 +28,10 @@ const MADE = ['cloned', 'blended', 'uploaded'];
 export interface VoicesCardProps {
     engine: string;
     voices: Voice[];
+    /** Still loading: shown as such, so an empty list is never read as "this engine has none". */
+    pending?: boolean;
+    /** The list could not be read. */
+    error?: Error;
     /**
      * The chosen variant's cloning claim, which also says what files it makes voices from. The form
      * is offered unless it says no: absent means a worker too old to say, and the worker refuses a
@@ -40,7 +45,7 @@ export interface VoicesCardProps {
 }
 
 /** This engine's voices: hear each, make one from a file or a blend, delete one that was made. */
-export function VoicesCard({ engine, voices, cloning, blending, onCloned }: VoicesCardProps) {
+export function VoicesCard({ engine, voices, pending, error, cloning, blending, onCloned }: VoicesCardProps) {
     const remove = useDeleteVoice(engine);
     const [playing, setPlaying] = useState<string | undefined>(undefined);
     const [removing, setRemoving] = useState<Voice | undefined>(undefined);
@@ -53,7 +58,11 @@ export function VoicesCard({ engine, voices, cloning, blending, onCloned }: Voic
                     Voices
                 </Title>
                 <Stack gap={6}>
-                    {voices.length === 0 ? (
+                    {pending ? <PageSkeleton variant="rows" count={3} /> : undefined}
+                    {error !== undefined ? (
+                        <ErrorAlert title="The voices could not be read" error={error} fallback="Its worker did not answer." />
+                    ) : undefined}
+                    {!pending && error === undefined && voices.length === 0 ? (
                         <Text size="sm" c="dimmed">
                             {clones || blending
                                 ? 'This engine has no voices yet. Make one below, or speak in its default.'

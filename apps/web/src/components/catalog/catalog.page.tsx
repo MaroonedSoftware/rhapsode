@@ -22,7 +22,7 @@ import { WARM_COST, WarmOffer } from '../installs/warm.offer';
 import { ConfirmModal } from '../shared/confirm.modal';
 import { EmptyState } from '../shared/empty.state';
 import { ErrorAlert } from '../shared/error.alert';
-import { notifyFailure, notifySuccess } from '../shared/notify';
+import { notifyFailure, notifyInfo, notifySuccess } from '../shared/notify';
 import { PageHeader } from '../shared/page.header';
 import { PageSkeleton } from '../shared/page.skeleton';
 import { severityColor } from '../shared/status';
@@ -135,9 +135,8 @@ export function CatalogPage() {
                 if (started[0] !== undefined) setWatching(started[0].id);
                 const licence = skipped.filter(entry => entry.reason === 'licence').map(entry => entry.engine);
                 if (licence.length > 0) {
-                    notifyFailure(
+                    notifyInfo(
                         'Some engines were left alone',
-                        undefined,
                         `${licence.join(', ')}: the weights licence has to be accepted again, so reinstall ${licence.length === 1 ? 'it' : 'each one'} from its card.`,
                     );
                 }
