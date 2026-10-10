@@ -335,7 +335,7 @@ a newer `compose.yaml` can be downloaded over the old one without losing them. I
 compose merges (`COMPOSE_FILE`, which is how `compose.gpu.yaml` stays merged without `-f` on every
 command) and the image tag.
 
-One image, `maroonedsoftware/rhapsode` on Docker Hub. Each release publishes it for amd64 and arm64,
+One image, [`maroonedsoftware/rhapsode`](https://hub.docker.com/r/maroonedsoftware/rhapsode) on Docker Hub. Each release publishes it for amd64 and arm64,
 tagged with its version, its minor line (`0.1`) and `latest`. `RHAPSODE_VERSION` picks one, and
 defaults to the minor line `compose.yaml` was released on, so a pull takes every patch release and
 stops at the next minor, where breaking changes go while the version is 0.x. The
