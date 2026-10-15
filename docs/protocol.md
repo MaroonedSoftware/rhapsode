@@ -180,6 +180,18 @@ for "how big are these weights". An adapter that knows the real figure returns i
 adding up a card reads those as a model that is free, so a measurement that failed is left out
 instead.
 
+A card-wide delta also counts what other processes freed during the load, and a card shared with
+anything else frees memory often. Chatterbox `turbo` measured 2.6 GiB on its earlier loads on an
+RTX 4070 Ti SUPER, then loaded onto a full card in October 2026 while a failed Breeze load and an
+Ollama model were giving memory back, and its delta came out at zero or less, so it reported
+nothing. Where the device has an allocator that belongs to the worker's process alone (torch's, on
+CUDA and ROCm), the SDK reads that across the load too. A card-wide delta smaller than what this
+process's own allocator took proves somebody else freed memory, so the allocator's figure is
+reported instead. It is a floor, missing the context and anything outside torch, but it is the
+model's own and a floor beats nothing to a core deciding what fits. The driver's per-process list
+is no help here: inside a container it names processes by host PID, which a worker cannot match to
+its own.
+
 ### Three rules, each paid for
 
 **`POST /speak` loads on demand.** If the model is not resident, `/speak` loads it and then speaks.
@@ -963,7 +975,8 @@ serve(ChatterboxEngine())
   own `empty_cache` finds nothing to return: Fish Audio S2 Pro left 3.93 GiB of the 11.97 GiB a load
   took on the card after its unload, and every reload ran out of memory, until a collection ran.
 - **Measures what a load cost**, as a device-wide delta across `load()`, and reports it as
-  `modelBytes` (§ 3). An adapter that knows better overrides `memory_bytes()`; one that does not
+  `modelBytes` (§ 3), falling back to the process's own allocator delta when another process freed
+  memory during the load. An adapter that knows better overrides `memory_bytes()`; one that does not
   gets a figure for free, and one on a device nothing can measure reports nothing rather than zero.
 - Maps exceptions onto the error taxonomy, with `retryable` set correctly, and aborts the connection
   rather than closing it cleanly when `speak()` raises mid-stream.
