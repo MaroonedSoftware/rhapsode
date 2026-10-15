@@ -9,6 +9,12 @@ rather than per-tensor because that is the only figure that counts the pieces no
 a model: the CUDA context, an ONNX Runtime arena, a vLLM worker in a child process. An adapter that
 knows better says so through `Engine.memory_bytes`, which wins.
 
+Card-wide also means it counts what other processes freed during the load. Chatterbox `turbo`
+measured 2.6 GiB on its earlier loads, then reported nothing after one onto a full card shared with
+Ollama, because the card gave back more than the model took. So the worker's own allocator is read
+across the load as well, where it has one, and it is the answer whenever the card-wide delta comes
+out smaller than it. protocol.md § 3.
+
 torch is imported inside the functions, as in `detect_device`: an ONNX or pure-CPU adapter has no
 torch and must still be able to install this SDK.
 """
@@ -20,10 +26,43 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 from .engine import Device
 
-__all__ = ["held_bytes", "release"]
+__all__ = ["Snapshot", "cost", "held_bytes", "own_bytes", "release", "snapshot"]
+
+
+class Snapshot(NamedTuple):
+    """What the device and this process's own allocator held at one moment. Either may be None."""
+
+    held: int | None
+    own: int | None
+
+
+def snapshot(device: Device) -> Snapshot:
+    return Snapshot(held=held_bytes(device), own=own_bytes(device))
+
+
+def cost(before: Snapshot, after: Snapshot) -> int | None:
+    """What a load cost, from readings taken on either side of it, or None when nothing could say.
+
+    The card-wide delta is preferred, because it counts the context and the allocations torch never
+    sees. But it can never honestly be smaller than what this process's own allocator took: when it
+    is, another process freed memory during the load, and the allocator's figure is the one left
+    standing. A result of zero or less is a failed measurement, never a free model.
+    """
+    held = _delta(before.held, after.held)
+    own = _delta(before.own, after.own)
+    if held is not None and (own is None or held >= own):
+        best = held
+    else:
+        best = own
+    return best if best is not None and best > 0 else None
+
+
+def _delta(before: int | None, after: int | None) -> int | None:
+    return None if before is None or after is None else after - before
 
 
 def release() -> int:
@@ -64,6 +103,26 @@ def held_bytes(device: Device) -> int | None:
     if device.type == "mps":
         return _mps_bytes()
     return _resident_set_bytes()
+
+
+def own_bytes(device: Device) -> int | None:
+    """What this process's own allocator has reserved on the device, where that differs from
+    `held_bytes`.
+
+    Only CUDA and ROCm need it: `held_bytes` is already this process alone on MPS and the CPU. On a
+    card it is a floor, since it misses the context and anything outside torch, and it is the only
+    reading another process cannot move. The driver's per-process list would be better and cannot
+    be used: inside a container it names processes by host PID, and a worker cannot tell which of
+    them is itself.
+    """
+    if device.type not in {"cuda", "rocm"}:
+        return None
+    try:  # pragma: no cover - depends on what the adapter's venv happens to hold
+        import torch
+
+        return int(torch.cuda.memory_reserved())
+    except Exception:
+        return None
 
 
 def _accelerator_bytes() -> int | None:

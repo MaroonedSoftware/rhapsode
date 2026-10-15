@@ -27,7 +27,7 @@ from .engine import (
 from .errors import BadRequest, Overloaded, Unsupported, WorkerError, classify
 from .listen import SUPPORTED_CONTRACTS
 from .log import Log
-from .memory import held_bytes, release
+from .memory import Snapshot, cost, release, snapshot
 
 
 class Worker:
@@ -193,7 +193,7 @@ class Worker:
         await self.until_synthesising_fewer_than(1)
         self.model = "loading"
         self.log.info("loading", variant=variant)
-        before = held_bytes(self.engine.device)
+        before = snapshot(self.engine.device)
         try:
             await asyncio.to_thread(self.engine.load, variant)
         except BaseException as error:
@@ -205,20 +205,17 @@ class Worker:
         self.model_bytes = self._measure(before)
         self.log.info("loaded", variant=variant, modelBytes=self.model_bytes)
 
-    def _measure(self, before: int | None) -> int | None:
+    def _measure(self, before: Snapshot) -> int | None:
         """What the load cost, as the adapter's own answer or a delta across it.
 
         A delta of zero or less is discarded rather than reported: the load happened, so zero is
         the measurement failing rather than the model being free, and an invented number is worse
-        than no number at all to a core deciding what to evict.
+        than no number at all to a core deciding what to evict. `cost` says which delta to trust.
         """
         declared = self.engine.memory_bytes()
         if declared is not None:
             return declared
-        after = held_bytes(self.engine.device)
-        if before is None or after is None:
-            return None
-        return after - before if after > before else None
+        return cost(before, snapshot(self.engine.device))
 
     async def _unload_locked(self, *, quiet: bool = False) -> None:
         await self.until_synthesising_fewer_than(1)

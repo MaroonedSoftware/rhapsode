@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import types
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -102,3 +103,58 @@ class TestTheSdkStaysInstallable:
 
         # No torch in this venv, so the accelerator paths have nothing to ask and answer None.
         assert held_bytes(Device(type="cuda", name="test", vram_bytes=1)) is None
+
+
+class TestWhoseMemory:
+    """A card-wide delta counts other processes too. protocol.md § 3."""
+
+    def test_the_card_wide_delta_wins_when_it_is_honest(self) -> None:
+        from rhapsode_worker.memory import Snapshot, cost
+
+        # It is the larger figure because it counts the context and what torch never sees.
+        assert cost(Snapshot(held=10, own=0), Snapshot(held=310, own=250)) == 300
+
+    def test_another_process_freeing_memory_falls_back_to_our_own_allocator(self) -> None:
+        from rhapsode_worker.memory import Snapshot, cost
+
+        gib = 1024**3
+        # Chatterbox turbo onto a full card while something else gave 3 GiB back: card-wide, the
+        # load looked like it freed memory, and the model was reported as nothing at all.
+        before = Snapshot(held=15 * gib, own=0)
+        after = Snapshot(held=15 * gib - 3 * gib + int(2.6 * gib), own=int(2.5 * gib))
+
+        assert cost(before, after) == int(2.5 * gib)
+
+    def test_a_card_wide_delta_smaller_than_our_own_is_not_believed(self) -> None:
+        from rhapsode_worker.memory import Snapshot, cost
+
+        assert cost(Snapshot(held=0, own=0), Snapshot(held=100, own=400)) == 400
+
+    def test_without_an_allocator_reading_the_card_wide_delta_stands_alone(self) -> None:
+        from rhapsode_worker.memory import Snapshot, cost
+
+        assert cost(Snapshot(held=100, own=None), Snapshot(held=900, own=None)) == 800
+        assert cost(Snapshot(held=900, own=None), Snapshot(held=100, own=None)) is None
+
+    def test_nothing_measured_is_none_never_zero(self) -> None:
+        from rhapsode_worker.memory import Snapshot, cost
+
+        assert cost(Snapshot(None, None), Snapshot(None, None)) is None
+        assert cost(Snapshot(held=5, own=7), Snapshot(held=5, own=7)) is None
+
+    def test_a_card_reads_both_the_device_and_torchs_allocator(self, monkeypatch) -> None:
+        from rhapsode_worker.engine import Device
+        from rhapsode_worker.memory import snapshot
+
+        cuda = types.SimpleNamespace(mem_get_info=lambda: (1_000, 16_000), memory_reserved=lambda: 4_000)
+        monkeypatch.setitem(__import__("sys").modules, "torch", types.SimpleNamespace(cuda=cuda))
+
+        assert snapshot(Device(type="cuda", name="test", vram_bytes=16_000)) == (15_000, 4_000)
+
+    def test_off_a_card_there_is_no_separate_allocator_reading(self) -> None:
+        from rhapsode_worker.engine import Device
+        from rhapsode_worker.memory import own_bytes
+
+        # The resident set and Metal's driver figure are this process alone already.
+        assert own_bytes(Device(type="cpu", name="test")) is None
+        assert own_bytes(Device(type="mps", name="test")) is None
