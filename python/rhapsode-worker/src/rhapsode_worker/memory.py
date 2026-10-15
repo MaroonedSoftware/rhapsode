@@ -55,7 +55,7 @@ def cost(before: Snapshot, after: Snapshot) -> int | None:
     held = _delta(before.held, after.held)
     own = _delta(before.own, after.own)
     if held is not None and (own is None or held >= own):
-        best = held
+        best: int | None = held
     else:
         best = own
     return best if best is not None and best > 0 else None
