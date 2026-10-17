@@ -89,6 +89,7 @@ const config: Config = {
                         { label: 'Quick start', to: '/docs/quick-start' },
                         { label: 'Running one', to: '/docs/operating' },
                         { label: 'Engines', to: '/docs/engines' },
+                        { label: 'Samples', to: '/docs/samples' },
                         { label: 'OpenAI clients', to: '/docs/openai' },
                         { label: 'Help', to: '/docs/help' },
                     ],

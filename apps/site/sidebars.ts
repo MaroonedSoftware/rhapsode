@@ -28,6 +28,7 @@ const sidebars: SidebarsConfig = {
                 'engines/tone',
             ],
         },
+        'samples',
         'streaming',
         'openai',
         'mcp',

@@ -1,0 +1,24 @@
+.sample {
+    margin: 0 0 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--rh-border);
+    border-radius: 10px;
+    background: var(--rh-surface);
+}
+
+.title {
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.player {
+    display: block;
+    width: 100%;
+}
+
+/* The request text wraps rather than scrolling, so a phone never scrolls sideways. */
+.text {
+    margin: 0.75rem 0 0;
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+}
