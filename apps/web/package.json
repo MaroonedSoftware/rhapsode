@@ -16,13 +16,13 @@
     },
     "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
-        "@mantine/core": "^9.6.3",
-        "@mantine/hooks": "^9.6.3",
-        "@mantine/notifications": "^9.6.3",
+        "@mantine/core": "^9.7.1",
+        "@mantine/hooks": "^9.7.1",
+        "@mantine/notifications": "^9.7.1",
         "@maroonedsoftware/rhapsode-sdk": "workspace:*",
-        "@tabler/icons-react": "^3.48.0",
+        "@tabler/icons-react": "^3.49.0",
         "@tanstack/react-query": "^5.104.1",
-        "@tanstack/react-router": "^1.170.41",
+        "@tanstack/react-router": "^1.170.42",
         "luxon": "^3.7.2",
         "react": "^19.2.8",
         "react-dom": "^19.2.8"
@@ -30,7 +30,7 @@
     "devDependencies": {
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
-        "@tanstack/router-plugin": "^1.168.42",
+        "@tanstack/router-plugin": "^1.168.43",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/jest-dom": "^7.0.0",
         "@testing-library/react": "^16.3.2",
@@ -38,13 +38,13 @@
         "@types/luxon": "^3.7.6",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.4",
-        "@vitejs/plugin-react": "^6.0.5",
-        "jsdom": "^30.1.1",
-        "postcss": "^8.5.25",
+        "@vitejs/plugin-react": "^6.1.2",
+        "jsdom": "^30.1.2",
+        "postcss": "^8.5.29",
         "postcss-preset-mantine": "^1.18.0",
         "postcss-simple-vars": "^7.0.1",
         "typescript": "^6.0.3",
-        "vite": "^8.3.2",
+        "vite": "^8.3.4",
         "vitest": "^5.0.3"
     }
 }
