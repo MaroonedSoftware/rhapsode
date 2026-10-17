@@ -98,6 +98,9 @@ export default function Home() {
                             <Link className={styles.primary} to="/docs/quick-start">
                                 Quick start
                             </Link>
+                            <Link className={styles.secondary} to="/docs/samples">
+                                Hear the engines
+                            </Link>
                             <Link className={styles.secondary} to="/docs/protocol">
                                 Read the protocol
                             </Link>
