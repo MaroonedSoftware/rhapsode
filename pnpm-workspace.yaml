@@ -33,3 +33,10 @@ overrides:
     # Infinity` kept 1.2.1, so this pins the floor. Build tooling only, never in the image. Scoped to
     # `<1.2.2` so it stops doing anything once upstream resolves past it.
     'source-map-js@<1.2.2': ^1.2.2
+    # GHSA for quadratic selector parsing (Dependabot #45). cssnano 6's plugins under the site's
+    # Docusaurus accept ^6.0.16, but `pnpm update --depth Infinity` kept 6.1.4 for them while moving
+    # every other dependent. Build tooling only, never in the image.
+    'postcss-selector-parser@>=6 <6.1.5': ^6.1.5
+    # Four fast-uri advisories (Dependabot #33 to #40). fast-json-stringify 7 accepts ^4.0.0 and runs
+    # in the server's response serialisation, yet the same update left it on 4.1.5.
+    'fast-uri@>=4 <4.2.3': ^4.2.3

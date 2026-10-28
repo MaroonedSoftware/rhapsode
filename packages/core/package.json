@@ -41,11 +41,11 @@
         "@maroonedsoftware/zod": "^0.8.0",
         "@modelcontextprotocol/sdk": "^1.32.1",
         "@rhapsode/contract": "workspace:*",
-        "fastify": "^5.12.5",
+        "fastify": "^5.12.7",
         "injectkit": "^1.7.1",
         "luxon": "^3.7.2",
-        "undici": "^8.12.2",
-        "zod": "^4.5.4"
+        "undici": "^8.12.3",
+        "zod": "^4.6.7"
     },
     "devDependencies": {
         "@repo/config-eslint": "workspace:*",
