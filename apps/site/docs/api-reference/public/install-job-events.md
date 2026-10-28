@@ -27,7 +27,7 @@ SDK method: `installJobEvents`
 
 ## Response
 
-`200 OK` — Returns `string`.
+`200 OK` — Returns a stream of [FeedEvent](../models/rhapsode/feed-event.md) events (Server-Sent Events).
 
 `403 Forbidden` — Returns a [ErrorBody](../models/rhapsode/error-body.md) object.
 

@@ -1207,8 +1207,9 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "content": {
                             "text/event-stream": {
                                 "schema": {
-                                    "type": "string"
-                                }
+                                    "$ref": "#/components/schemas/FeedEvent"
+                                },
+                                "x-contractkit-stream": true
                             }
                         }
                     },
@@ -1220,7 +1221,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                                     "$ref": "#/components/schemas/ErrorBody"
                                 }
                             }
-                        }
+                        },
+                        "x-contractkit-emit": "documented"
                     },
                     "404": {
                         "description": "Not found",
@@ -1230,7 +1232,8 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                                     "$ref": "#/components/schemas/ErrorBody"
                                 }
                             }
-                        }
+                        },
+                        "x-contractkit-emit": "documented"
                     }
                 }
             }
@@ -2492,6 +2495,88 @@ export const OPENAPI_DOCUMENT: OpenApiDocument = {
                         "description": "Absent means the engine's default variant."
                     }
                 }
+            },
+            "FeedProgress": {
+                "type": "object",
+                "properties": {
+                    "phase": {
+                        "type": "string",
+                        "description": "The job's step."
+                    },
+                    "index": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "running",
+                            "done",
+                            "failed"
+                        ]
+                    }
+                },
+                "required": [
+                    "phase",
+                    "index",
+                    "total",
+                    "status"
+                ],
+                "description": "One event on a job's stream, `GET /installs/{job}/events`. The shape is ServerKit's server feed,\ndeclared here so a client can parse it without depending on ServerKit."
+            },
+            "FeedEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "The Last-Event-ID resume key."
+                    },
+                    "ts": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "level": {
+                        "type": "string",
+                        "enum": [
+                            "debug",
+                            "info",
+                            "warn",
+                            "error"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "progress",
+                            "status",
+                            "log",
+                            "error",
+                            "heartbeat"
+                        ]
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The job id."
+                    },
+                    "progress": {
+                        "$ref": "#/components/schemas/FeedProgress"
+                    },
+                    "data": {}
+                },
+                "required": [
+                    "id",
+                    "ts",
+                    "source",
+                    "level",
+                    "kind"
+                ]
             },
             "OpenApiDocument": {
                 "type": "object",

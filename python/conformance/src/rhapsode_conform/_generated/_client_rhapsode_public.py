@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 from urllib.parse import quote
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict, cast
 from pydantic import TypeAdapter
 from ._base_client import BaseClient, SdkError, _path_text  # noqa: F401
+from ._enums import ReadsUnknown, UnknownValue
 from ._models_rhapsode_public import OpenApiDocument, Settings, SettingsPatch
-from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice, WarmRequest
+from ._models_rhapsode_types import Capabilities, CatalogEntry, CoreHealth, CreateVoiceForm, EngineDialogueRequest, EngineSpeakRequest, EngineSummary, ErrorBody, FeedEvent, InstallJob, PullRequest, ReinstallOutdated, ResidencyDetail, UpdateStatus, Voice, WarmRequest
 
 
 UnloadEngineQuery = TypedDict("UnloadEngineQuery", {
-    "mode": NotRequired[Literal["terminate", "unload"]],
+    "mode": NotRequired[Annotated[Literal["terminate", "unload"] | UnknownValue, ReadsUnknown]],
 })
 
 
@@ -393,24 +394,6 @@ class InstallJob404Response(TypedDict):
     data: ErrorBody
 
 
-class InstallJobEvents200Response(TypedDict):
-    status: Literal[200]
-    content_type: Literal["text/event-stream"]
-    data: str
-
-
-class InstallJobEvents403Response(TypedDict):
-    status: Literal[403]
-    content_type: Literal["application/json"]
-    data: ErrorBody
-
-
-class InstallJobEvents404Response(TypedDict):
-    status: Literal[404]
-    content_type: Literal["application/json"]
-    data: ErrorBody
-
-
 class Settings200Response(TypedDict):
     status: Literal[200]
     content_type: Literal["application/json"]
@@ -759,17 +742,13 @@ class RhapsodePublicClient(BaseClient):
             return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
         return { "status": 200, "content_type": "application/json", "data": InstallJob.model_validate(result) }
 
-    async def install_job_events(self, job: str) -> InstallJobEvents200Response | InstallJobEvents403Response | InstallJobEvents404Response:
+    async def install_job_events(self, job: str) -> str:
         """
         Install job events
         An install job's progress and output as server-sent events.
         """
-        _status, _content_type, result, _response_headers = await self._fetch_full(f"/installs/{quote(_path_text(job), safe='')}/events", method="GET", response_kind="auto", expect_statuses=(403, 404))
-        if _status == 403:
-            return { "status": 403, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
-        if _status == 404:
-            return { "status": 404, "content_type": "application/json", "data": ErrorBody.model_validate(result) }
-        return { "status": 200, "content_type": "text/event-stream", "data": result }
+        result = await self._fetch(f"/installs/{quote(_path_text(job), safe='')}/events", method="GET", response_kind="text")
+        return cast(str, result)
 
     async def settings(self) -> Settings200Response | Settings403Response:
         """
