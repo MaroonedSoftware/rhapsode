@@ -2,6 +2,11 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.28
+
+- The client SDK's `installJobEvents` now streams. It returns an async iterable of `FeedEvent`s, with `lastEventId` for resuming and an optional `signal`, where it used to read the whole body and never return for a job still running. A 403 or 404 is now a thrown `SdkError` rather than a returned status.
+- Patched dependencies for every open Dependabot alert: undici 8.12.3, body-parser 1.20.9 and 2.4.0, zod 4.6.7, fastify 5.12.7, fast-uri 3.1.9 and 4.2.3, ip-address 10.7.5 and postcss-selector-parser 6.1.5. The first five run inside the server image.
+
 ## 0.1.27
 
 - A model loaded onto a GPU shared with other programs now reports its size. When another process freed memory during the load, the card-wide measurement came out at zero or less and the size was left out, so the web page showed "—". The worker now also reads its own torch allocator across the load and reports that figure when the card-wide one is smaller.
