@@ -9,6 +9,8 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 
+from ._enums import refuse_unknown
+
 
 def _wire_values(values: Mapping[str, Any] | BaseModel | None) -> dict[str, Any]:
     """Query or header values in the JSON forms the server's schemas parse, unset ones left out.
@@ -17,29 +19,31 @@ def _wire_values(values: Mapping[str, Any] | BaseModel | None) -> dict[str, Any]
     flags a request body uses. A mapping (the TypedDict of an inline block) holds Python values,
     which httpx would str(): a datetime into "2026-01-02 03:04:00+00:00", which no ISO 8601 parser
     accepts, and None into an empty string. A Decimal would become "1E-8" for 0.00000001, which the
-    server's decimal pattern rejects, so it is written in plain digits first.
+    server's decimal pattern rejects, so it is written in plain digits first. An enum's UNKNOWN has
+    no wire spelling, so it raises rather than being sent.
     """
     if values is None:
         return {}
     if isinstance(values, BaseModel):
         data = values.model_dump(mode="json", by_alias=True, exclude_unset=True)
     else:
-        data = to_jsonable_python({key: _plain_decimals(value) for key, value in values.items()})
+        data = to_jsonable_python({key: _wire_value(value) for key, value in values.items()})
     # Neither a query string nor a header can say null, so a None is sent as nothing at all.
     return {key: value for key, value in data.items() if value is not None}
 
 
-def _plain_decimals(value: Any) -> Any:
-    """A Decimal, or a list of them, in plain digits rather than str()'s exponent form."""
+def _wire_value(value: Any) -> Any:
+    """A Decimal, or a list of them, in plain digits rather than str()'s exponent form, refusing UNKNOWN."""
     if isinstance(value, Decimal):
         return format(value, "f")
     if isinstance(value, list):
-        return [_plain_decimals(item) for item in value]
-    return value
+        return [_wire_value(item) for item in value]
+    return refuse_unknown(value)
 
 
 def _path_text(value: Any) -> str:
     """A path parameter as text, before percent-encoding: a Decimal in plain digits, not "1E-8"."""
+    refuse_unknown(value)
     if isinstance(value, Decimal):
         return format(value, "f")
     return str(value)
@@ -158,6 +162,9 @@ class BaseClient:
             elif body_kind == "form":
                 request_kwargs["data"] = body
             elif body_kind == "multipart":
+                # The caller builds a multipart body by hand, so no serializer has seen its values.
+                for value in body.values():
+                    refuse_unknown(value)
                 request_kwargs["files"] = body
             else:
                 request_kwargs["content"] = body
