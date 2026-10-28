@@ -30,13 +30,13 @@
     "dependencies": {
         "@fastify/websocket": "^11.3.4",
         "@maroonedsoftware/appconfig": "^2.6.1",
-        "@maroonedsoftware/authentication": "^6.3.0",
+        "@maroonedsoftware/authentication": "^6.6.0",
         "@maroonedsoftware/errors": "^1.9.1",
-        "@maroonedsoftware/fastify": "^0.4.4",
+        "@maroonedsoftware/fastify": "^0.4.10",
         "@maroonedsoftware/logger": "^1.1.9",
-        "@maroonedsoftware/mcp": "^0.7.1",
+        "@maroonedsoftware/mcp": "^0.7.5",
         "@maroonedsoftware/policies": "^0.6.9",
-        "@maroonedsoftware/servercore": "^0.3.0",
+        "@maroonedsoftware/servercore": "^0.4.1",
         "@maroonedsoftware/serverfeed": "^0.1.6",
         "@maroonedsoftware/zod": "^0.8.0",
         "@modelcontextprotocol/sdk": "^1.32.1",
@@ -51,7 +51,7 @@
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "@types/luxon": "^3.7.6",
-        "openai": "^7.32.0",
-        "vitest": "^5.0.3"
+        "openai": "^7.39.0",
+        "vitest": "^5.0.5"
     }
 }

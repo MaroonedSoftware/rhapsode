@@ -436,14 +436,15 @@ operation /installs/{job}/events: {
         job: string
     }
     get: { # An install job's progress and output as server-sent events.
-        # Server-sent events, each frame's data a FeedEvent. Hand-written, like /speak: ContractKit
-        # cannot express a stream, so this declares the route and the shapes and nothing more.
+        # Server-sent events, each frame's data a FeedEvent. The route is still hand-written, but
+        # the SDK method streams. A streaming operation throws every other outcome, so 403 and 404
+        # are (documented): ContractKit 0.35 refuses the build otherwise.
         name: Install job events
         sdk: installJobEvents
         response: {
-            200: { text/event-stream: string }
-            403: { application/json: ErrorBody }
-            404: { application/json: ErrorBody }
+            200: { text/event-stream: FeedEvent }
+            403(documented): { application/json: ErrorBody }
+            404(documented): { application/json: ErrorBody }
         }
     }
 }

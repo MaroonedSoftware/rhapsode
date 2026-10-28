@@ -1,5 +1,5 @@
-import type { SdkFetch } from '../sdk-options.js';
-import { bigIntReplacer, parseJson, buildQueryString, readContentType } from '../sdk-options.js';
+import type { SdkFetch, SseEventStream, SseRequestOptions } from '../sdk-options.js';
+import { parseSse, sseRequestHeaders, bigIntReplacer, parseJson, buildQueryString, readContentType } from '../sdk-options.js';
 import type {
     Capabilities,
     CatalogEntry,
@@ -8,6 +8,7 @@ import type {
     EngineSpeakRequest,
     EngineSummary,
     ErrorBody,
+    FeedEvent,
     InstallJob,
     PullRequest,
     ReinstallOutdated,
@@ -17,6 +18,8 @@ import type {
     WarmRequest,
 } from '../rhapsode/types/rhapsode.types.js';
 import type { OpenApiDocument, Settings, SettingsPatch } from './types/rhapsode.public.js';
+
+export type InstallJobEventsErrorBody = ErrorBody;
 
 export class PublicClient {
     constructor(private fetch: SdkFetch) {}
@@ -546,26 +549,15 @@ export class PublicClient {
     /**
      * @name Install job events
      * @description An install job's progress and output as server-sent events.
+     * @throws {SdkError<InstallJobEventsErrorBody>} on 403, 404
      */
-    async installJobEvents(
-        job: string,
-    ): Promise<
-        | { status: 200; contentType: 'text/event-stream'; data: string }
-        | { status: 403; contentType: 'application/json'; data: ErrorBody }
-        | { status: 404; contentType: 'application/json'; data: ErrorBody }
-    > {
+    async installJobEvents(job: string, requestOptions?: SseRequestOptions): Promise<SseEventStream<FeedEvent>> {
         const result = await this.fetch(`/installs/${encodeURIComponent(job)}/events`, {
             method: 'GET',
-            expectStatuses: [403, 404],
+            headers: sseRequestHeaders(requestOptions),
+            signal: requestOptions?.signal,
         });
-        switch (result.status) {
-            case 403:
-                return { status: 403, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
-            case 404:
-                return { status: 404, contentType: 'application/json', data: await parseJson<ErrorBody>(result) };
-            default:
-                return { status: 200, contentType: 'text/event-stream', data: await result.text() };
-        }
+        return parseSse<FeedEvent>(result);
     }
 
     /**
