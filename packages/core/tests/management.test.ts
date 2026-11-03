@@ -235,6 +235,7 @@ describe('GET /catalog', () => {
             'kokoro',
             'orpheus',
             'phonon',
+            'phonon-40m',
             'styletts2',
             'tone',
         ]);

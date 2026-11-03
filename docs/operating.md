@@ -142,7 +142,8 @@ the model and 1.9 GB for its codec. Fish's inference code is in `~/.cache/rhapso
 wherever `RHAPSODE_FISH_SOURCE` points. StyleTTS 2's weights are in `~/.cache/huggingface`, 774 MB,
 and its code and the three checkpoints that come with it, 141 MB, are in
 `~/.cache/rhapsode/styletts2`, or wherever `RHAPSODE_STYLETTS2_SOURCE` points. Phonon's are in
-`~/.cache/huggingface`, 65 MB for the model and 10 MB for its voices.
+`~/.cache/huggingface`, 65 MB for the model and 10 MB for its voices, and so are Phonon 40M's, 75 MB
+for a build and up to 26 MB for its voices.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.
@@ -512,9 +513,18 @@ The wizard installs through the page's proxy, with no token on the host:
 pnpm wizard install kokoro --server http://127.0.0.1:8081/api
 ```
 
-`HF_TOKEN`, `CUDA_VISIBLE_DEVICES` and anything else an engine should see go in that engine's `env`
-block in `/config/rhapsode.config.json`, not in the container's environment, because a worker's
-environment is constructed rather than inherited.
+`CUDA_VISIBLE_DEVICES` and anything else an engine should see go in that engine's `env` block in
+`/config/rhapsode.config.json`, not in the container's environment, because a worker's environment is
+constructed rather than inherited. Naming an engine there makes it yours rather than the API's
+(`docs/protocol.md` § 10): an install of it is refused, and one already installed can no longer be
+reinstalled or removed through the API.
+
+So a Hugging Face token for an engine the API installs goes in the saved login rather than in `env`.
+A worker keeps `HOME`, and `~/.cache/huggingface` is on a volume, so it survives the container:
+
+```bash
+docker compose exec -it rhapsode sh -c 'read -rs t; umask 077; mkdir -p ~/.cache/huggingface; printf %s "$t" > ~/.cache/huggingface/token'
+```
 
 ### GPUs
 

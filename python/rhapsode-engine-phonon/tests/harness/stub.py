@@ -30,6 +30,17 @@ class Download:
     token: str | None
 
 
+class StubResponse:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+
+class StubHfHubHTTPError(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"HTTP {status_code}")
+        self.response = StubResponse(status_code)
+
+
 class StubStream:
     """The runtime's own context manager, with its growing chunks. `closed` is what a test reads."""
 
@@ -91,11 +102,17 @@ class StubTTS:
         return built
 
 
-def install(root: Path) -> tuple[list[StubTTS], list[Download], list[int]]:
-    """Put both stubs on the import path. Returns what was built, downloaded, and sized in threads."""
+def install(
+    root: Path, refuse: int | None = None
+) -> tuple[list[StubTTS], list[Download], list[int], list[str]]:
+    """Put both stubs on the import path. Returns what was built, downloaded, sized and normalised.
+
+    `refuse` is the status every download fails with, as a gated repository answers one.
+    """
     built: list[StubTTS] = []
     downloads: list[Download] = []
     threads: list[int] = []
+    languages: list[str] = []
 
     runtime = types.ModuleType("ptts")
 
@@ -106,7 +123,13 @@ def install(root: Path) -> tuple[list[StubTTS], list[Download], list[int]]:
         built.append(tts)
         return tts
 
+    def normalize(text: str, lang: str | None = None) -> str:
+        languages.append(str(lang))
+        # As the real one does: it removes what cannot be read.
+        return text if any(character.isalnum() for character in text) else ""
+
     runtime.TTS = construct  # type: ignore[attr-defined]
+    runtime.normalize = normalize  # type: ignore[attr-defined]
     runtime.set_num_threads = threads.append  # type: ignore[attr-defined]
 
     hub = types.ModuleType("huggingface_hub")
@@ -118,10 +141,16 @@ def install(root: Path) -> tuple[list[StubTTS], list[Download], list[int]]:
         token: str | None = None,
     ) -> str:
         downloads.append(Download(repo_id, revision, list(allow_patterns or []), token))
+        if refuse is not None:
+            raise StubHfHubHTTPError(refuse)
         return str(root / repo_id)
 
     hub.snapshot_download = snapshot_download  # type: ignore[attr-defined]
 
     sys.modules["ptts"] = runtime
+    utils = types.ModuleType("huggingface_hub.utils")
+    utils.HfHubHTTPError = StubHfHubHTTPError  # type: ignore[attr-defined]
+
     sys.modules["huggingface_hub"] = hub
-    return built, downloads, threads
+    sys.modules["huggingface_hub.utils"] = utils
+    return built, downloads, threads, languages

@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
             items: [
                 'engines/kokoro',
                 'engines/phonon',
+                'engines/phonon-40m',
                 'engines/chatterbox',
                 'engines/orpheus',
                 'engines/dia',

@@ -59,7 +59,7 @@ class TestResidency:
     def test_load_pins_the_cpu_and_the_format(self, engine: PhononEngine, stubs: Stubs) -> None:
         engine.load("31m")
         model = stubs.built[0]
-        assert (model.device, model.quant, model.lang) == ("cpu", "q8", "en")
+        assert (model.device, model.quant, model.lang) == ("cpu", "q8", "none")
         assert model.model.endswith("phonon-31m-en")
 
     def test_load_registers_every_voice_under_its_own_id(self, engine: PhononEngine, stubs: Stubs) -> None:
@@ -103,6 +103,14 @@ class TestSpeaking:
         assert call.temperature == 0.7
         assert call.seed == 7
         assert call.conditions == {"duration_delta": -0.3}
+
+    def test_the_adapter_normalises_in_the_requests_language(
+        self, engine: PhononEngine, stubs: Stubs
+    ) -> None:
+        engine.load("31m")
+        spoken(engine, text="It costs $5.")
+        assert stubs.languages == ["en"]
+        assert stubs.built[0].calls[0].text == "It costs $5."
 
     def test_a_dial_does_not_outlive_its_request(self, engine: PhononEngine, stubs: Stubs) -> None:
         # Conditions are state on the model, and the next caller did not ask for the last one's pace.
@@ -149,3 +157,60 @@ class TestPcm:
     def test_an_overshoot_is_clipped_rather_than_wrapped(self) -> None:
         pcm = b"".join(chunked_pcm(np.array([1.5, -1.5], dtype=np.float32)))
         assert list(np.frombuffer(pcm, dtype="<i2")) == [32767, -32767]
+
+
+class TestTheFortyEngine:
+    def test_it_is_another_engine_with_another_licence(self, forty: PhononEngine) -> None:
+        assert forty.id == "phonon-40m"
+        assert forty.license["weights"] == "CC-BY-NC-4.0"
+        assert forty.license["weights_commercial_use"] is False
+        # The class it inherits from is not touched: a commercial user of 31M reads Apache-2.0.
+        assert PhononEngine.license["weights_commercial_use"] is True
+
+    def test_the_variants_are_named_for_what_they_speak(self, forty: PhononEngine) -> None:
+        assert sorted(forty.variants()) == ["de", "en", "es", "fr", "multilingual", "pt"]
+        assert forty.variants()["de"].languages == ("de",)
+        assert forty.variants()["multilingual"].languages == ("en", "fr", "de", "es", "pt")
+        assert forty.default_variant == "multilingual"
+
+    def test_it_cannot_load_the_open_build_or_the_reverse(
+        self, engine: PhononEngine, forty: PhononEngine, stubs: Stubs
+    ) -> None:
+        with pytest.raises(Unsupported, match="no build"):
+            forty.load("31m")
+        with pytest.raises(Unsupported, match="no build"):
+            engine.load("de")
+
+    def test_a_single_language_build_lists_only_its_own_voices(self, forty: PhononEngine) -> None:
+        forty.variant = "de"
+        ids = {voice.id for voice in forty.voices()}
+        assert "Nele" in ids
+        assert "Zoey" not in ids
+        assert len(ids) == 14
+
+    def test_german_is_normalised_as_german(self, forty: PhononEngine, stubs: Stubs) -> None:
+        forty.load("de")
+        forty.variant = "de"
+        spoken(forty, text="Es kostet 5 Euro.", voice="Nele", language="de", variant="de")
+        assert stubs.languages == ["de"]
+        assert stubs.built[0].calls[0].voice == "Nele"
+
+    def test_one_model_speaks_each_language_it_is_asked_for(self, forty: PhononEngine, stubs: Stubs) -> None:
+        forty.load("multilingual")
+        forty.variant = "multilingual"
+        for language in ("en", "de", "pt"):
+            spoken(forty, language=language)
+        assert stubs.languages == ["en", "de", "pt"]
+        assert len(stubs.built) == 1
+
+    def test_a_multilingual_voice_may_read_another_language(self, forty: PhononEngine, stubs: Stubs) -> None:
+        forty.load("multilingual")
+        forty.variant = "multilingual"
+        spoken(forty, voice="Nele", language="en")
+        assert stubs.built[0].calls[0].voice == "Nele"
+
+    def test_an_accented_name_is_a_voice_it_can_be_asked_for(self, forty: PhononEngine, stubs: Stubs) -> None:
+        forty.load("es")
+        forty.variant = "es"
+        spoken(forty, voice="Lucia-Sol", language="es", variant="es")
+        assert stubs.built[0].added["Lucia-Sol"].endswith(".safetensors")

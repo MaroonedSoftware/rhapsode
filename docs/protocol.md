@@ -460,6 +460,14 @@ The catalog entry for an engine carries the same two fields, so the licence is v
 install, not after, and an install of weights that may not be used commercially has to name the
 licence it accepts (§ 10).
 
+**A licence belongs to an engine, so builds under different licences are different engines.** Gradium's
+Phonon 31M is Apache-2.0 and its 40M builds are CC BY-NC 4.0. As variants of one engine there were two
+answers and both were wrong: report the most restrictive and a commercial user is told the Apache
+build is non-commercial, or report the other and an install of the 40M builds accepts nothing. So they
+are `phonon` and `phonon-40m`, two catalog records over one adapter package. A licence per variant
+would have had to change what an install accepts, since an install names no variant unless it pulls
+one, for the sake of the one upstream that needs it.
+
 ---
 
 ## 5. The standard vocabulary

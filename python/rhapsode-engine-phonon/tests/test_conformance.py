@@ -22,10 +22,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 
 
-@pytest.fixture
-def stubbed(tmp_path: Path) -> Iterator[str]:
+@pytest.fixture(params=["31m", "40m"])
+def stubbed(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[str]:
     process = subprocess.Popen(
-        [sys.executable, "-m", "harness.stubbed"],
+        [sys.executable, "-m", "harness.stubbed", *(["40m"] if request.param == "40m" else [])],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -35,7 +35,7 @@ def stubbed(tmp_path: Path) -> Iterator[str]:
             "PYTHONPATH": os.pathsep.join(filter(None, [str(HERE), os.environ.get("PYTHONPATH", "")])),
             "RHAPSODE_VOICE_DIR": str(tmp_path / "voices"),
             "RHAPSODE_WORKER_LISTEN": "tcp:127.0.0.1:0",
-            "RHAPSODE_WORKER_ENGINE": "phonon",
+            "RHAPSODE_WORKER_ENGINE": "phonon-40m" if request.param == "40m" else "phonon",
             "RHAPSODE_WORKER_CONTRACT": "1",
         },
     )

@@ -145,6 +145,23 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'https://huggingface.co/gradium/phonon-31m-en, run through ptts. The weights, tokenizer and voices are Apache-2.0. Upstream asks that it not be used to impersonate a real person or deceive listeners about who is speaking. English only. On Linux and Windows x86_64 the runtime needs a CPU with AVX2.',
         },
     },
+    'phonon-40m': {
+        displayName: 'Phonon 40M',
+        // A module of the same package: one adapter, and the licence is all that needs a second record.
+        module: 'rhapsode_engine_phonon.forty',
+        package: 'rhapsode-engine-phonon',
+        // multilingual, so one download speaks all five. A build for one language reads it better, and
+        // a client that wants that names it.
+        defaultVariant: 'multilingual',
+        license: {
+            code: 'MIT OR Apache-2.0',
+            weights: 'CC-BY-NC-4.0',
+            weightsCommercialUse: false,
+            // Both decide an install. The gate is the part a licence field cannot say: without an
+            // accepted-terms login the install succeeds and its pull is what fails.
+            notes: 'https://huggingface.co/gradium/phonon-40m-multilingual, run through ptts. Non-commercial use only. Gated: accept the terms on each build\'s Hugging Face page and log in on this machine with `hf auth login`. English, French, German, Spanish and Portuguese. Upstream asks that it not be used to impersonate a real person or deceive listeners about who is speaking. On Linux and Windows x86_64 the runtime needs a CPU with AVX2.',
+        },
+    },
     orpheus: {
         displayName: 'Orpheus',
         module: 'rhapsode_engine_orpheus',

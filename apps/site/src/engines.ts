@@ -42,6 +42,16 @@ export const ENGINES: Engine[] = [
         license: { code: 'MIT OR Apache-2.0', weights: 'Apache-2.0' },
     },
     {
+        id: 'phonon-40m',
+        name: 'Phonon 40M',
+        summary: 'The same runtime in five languages, for non-commercial use, from weights gated behind a Hugging Face login.',
+        runsOn: 'CPU',
+        weights: 'multilingual, 100 MB',
+        cues: 0,
+        voices: 'Its own 103',
+        license: { code: 'MIT OR Apache-2.0', weights: 'CC-BY-NC-4.0' },
+    },
+    {
         id: 'chatterbox',
         name: 'Chatterbox',
         summary: 'Clones a voice from a short clip, and performs cues or honours dials depending on the build.',

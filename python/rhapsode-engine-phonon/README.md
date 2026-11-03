@@ -47,7 +47,8 @@ Apache-2.0, so all of it is commercially usable. Upstream asks that it not be us
 person, to deceive listeners about who is speaking, or to clone a voice without consent.
 
 Gradium's 40M builds, which add French, German, Spanish and Portuguese, are CC BY-NC 4.0 and gated. They
-are not in this engine, because a licence here belongs to an engine rather than to a variant.
+are [`phonon-40m`](README.40m.md), a separate engine from this same package, because a licence here
+belongs to an engine rather than to a variant.
 
 ## What it costs
 

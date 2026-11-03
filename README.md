@@ -196,6 +196,9 @@ Mac it speaks about twice as fast.
 [`rhapsode-engine-phonon`](python/rhapsode-engine-phonon/) is Gradium's Phonon 31M, the other engine
 that needs no GPU and no torch: `pnpm wizard install phonon`, 75 MB, and it streams at more than 50
 times realtime on the CPU in 38 voices. English only, with no cues, no cloning and Apache-2.0 weights.
+[`phonon-40m`](python/rhapsode-engine-phonon/README.40m.md) adds French, German, Spanish and
+Portuguese, under a non-commercial licence its install has to accept, from weights gated behind a
+Hugging Face login.
 
 [`rhapsode-engine-orpheus`](python/rhapsode-engine-orpheus/) is the second engine that performs
 cues, seven of the eight, and the first that streams audio while the model is still generating.

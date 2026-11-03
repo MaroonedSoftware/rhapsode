@@ -80,7 +80,9 @@ class PhononEngine(Engine):
     }
 
     native_format = NativeFormat(encoding="pcm_s16le", sample_rate=SAMPLE_RATE, channels=1)
-    default_variant = builds.DEFAULT_BUILD
+    default_variant = "31m"
+    #: Which builds this engine is. The other engine differs in this and in its licence.
+    BUILDS: ClassVar[dict[str, builds.Build]] = builds.OPEN_BUILDS
     concurrency = 1
     # Ollama refuses past 4,096 for this model, and that much is about four and a half minutes of audio
     # which arrives in under five seconds. The first chunk leaves in about 10 ms however long the text
@@ -95,7 +97,7 @@ class PhononEngine(Engine):
     def variants(self) -> dict[str, Variant]:
         return {
             name: Variant(cues=(), deliveries=(), dials=DIALS, languages=build.languages)
-            for name, build in builds.BUILDS.items()
+            for name, build in self.BUILDS.items()
         }
 
     # ------------------------------------------------------------------ residency
@@ -104,13 +106,15 @@ class PhononEngine(Engine):
         """Bring one build into memory, downloading it first if it has never been fetched."""
         import ptts
 
-        checkpoint, voices = builds.ensure(variant)
+        checkpoint, voices = builds.ensure(self._build(variant))
         _set_threads(ptts)
         # The CPU rather than `auto`, which would pick Metal on a Mac. Ollama's published comparison has
         # this runtime at 84x realtime on the CPU and 38x on Metal on an M5 Max.
-        model = ptts.TTS(
-            str(checkpoint), device="cpu", quant=QUANT, lang=builds.build_of(variant).languages[0]
-        )
+        #
+        # `lang` is fixed here and says only how text is normalised, and § 6 picks a language per
+        # request, so the runtime is told not to and `speak` does it. Normalising first and passing
+        # lang="none" gave the same audio as lang="en", to within 5e-7 in a sample.
+        model = ptts.TTS(str(checkpoint), device="cpu", quant=QUANT, lang="none")
         # 0.26 ms each, so all of them now, and the runtime never has to reach for its catalog: that
         # would be a network request in the middle of somebody's speech.
         for voice, path in voices.items():
@@ -118,7 +122,7 @@ class PhononEngine(Engine):
         self._model = model
 
     def fetch(self, variant: str) -> None:
-        builds.ensure(variant)
+        builds.ensure(self._build(variant))
 
     def unload(self) -> None:
         self._model = None
@@ -126,15 +130,16 @@ class PhononEngine(Engine):
     # ------------------------------------------------------------------ voices
 
     def voices(self) -> list[Voice]:
-        variant = self.variant or self.default_variant or builds.DEFAULT_BUILD
+        variant = self.effective_variant(None)
+        build = self._build(variant)
         own = Voice(
             id=DEFAULT_VOICE,
             label="Default",
             description="The checkpoint's own voice",
-            spec=f"{DEFAULT_VOICE}@{builds.build_of(variant).revision[:8]}-{variant}",
-            tags=tuple(builds.build_of(variant).languages),
+            spec=f"{DEFAULT_VOICE}@{build.revision[:8]}-{variant}",
+            tags=build.languages,
         )
-        return [own, *(_voice(voice, variant) for voice in builds.voices_for(variant))]
+        return [own, *(_voice(voice, build) for voice in builds.voices_for(build))]
 
     # ------------------------------------------------------------------ speaking
 
@@ -147,19 +152,25 @@ class PhononEngine(Engine):
         can, and the conformance suite skips rather than fails it.
         """
         name = request.voice or DEFAULT_VOICE
-        variant = self.effective_variant(request.variant)
+        build = self._build(self.effective_variant(request.variant))
         # Checked here rather than left to the runtime, which on a name it has not got goes looking in
-        # its online catalog. A request should not be able to start a download.
-        if name != DEFAULT_VOICE and name not in {voice.id for voice in builds.voices_for(variant)}:
+        # its online catalog. A request should not be able to start a download. On a multilingual build
+        # a voice may read any of the languages: upstream advises matching them, and does not require it.
+        if name != DEFAULT_VOICE and name not in {voice.id for voice in builds.voices_for(build)}:
             raise UnknownVoice(f'no voice "{name}"')
         if self._model is None:
             raise Unsupported("no model is loaded")
+
+        import ptts
 
         dials = self.dials_for(request)
         self._model.set_conditions({"duration_delta": dials["durationDelta"]})
         try:
             with self._model.stream(
-                request.text, voice=name, temperature=dials["temperature"], seed=request.seed
+                ptts.normalize(request.text, lang=request.language),
+                voice=name,
+                temperature=dials["temperature"],
+                seed=request.seed,
             ) as audio:
                 for chunk in audio:
                     yield from chunked_pcm(chunk)
@@ -167,6 +178,12 @@ class PhononEngine(Engine):
             # Text the normaliser leaves nothing of: "🙂" alone is "nothing to synthesize". The
             # request's fault, and the SDK makes this a 400 as long as no audio has left.
             raise BadRequest(str(error)) from error
+
+    def _build(self, variant: str) -> builds.Build:
+        build = self.BUILDS.get(variant)
+        if build is None:
+            raise Unsupported(f'no build "{variant}"; this engine has {sorted(self.BUILDS)}')
+        return build
 
 
 def _set_threads(runtime: Any) -> None:
@@ -177,7 +194,7 @@ def _set_threads(runtime: Any) -> None:
         _threads_set = True
 
 
-def _voice(voice: builds.CatalogVoice, variant: str) -> Voice:
+def _voice(voice: builds.CatalogVoice, build: builds.Build) -> Voice:
     tags = (voice.language, voice.locale, *((voice.gender,) if voice.gender else ()))
     return Voice(
         id=voice.id,
@@ -185,7 +202,7 @@ def _voice(voice: builds.CatalogVoice, variant: str) -> Voice:
         description=voice.description,
         # The rendering changes with the voice file and the weights, and with nothing else this
         # adapter controls.
-        spec=f"{voice.id}@{builds.VOICES_REVISION[:8]}-{builds.build_of(variant).revision[:8]}",
+        spec=f"{voice.id}@{builds.VOICES_REVISION[:8]}-{build.revision[:8]}",
         tags=tags,
     )
 

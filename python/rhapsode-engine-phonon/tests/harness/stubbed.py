@@ -6,6 +6,7 @@ taxonomy, residency verbs. Only the runtime and the download are stubbed.
 
 from __future__ import annotations
 
+import sys
 import tempfile
 from pathlib import Path
 
@@ -17,5 +18,6 @@ if __name__ == "__main__":
     from rhapsode_worker import serve
 
     from rhapsode_engine_phonon.engine import PhononEngine
+    from rhapsode_engine_phonon.forty import Phonon40mEngine
 
-    serve(PhononEngine())
+    serve(Phonon40mEngine() if sys.argv[1:] == ["40m"] else PhononEngine())
