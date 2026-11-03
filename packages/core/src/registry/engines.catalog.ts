@@ -159,7 +159,7 @@ export const CATALOG: Record<string, CatalogRecord> = {
             weightsCommercialUse: false,
             // Both decide an install. The gate is the part a licence field cannot say: without an
             // accepted-terms login the install succeeds and its pull is what fails.
-            notes: 'https://huggingface.co/gradium/phonon-40m-multilingual, run through ptts. Non-commercial use only. Gated: accept the terms on each build\'s Hugging Face page and log in on this machine with `hf auth login`. English, French, German, Spanish and Portuguese. Upstream asks that it not be used to impersonate a real person or deceive listeners about who is speaking. On Linux and Windows x86_64 the runtime needs a CPU with AVX2.',
+            notes: "https://huggingface.co/gradium/phonon-40m-multilingual, run through ptts. Non-commercial use only. Gated: accept the terms on each build's Hugging Face page and log in on this machine with `hf auth login`. English, French, German, Spanish and Portuguese. Upstream asks that it not be used to impersonate a real person or deceive listeners about who is speaking. On Linux and Windows x86_64 the runtime needs a CPU with AVX2.",
         },
     },
     orpheus: {
