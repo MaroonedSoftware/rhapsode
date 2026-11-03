@@ -28,6 +28,7 @@ export const TARGETS: Target[] = [
     { id: 'fish', label: 'Fish Audio S2 Pro', tags: { 'clear throat': '[clears throat]', laugh: '[laughing]' } },
     { id: 'chatterbox-original', label: 'Chatterbox original', tags: {} },
     { id: 'kokoro', label: 'Kokoro', tags: {} },
+    { id: 'phonon', label: 'Phonon', tags: {} },
 ];
 
 /** One piece of what the model is handed: words, or an engine's tag for a cue. */
