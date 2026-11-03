@@ -262,6 +262,31 @@ eSpeak NG, which it phonemizes with, exits the process when its data is at a pat
 or more, as it does for Kokoro, so a virtualenv under a long home directory fails to load with a
 message saying so. Set `install.venvDir` somewhere shorter.
 
+### Phonon
+
+Phonon needs no GPU and no torch. There are two engines over one adapter, because their licences
+differ and a licence belongs to an engine (`docs/protocol.md` § 4):
+
+- **`phonon`** is the 31M English build: Apache-2.0, ungated, 75 MB.
+- **`phonon-40m`** is the 40M builds in English, French, German, Spanish and Portuguese. **Its weights
+  are CC BY-NC 4.0, for non-commercial use only**, so an install has to accept that by name:
+  `?accept=CC-BY-NC-4.0`.
+
+The 40M weights are gated too, and per repository: accepting the terms of `phonon-40m-de` unlocks nothing
+else, so accept each build you want on its Hugging Face page. Then log in as [the section on installing
+from the page](#installing-from-the-page) describes, with the saved login rather than `env`. Without it
+the install succeeds, and its pull fails with a message naming the page to visit.
+
+Measured on an M5 Pro's CPU, November 2026: 75x realtime for 31M, 60x for 40M `de` and `multilingual`,
+with the first audio out in under 20 ms, including for a 4,096-character request. Each loads in about 0.1 s
+and peaks around 400 to 450 MB. It stays on the CPU because [Ollama's figures](https://ollama.com/blog/speech-models) put the runtime's
+Metal build at under half the speed, and uses 4 threads because the runtime's default of every core was the slowest setting measured. On Linux and
+Windows x86_64 the wheels need a CPU with AVX2, and an older one dies with SIGILL rather than an error.
+
+`language` decides only how numbers and symbols are spelled out: the model has no language input and
+reads the words it is given. A request that names no variant stays on the build already loaded, so a
+client using more than one build names its variant every time.
+
 ## The web page
 
 `apps/web` is a page for the same routes: the catalog with both licences, and install, pull and
@@ -523,7 +548,7 @@ So a Hugging Face token for an engine the API installs goes in the saved login r
 A worker keeps `HOME`, and `~/.cache/huggingface` is on a volume, so it survives the container:
 
 ```bash
-docker compose exec -it rhapsode sh -c 'read -rs t; umask 077; mkdir -p ~/.cache/huggingface; printf %s "$t" > ~/.cache/huggingface/token'
+docker compose exec server sh -c 'stty -echo; read -r t; stty echo; umask 077; mkdir -p ~/.cache/huggingface; printf %s "$t" > ~/.cache/huggingface/token'
 ```
 
 ### GPUs
