@@ -45,6 +45,7 @@ const PYTHON = [
     'python/conformance',
     'python/rhapsode-engine-chatterbox',
     'python/rhapsode-engine-kokoro',
+    'python/rhapsode-engine-phonon',
     'python/rhapsode-engine-orpheus',
     'python/rhapsode-engine-dia',
     'python/rhapsode-engine-breeze',

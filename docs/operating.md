@@ -141,7 +141,8 @@ so are Breeze's, 7.0 GB for the model and 0.7 GB for its audio tokenizer, and Fi
 the model and 1.9 GB for its codec. Fish's inference code is in `~/.cache/rhapsode/fish-speech`, or
 wherever `RHAPSODE_FISH_SOURCE` points. StyleTTS 2's weights are in `~/.cache/huggingface`, 774 MB,
 and its code and the three checkpoints that come with it, 141 MB, are in
-`~/.cache/rhapsode/styletts2`, or wherever `RHAPSODE_STYLETTS2_SOURCE` points.
+`~/.cache/rhapsode/styletts2`, or wherever `RHAPSODE_STYLETTS2_SOURCE` points. Phonon's are in
+`~/.cache/huggingface`, 65 MB for the model and 10 MB for its voices.
 
 Kokoro needs Python 3.11 to 3.13. The installer asks uv for one when uv is on the path; without uv it
 checks `install.python` first and stops, saying so, when that interpreter is outside the range.

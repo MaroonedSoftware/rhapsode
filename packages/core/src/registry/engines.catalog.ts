@@ -129,6 +129,22 @@ export const CATALOG: Record<string, CatalogRecord> = {
             notes: 'GPL through phonemizer and eSpeak NG, which kokoro-onnx (MIT) phonemizes with. Weights: hexgrad/Kokoro-82M, Apache-2.0.',
         },
     },
+    phonon: {
+        displayName: 'Phonon',
+        module: 'rhapsode_engine_phonon',
+        package: 'rhapsode-engine-phonon',
+        // The one Apache-2.0 build, named for its size. Gradium's 40M builds are CC BY-NC and gated, and
+        // the licence here is per engine, so they cannot sit beside it as variants of this record.
+        defaultVariant: '31m',
+        license: {
+            code: 'MIT OR Apache-2.0',
+            weights: 'Apache-2.0',
+            weightsCommercialUse: true,
+            // The AVX2 floor decides an install on an old x86 box: the wheel dies with SIGILL rather
+            // than an error. Upstream's request is on its card, in a section it does not call a licence.
+            notes: 'https://huggingface.co/gradium/phonon-31m-en, run through ptts. The weights, tokenizer and voices are Apache-2.0. Upstream asks that it not be used to impersonate a real person or deceive listeners about who is speaking. English only. On Linux and Windows x86_64 the runtime needs a CPU with AVX2.',
+        },
+    },
     orpheus: {
         displayName: 'Orpheus',
         module: 'rhapsode_engine_orpheus',

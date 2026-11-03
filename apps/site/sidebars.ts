@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
             collapsed: false,
             items: [
                 'engines/kokoro',
+                'engines/phonon',
                 'engines/chatterbox',
                 'engines/orpheus',
                 'engines/dia',

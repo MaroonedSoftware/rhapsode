@@ -32,6 +32,16 @@ export const ENGINES: Engine[] = [
         license: { code: 'GPL-3.0-or-later', weights: 'Apache-2.0' },
     },
     {
+        id: 'phonon',
+        name: 'Phonon',
+        summary: 'A 65 MB model that streams many times faster than realtime on a CPU.',
+        runsOn: 'CPU',
+        weights: '31m, 75 MB',
+        cues: 0,
+        voices: 'Its own 38',
+        license: { code: 'MIT OR Apache-2.0', weights: 'Apache-2.0' },
+    },
+    {
         id: 'chatterbox',
         name: 'Chatterbox',
         summary: 'Clones a voice from a short clip, and performs cues or honours dials depending on the build.',

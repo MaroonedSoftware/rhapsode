@@ -1120,6 +1120,9 @@ what running them in-process would actually have cost:
   engine its own virtualenv with `uv`. The gain that remains is a first engine that needs no GPU and
   a download measured in megabytes, and a CPU worker delivers that.
 
+Phonon is the same case with a different runtime. `ptts` is a Rust library behind Python bindings,
+needs neither torch nor onnxruntime, and is a worker for the same reasons, on the same CPU footing.
+
 What this asks of the SDK is only what it already promises: it must never depend on torch, or an
 ONNX adapter could not install it. `device` is `cpu` for such an engine and means it; nothing in
 this document treats CPU as a degraded case.

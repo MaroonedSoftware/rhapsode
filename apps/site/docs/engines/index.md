@@ -14,6 +14,8 @@ crash takes down that engine's worker rather than the server.
 - **Start with [Kokoro](kokoro.md).** It runs on the CPU with no torch, its weights are about 200
   MB, and it speaks faster than realtime on a laptop. It performs no cues, and makes new voices by
   blending its own rather than by cloning.
+- **For the fastest speech on a CPU, [Phonon](phonon.md).** It streams at more than 50 times realtime
+  from a 75 MB download, with no torch, in 38 voices. It is English only here, and performs no cues.
 - **With a GPU, [Chatterbox](chatterbox.md).** It clones a voice from a few seconds of audio. Its
   `turbo` and `nano` builds perform all eight cues; its `original` and `multilingual` builds take
   dials instead. Which you get depends on the build that is loaded, and the capability document says
