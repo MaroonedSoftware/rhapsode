@@ -2,6 +2,11 @@
 
 Every package releases at one version. protocol.md § 9.
 
+## 0.1.29
+
+- A new engine, `phonon`: Gradium's Phonon 31M through its `ptts` runtime, on the CPU with no torch. A 75 MB download, Apache-2.0 weights, 38 English voices, and speech that streams at more than 50 times realtime. `pnpm wizard install phonon`. It performs no cues and does not clone, and a seed does not reproduce its audio exactly.
+- A new engine, `phonon-40m`: Gradium's Phonon 40M in English, French, German, Spanish and Portuguese, on the CPU with no torch. Its weights are CC BY-NC 4.0, so an install has to accept that licence, and they are gated, so it needs a Hugging Face login with the terms accepted. `phonon-40m:de` as the OpenAI shim's `model` speaks German.
+
 ## 0.1.28
 
 - The client SDK's `installJobEvents` now streams. It returns an async iterable of `FeedEvent`s, with `lastEventId` for resuming and an optional `signal`, where it used to read the whole body and never return for a job still running. A 403 or 404 is now a thrown `SdkError` rather than a returned status.
