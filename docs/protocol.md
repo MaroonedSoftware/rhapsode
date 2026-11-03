@@ -460,6 +460,14 @@ The catalog entry for an engine carries the same two fields, so the licence is v
 install, not after, and an install of weights that may not be used commercially has to name the
 licence it accepts (§ 10).
 
+**A licence belongs to an engine, so builds under different licences are different engines.** Gradium's
+Phonon 31M is Apache-2.0 and its 40M builds are CC BY-NC 4.0. As variants of one engine there were two
+answers and both were wrong: report the most restrictive and a commercial user is told the Apache
+build is non-commercial, or report the other and an install of the 40M builds accepts nothing. So they
+are `phonon` and `phonon-40m`, two catalog records over one adapter package. A licence per variant
+would have had to change what an install accepts, since an install names no variant unless it pulls
+one, for the sake of the one upstream that needs it.
+
 ---
 
 ## 5. The standard vocabulary
@@ -1119,6 +1127,9 @@ what running them in-process would actually have cost:
 - **The benefit was a first run with no Python**, and the installer (§ 10) already builds each
   engine its own virtualenv with `uv`. The gain that remains is a first engine that needs no GPU and
   a download measured in megabytes, and a CPU worker delivers that.
+
+Phonon is the same case with a different runtime. `ptts` is a Rust library behind Python bindings,
+needs neither torch nor onnxruntime, and is a worker for the same reasons, on the same CPU footing.
 
 What this asks of the SDK is only what it already promises: it must never depend on torch, or an
 ONNX adapter could not install it. `device` is `cpu` for such an engine and means it; nothing in

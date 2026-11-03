@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rhapsode-engine-phonon"
+version = "0.1.28"
+description = "Phonon for rhapsode: streaming speech on the CPU, with no torch and a 65 MB model."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rhapsode-worker==0.1.28",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "numpy>=1.26",
+    # Gradium's Rust runtime. 0.6 is what this adapter was measured on, and its wheels are cp39-abi3,
+    # so no Python range is needed in the catalog: a new CPython needs no new wheel.
+    "ptts>=0.6,<0.7",
+    # Rather than ptts's own resolver, because the files then land in the Hugging Face cache every
+    # other engine uses, and a voice is on disk before the first request asks for it.
+    "huggingface_hub>=0.23",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rhapsode_engine_phonon"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["ptts", "ptts.*", "huggingface_hub", "huggingface_hub.*", "numpy.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The conformance test spawns a real worker running this adapter, so tests/ has to be importable for
+# the harness that puts a stub where the model would be.
+pythonpath = ["tests"]
+timeout = 60

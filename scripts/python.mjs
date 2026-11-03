@@ -27,6 +27,7 @@ const PACKAGES = ['rhapsode-worker', 'rhapsode-engine-tone', 'conformance'];
 const ADAPTERS = [
     'rhapsode-engine-chatterbox',
     'rhapsode-engine-kokoro',
+    'rhapsode-engine-phonon',
     'rhapsode-engine-orpheus',
     'rhapsode-engine-dia',
     'rhapsode-engine-breeze',

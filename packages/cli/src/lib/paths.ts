@@ -16,6 +16,7 @@ export const DEV_MODULES = [
     'rhapsode_conform',
     'rhapsode_engine_chatterbox',
     'rhapsode_engine_kokoro',
+    'rhapsode_engine_phonon',
     'rhapsode_engine_orpheus',
     'rhapsode_engine_dia',
     'rhapsode_engine_breeze',
