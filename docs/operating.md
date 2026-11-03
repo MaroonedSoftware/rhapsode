@@ -279,8 +279,8 @@ the install succeeds, and its pull fails with a message naming the page to visit
 
 Measured on an M5 Pro's CPU, November 2026: 75x realtime for 31M, 60x for 40M `de` and `multilingual`,
 with the first audio out in under 20 ms, including for a 4,096-character request. Each loads in about 0.1 s
-and peaks around 400 to 450 MB. It stays on the CPU because the runtime's Metal build is slower, and uses
-4 threads because the runtime's default of every core was the slowest setting measured. On Linux and
+and peaks around 400 to 450 MB. It stays on the CPU because [Ollama's figures](https://ollama.com/blog/speech-models) put the runtime's
+Metal build at under half the speed, and uses 4 threads because the runtime's default of every core was the slowest setting measured. On Linux and
 Windows x86_64 the wheels need a CPU with AVX2, and an older one dies with SIGILL rather than an error.
 
 `language` decides only how numbers and symbols are spelled out: the model has no language input and
