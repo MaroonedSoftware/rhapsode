@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rhapsode-engine-phonon"
-version = "0.1.28"
+version = "0.1.29"
 description = "Phonon for rhapsode: streaming speech on the CPU, with no torch and a 65 MB model."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "rhapsode-worker==0.1.28",  # Its own version, exactly, and bumped with it. protocol.md § 9.
+    "rhapsode-worker==0.1.29",  # Its own version, exactly, and bumped with it. protocol.md § 9.
     "numpy>=1.26",
     # Gradium's Rust runtime. 0.6 is what this adapter was measured on, and its wheels are cp39-abi3,
     # so no Python range is needed in the catalog: a new CPython needs no new wheel.
