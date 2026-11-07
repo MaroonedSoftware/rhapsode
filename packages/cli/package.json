@@ -13,11 +13,11 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@maroonedsoftware/johnny5": "^8.1.9",
+        "@maroonedsoftware/johnny5": "^8.1.10",
         "@rhapsode/contract": "workspace:*",
         "@rhapsode/core": "workspace:*",
         "@swc-node/register": "^1.12.1",
-        "@swc/core": "^1.16.20",
+        "@swc/core": "^1.16.21",
         "luxon": "^3.7.2"
     },
     "devDependencies": {
