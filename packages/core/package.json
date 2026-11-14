@@ -28,30 +28,30 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@fastify/websocket": "^11.3.4",
-        "@maroonedsoftware/appconfig": "^2.6.1",
-        "@maroonedsoftware/authentication": "^6.7.0",
-        "@maroonedsoftware/errors": "^1.9.1",
-        "@maroonedsoftware/fastify": "^0.4.11",
-        "@maroonedsoftware/logger": "^1.1.9",
-        "@maroonedsoftware/mcp": "^0.7.6",
-        "@maroonedsoftware/policies": "^0.6.9",
-        "@maroonedsoftware/servercore": "^0.4.1",
-        "@maroonedsoftware/serverfeed": "^0.1.6",
-        "@maroonedsoftware/zod": "^0.8.0",
+        "@fastify/websocket": "^11.3.7",
+        "@maroonedsoftware/appconfig": "^2.7.1",
+        "@maroonedsoftware/authentication": "^6.8.1",
+        "@maroonedsoftware/errors": "^1.9.2",
+        "@maroonedsoftware/fastify": "^0.4.14",
+        "@maroonedsoftware/logger": "^1.1.10",
+        "@maroonedsoftware/mcp": "^0.8.1",
+        "@maroonedsoftware/policies": "^0.6.10",
+        "@maroonedsoftware/servercore": "^0.5.1",
+        "@maroonedsoftware/serverfeed": "^0.1.7",
+        "@maroonedsoftware/zod": "^0.8.1",
         "@modelcontextprotocol/sdk": "^1.32.2",
         "@rhapsode/contract": "workspace:*",
-        "fastify": "^5.12.7",
+        "fastify": "^5.12.8",
         "injectkit": "^1.7.1",
         "luxon": "^3.7.2",
-        "undici": "^8.12.3",
+        "undici": "^8.12.4",
         "zod": "^4.6.7"
     },
     "devDependencies": {
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "@types/luxon": "^3.7.6",
-        "openai": "^7.43.0",
-        "vitest": "^5.0.5"
+        "openai": "^7.53.0",
+        "vitest": "^5.1.0"
     }
 }
