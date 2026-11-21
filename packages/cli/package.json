@@ -13,17 +13,17 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@maroonedsoftware/johnny5": "^8.1.9",
+        "@maroonedsoftware/johnny5": "^8.1.12",
         "@rhapsode/contract": "workspace:*",
         "@rhapsode/core": "workspace:*",
         "@swc-node/register": "^1.12.1",
-        "@swc/core": "^1.16.20",
+        "@swc/core": "^1.16.22",
         "luxon": "^3.7.2"
     },
     "devDependencies": {
         "@repo/config-eslint": "workspace:*",
         "@repo/config-typescript": "workspace:*",
         "@types/luxon": "^3.7.6",
-        "vitest": "^5.0.5"
+        "vitest": "^5.1.0"
     }
 }
